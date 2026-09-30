@@ -16,6 +16,7 @@ import com.nivara.app.domain.security.BiometricAuthenticationOutcome
 import com.nivara.app.domain.security.BiometricAuthenticator
 import com.nivara.app.domain.security.BiometricFailure
 import com.nivara.app.domain.security.BiometricPromptHost
+import com.nivara.app.domain.security.BiometricState
 import com.nivara.app.domain.security.BiometricStatus
 import com.nivara.app.domain.security.BiometricThrottlePolicy
 import com.nivara.app.domain.security.BiometricUnavailability
