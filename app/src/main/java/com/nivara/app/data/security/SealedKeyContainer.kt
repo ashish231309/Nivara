@@ -90,7 +90,7 @@ internal object SealedKeyContainer {
     private const val RESERVED_VALUE = 0
 
     /** `true` when [bytes] starts with this family's magic, without validating the rest. */
-    fun hasMagic(bytes: ByteArray, format: SealedKeyFormat): Boolean = bytes.startsWith(format.magic)
+    fun hasMagic(bytes: ByteArray, format: SealedKeyFormat): Boolean = bytes.hasPrefix(format.magic)
 
     /**
      * Seals [contentKey] under [wrappingKey].
@@ -186,7 +186,7 @@ internal object SealedKeyContainer {
 
     private fun validate(format: SealedKeyFormat, container: ByteArray) {
         if (container.size != LENGTH) throw CryptographicFailure.MalformedEnvelope
-        if (!container.startsWith(format.magic)) throw CryptographicFailure.UnsupportedEnvelope
+        if (!container.hasPrefix(format.magic)) throw CryptographicFailure.UnsupportedEnvelope
         if (container[VERSION_OFFSET].toInt() != VERSION) throw CryptographicFailure.UnsupportedVersion
         if (container[SCHEME_OFFSET].toInt() != SCHEME_HKDF_SHA256_XOR_HMAC_SHA256) {
             throw CryptographicFailure.UnsupportedKeyScheme

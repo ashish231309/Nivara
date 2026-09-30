@@ -336,6 +336,23 @@ for path in security_sources:
         for match in re.finditer(r"^import\s+(androidx\.\w+|android\.widget\.\w+)", text, re.MULTILINE):
             err(f"{rel}: platform UI import in security code ({match.group(1)})")
 
+# Byte arrays have no string helpers in the Kotlin standard library. A parser that assumes
+# otherwise does not compile, so it is worth catching here as well as in the compiler.
+string_only_helpers = ("startsWith", "endsWith", "substring", "split", "trim", "replace")
+for path in security_sources:
+    rel = path.relative_to(ROOT)
+    text = strip_comments(path.read_text())
+    for helper in string_only_helpers:
+        for match in re.finditer(rf"\b(\w+)\.{helper}\s*\(", text):
+            target = match.group(1)
+            # only flag identifier-shaped receivers; arrays and strings are indistinguishable
+            # statically, so this looks for the byte-array style names used in this package
+            if re.search(rf"\bval\s+{target}\s*(?::\s*ByteArray)?\s*=", text) or target in {
+                "bytes", "envelope", "container", "nonce", "material", "buffer", "wrappedKey",
+                "ciphertext", "plaintext", "magic",
+            }:
+                err(f"{rel}: '{helper}' is not available on a byte array (receiver '{target}')")
+
 # the domain security layer must stay free of Android and JCE implementation types
 for path in sorted((ROOT / "app/src/main/java/com/nivara/app/domain/security").glob("*.kt")):
     rel = path.relative_to(ROOT)

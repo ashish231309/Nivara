@@ -77,7 +77,7 @@ internal object EncryptedEnvelope {
     const val TRANSFORMATION: String = "AES/GCM/NoPadding"
 
     /** `true` when [bytes] starts with an envelope magic, without validating the rest. */
-    fun hasMagic(bytes: ByteArray): Boolean = bytes.startsWith(MAGIC)
+    fun hasMagic(bytes: ByteArray): Boolean = bytes.hasPrefix(MAGIC)
 
     /**
      * Builds a complete envelope. The caller supplies the nonce, which must be unique for the key
@@ -161,7 +161,7 @@ internal object EncryptedEnvelope {
         if (envelope.size < MINIMUM_LENGTH || envelope.size > MAXIMUM_LENGTH) {
             throw CryptographicFailure.MalformedEnvelope
         }
-        if (!envelope.startsWith(MAGIC)) {
+        if (!envelope.hasPrefix(MAGIC)) {
             throw CryptographicFailure.UnsupportedEnvelope
         }
         if (envelope[VERSION_OFFSET].toInt() != VERSION) {
