@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Adaptive launcher icon background. -->
+    <color name="ic_launcher_background">#0B3B36</color>
+
+    <!-- Window background used before the Compose UI draws its first frame. -->
+    <color name="window_background">#FFFBFF</color>
+</resources>

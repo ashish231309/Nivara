@@ -1,0 +1,96 @@
+name: Android CI
+
+# CI is intentionally not run on every push. Gradle builds are expensive and repeating them for
+# documentation or UI-only changes teaches nothing, so a run happens when build configuration
+# changes (pull request or push to main) or when someone starts one on purpose from the
+# Actions tab. Milestone and release verification is done with workflow_dispatch.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'app/build.gradle.kts'
+      - 'app/proguard-rules.pro'
+      - '.github/workflows/android-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'app/build.gradle.kts'
+      - 'app/proguard-rules.pro'
+      - '.github/workflows/android-ci.yml'
+
+# A newer run for the same ref makes an older one pointless.
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Build, test and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # --continue keeps the remaining tasks running so a single run reports every problem
+      # instead of stopping at the first one.
+      - name: Build, test and lint
+        run: >-
+          ./gradlew --stacktrace --continue
+          :app:assembleDebug
+          :app:assembleDebugAndroidTest
+          :app:testDebugUnitTest
+          :app:assembleRelease
+          :app:lintDebug
+
+      - name: Upload debug APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nivara-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload unit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/testDebugUnitTest
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+          retention-days: 7

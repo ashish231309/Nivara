@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nivara</string>
+
+    <!-- Home -->
+    <string name="home_tagline">Privacy. Security. Control.</string>
+    <string name="home_intro">Nivara keeps your private space on this device, under your control.</string>
+    <string name="home_status_title">Device security</string>
+    <string name="home_status_lock_configured">Screen lock configured</string>
+    <string name="home_status_lock_configured_summary">A screen lock is set on this device.</string>
+    <string name="home_status_lock_missing">No screen lock</string>
+    <string name="home_status_lock_missing_summary">Set a screen lock in system settings to protect this device.</string>
+    <string name="home_foundation_title">Foundation release</string>
+    <string name="home_foundation_summary">This build contains the application shell only. Security modules are added in the releases that follow.</string>
+    <string name="home_about_action">About Nivara</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="about_version_label">Version</string>
+    <string name="about_build_type_label">Build type</string>
+    <string name="about_package_label">Application ID</string>
+    <string name="about_platform_label">Android API level</string>
+    <string name="about_privacy_title">Privacy defaults</string>
+    <string name="about_privacy_summary">Nivara requests no permissions, blocks cleartext network traffic and disables cloud backup of application data.</string>
+
+    <!-- Shared states -->
+    <string name="state_loading">Loading…</string>
+    <string name="state_error_title">Something went wrong</string>
+    <string name="state_error_summary">Nivara could not load this screen.</string>
+    <string name="state_retry_action">Try again</string>
+    <string name="navigation_back">Back</string>
+</resources>
