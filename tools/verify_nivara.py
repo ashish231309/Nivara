@@ -380,6 +380,17 @@ for doc in ("docs/crypto/envelope-format.md", "docs/crypto/README.md", "tools/cr
     if not (ROOT / doc).exists():
         err(f"documentation or tooling referenced by the code is missing: {doc}")
 
+# An integer literal compared against a byte expression never matches in JUnit: the assertion
+# boxes the literal as Integer and the byte as Byte, so the test fails (or, worse, a negated form
+# passes). Warn about it in test sources.
+for path in sorted(ROOT.rglob("*.kt")):
+    if "/src/test/" not in str(path) and "/src/androidTest/" not in str(path):
+        continue
+    pattern = r"assert(?:Not)?Equals\(\s*-?\d+\s*,\s*[\w.]+(?:\(\))?\[[^\]]*\]\s*[,)]"
+    for match in re.finditer(pattern, path.read_text()):
+        warn(f"{path.relative_to(ROOT)}: integer literal compared with a byte expression "
+             f"({match.group(0).strip()}) - box the literal with .toByte()")
+
 # ---------------------------------------------------------------- wrapper / hygiene
 wrapper_props = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()
 if "distributionUrl" not in wrapper_props:

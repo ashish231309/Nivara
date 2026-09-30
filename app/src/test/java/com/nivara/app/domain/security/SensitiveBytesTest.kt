@@ -23,7 +23,7 @@ class SensitiveBytesTest {
         val secret = SensitiveBytes.of(source)
         source[0] = 99
 
-        assertEquals(1, secret.unsafeByteArray()[0])
+        assertArrayEquals(byteArrayOf(1, 2, 3, 4), secret.unsafeByteArray())
     }
 
     @Test
@@ -33,7 +33,9 @@ class SensitiveBytesTest {
         val secret = SensitiveBytes.wrap(owned)
         owned[0] = 99
 
-        assertEquals(99, secret.unsafeByteArray()[0])
+        // Compared as bytes: JUnit's assertEquals(Integer, Byte) is never equal, which is exactly
+        // the kind of assertion that looks like a passing test until it runs.
+        assertEquals(99.toByte(), secret.unsafeByteArray()[0])
     }
 
     @Test
