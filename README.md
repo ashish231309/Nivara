@@ -10,13 +10,20 @@ frameworks, and no dependencies that are not justified by code that exists.
 
 ## Project status
 
-This repository currently contains the **foundation release**: the application shell, the
-navigation and architecture skeleton, and the build, test and security baseline that later
-features are built on.
+The repository contains the **foundation release** and the **cryptographic core**.
 
-The application launches, shows the Nivara home screen and an about screen, and reports the
-device's screen-lock status. Security features are not implemented yet — they arrive in the
-releases that follow.
+What works today:
+
+- the application shell — home and about screens, navigation, Material 3 light/dark theme;
+- reporting the device's screen-lock status;
+- the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
+  with a versioned envelope format, secure randomness, Android Keystore key management, key
+  wrapping, PBKDF2 credential derivation and the recovery-key foundation.
+
+No user-facing security feature is implemented yet. There is no credential enrolment, no
+biometric prompt, no app locking, no vault and no recovery flow — those are the stages that
+follow, and they consume the cryptographic layer described in
+[`docs/crypto/README.md`](docs/crypto/README.md).
 
 ## Planned capabilities
 
@@ -108,8 +115,15 @@ and `local.properties` are excluded by `.gitignore`.
 ./gradlew :app:lintDebug
 ```
 
-Unit tests cover the pieces that carry logic but no Android dependency: the result wrapper
-used between layers, the home screen state machine, and the navigation route table.
+Unit tests cover the pieces that carry logic but no Android dependency: the result wrapper between
+layers, the home screen state machine, the navigation route table, and the cryptographic layer —
+envelope parsing and rejection cases, tamper detection, purpose binding, known-answer vectors from
+RFC 5869 (HKDF) and PBKDF2, randomness lengths, secret-buffer handling, key wrapping and the
+recovery foundation.
+
+Instrumented tests cover what only a device can prove: Android Keystore key generation,
+non-exportability, invalidation detection and use through a cipher. They are never simulated on the
+JVM.
 
 ## Security defaults
 
@@ -127,6 +141,50 @@ Security behaviour is built into the project's defaults rather than added at the
   at the end of the project.
 
 Any change that weakens one of these defaults must explain why in the same change.
+
+## Cryptography
+
+The cryptographic core is documented in [`docs/crypto/README.md`](docs/crypto/README.md); the
+byte layout of encrypted data is specified in
+[`docs/crypto/envelope-format.md`](docs/crypto/envelope-format.md).
+
+Summary of what is in place:
+
+| Concern | Implementation |
+| --- | --- |
+| Randomness | `SecureRandomGenerator` over the platform CSPRNG |
+| Authenticated encryption | AES-256-GCM, fresh random 96-bit nonce per operation, 128-bit tag |
+| Encrypted format | Versioned, self-describing envelope with purpose binding (v1) |
+| Key protection | Android Keystore AES-256-GCM keys that cannot be exported |
+| Key wrapping | Content keys wrapped by device keys (GCM) or in-process keys (HKDF-SHA-256 + HMAC-SHA-256) |
+| Credential KDF | PBKDF2-HMAC-SHA-256, 600 000 iterations, 128-bit salt |
+| Recovery | Independent 256-bit recovery key sealing the same content key |
+
+Principles the layer is held to:
+
+- Callers never construct ciphers, choose nonces or see key material; the APIs make the classic
+  AEAD mistakes unavailable.
+- Unknown versions, schemes, algorithms and purposes are hard failures. There is no fallback to a
+  weaker algorithm.
+- Nothing persists secret material: no credential, no raw recovery key, no unprotected key.
+  Persistence decisions belong to the stages that own the data.
+- Erasure is best effort. The code clears live buffers and keeps secret lifetimes short, and the
+  documentation says plainly that a managed runtime cannot guarantee zeroisation.
+
+## Repository checks
+
+`tools/verify_nivara.py` runs a set of fast static checks that need no JDK: resource and version
+references, package/directory agreement, and cryptographic hygiene (no predictable randomness, no
+non-GCM cipher modes, no credentials converted to `String`, no logging in security code, no inline
+key material).
+
+```bash
+python3 tools/verify_nivara.py
+```
+
+`tools/crypto_reference.py` is an independent implementation of the envelope format and the
+credential KDF. It generates the known-answer vectors that the unit tests assert against, so the
+Kotlin code is checked against a second implementation rather than against itself.
 
 ## Continuous integration
 

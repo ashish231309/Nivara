@@ -16,6 +16,7 @@ on:
       - 'gradlew.bat'
       - 'app/build.gradle.kts'
       - 'app/proguard-rules.pro'
+      - 'tools/**'
       - '.github/workflows/android-ci.yml'
   push:
     branches: [main]
@@ -28,6 +29,7 @@ on:
       - 'gradlew.bat'
       - 'app/build.gradle.kts'
       - 'app/proguard-rules.pro'
+      - 'tools/**'
       - '.github/workflows/android-ci.yml'
 
 # A newer run for the same ref makes an older one pointless.
@@ -56,6 +58,11 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+
+      # Cheap repository checks (resources, versions, cryptographic hygiene). They run before the
+      # Gradle build so an obvious problem fails fast without paying for a full build.
+      - name: Run repository checks
+        run: python3 tools/verify_nivara.py
 
       # --continue keeps the remaining tasks running so a single run reports every problem
       # instead of stopping at the first one.
