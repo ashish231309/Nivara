@@ -65,15 +65,41 @@ jobs:
         run: python3 tools/verify_nivara.py
 
       # --continue keeps the remaining tasks running so a single run reports every problem
-      # instead of stopping at the first one.
+      # instead of stopping at the first one. The output is captured so failures can be reported
+      # as check annotations below, which a reviewer can read without the full log.
       - name: Build, test and lint
-        run: >-
-          ./gradlew --stacktrace --continue
-          :app:assembleDebug
-          :app:assembleDebugAndroidTest
-          :app:testDebugUnitTest
-          :app:assembleRelease
-          :app:lintDebug
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --stacktrace --continue --console=plain \
+            :app:assembleDebug \
+            :app:assembleDebugAndroidTest \
+            :app:testDebugUnitTest \
+            :app:assembleRelease \
+            :app:lintDebug 2>&1 | tee gradle-build.log
+
+      # Compiler errors, task failures and failing tests are surfaced as annotations.
+      - name: Report failures
+        if: failure()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re
+
+          try:
+              lines = open("gradle-build.log", errors="replace").read().splitlines()
+          except OSError:
+              print("no build log to inspect")
+              raise SystemExit(0)
+
+          pattern = re.compile(r"^e: |error:|error\b.*\.kt|FAILED|Execution failed|Could not |Caused by|> Task .*FAILED")
+          digest = [line.strip() for line in lines if pattern.search(line)][:40]
+          if not digest:
+              digest = ["build failed without a recognisable error line; see the job log"]
+          message = "\n".join(line[:400] for line in digest)
+          message = message.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+          print(f"::error title=Gradle failure::{message}")
+          PY
 
       - name: Upload debug APK
         if: always()
