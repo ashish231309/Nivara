@@ -34,7 +34,8 @@ class ThrottlingTest {
 
     @Test
     fun `the delay is capped and never becomes permanent`() {
-        assertEquals(300_000L, policy.delayMillisAfter(8))
+        // Doubling from 5 s: 5, 10, 20, 40, 80, 160, and the next step would be 320 s.
+        assertEquals(160_000L, policy.delayMillisAfter(8))
         assertEquals(300_000L, policy.delayMillisAfter(9))
         assertEquals(300_000L, policy.delayMillisAfter(1_000))
         assertEquals(300_000L, policy.delayMillisAfter(Int.MAX_VALUE))

@@ -113,7 +113,8 @@ class HomeViewModelTest {
             viewModel.uiState.value,
         )
         assertEquals(2, provider.callCount)
-        assertEquals(2, credentials.callCount)
+        // The failed first load stops at the device check, so the credential status is read once.
+        assertEquals(1, credentials.callCount)
     }
 
     private class FakeDeviceSecurityProvider(

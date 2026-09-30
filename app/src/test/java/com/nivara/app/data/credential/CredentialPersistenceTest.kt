@@ -10,6 +10,7 @@ import com.nivara.app.domain.security.KeyDerivationAlgorithm
 import com.nivara.app.domain.security.KeyDerivationConfig
 import com.nivara.app.testing.testAttemptStore
 import com.nivara.app.testing.testRecordStore
+import com.nivara.app.core.common.valueOrNull
 import com.nivara.app.testing.valueOrFail
 import java.io.File
 import kotlinx.coroutines.test.runTest
@@ -54,7 +55,7 @@ class CredentialPersistenceTest {
 
     @Test
     fun `nothing is configured before anything is written`() = runTest {
-        val loaded = testRecordStore(recordFile).load().valueOrFail()
+        val loaded = testRecordStore(recordFile).load().valueOrNull()
 
         assertNull(loaded)
         assertFalse(recordFile.exists())
