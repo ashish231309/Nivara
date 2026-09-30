@@ -1,6 +1,7 @@
 package com.nivara.app.ui.home
 
 import com.nivara.app.domain.credential.PrimaryCredentialType
+import com.nivara.app.domain.security.BiometricStatus
 
 /**
  * State of the home screen.
@@ -18,10 +19,12 @@ sealed interface HomeUiState {
      *
      * @param deviceLockConfigured whether the device currently has a screen lock set.
      * @param credentialType the configured primary credential, or `null` when none is set up.
+     * @param biometricStatus whether the secondary biometric path is usable, set up or broken.
      */
     data class Ready(
         val deviceLockConfigured: Boolean,
         val credentialType: PrimaryCredentialType?,
+        val biometricStatus: BiometricStatus,
     ) : HomeUiState
 
     /** The screen could not load. The UI offers a retry. */

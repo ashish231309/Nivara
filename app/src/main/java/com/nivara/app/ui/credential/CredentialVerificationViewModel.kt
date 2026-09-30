@@ -12,6 +12,7 @@ import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.domain.credential.CredentialManager
 import com.nivara.app.domain.credential.CredentialStatus
 import com.nivara.app.domain.credential.PrimaryCredentialType
+import com.nivara.app.ui.components.NivaraMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,7 +50,7 @@ sealed interface CredentialVerificationStep {
 data class CredentialVerificationUiState(
     val step: CredentialVerificationStep = CredentialVerificationStep.Loading,
     val type: PrimaryCredentialType? = null,
-    val failure: CredentialMessage? = null,
+    val failure: NivaraMessage? = null,
 )
 
 /**

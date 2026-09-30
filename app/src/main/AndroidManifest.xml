@@ -2,8 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      Nivara requests no permissions at this stage. Every future permission must be justified
-      by a feature that actually exists, added in the stage that introduces it.
+      Nivara requests no permissions. Every future permission must be justified by a feature that
+      actually exists, added in the stage that introduces it. The AndroidX biometric library
+      contributes the platform's biometric permission in the merged manifest, which is why
+      biometric authentication works without a declaration here.
     -->
 
     <application

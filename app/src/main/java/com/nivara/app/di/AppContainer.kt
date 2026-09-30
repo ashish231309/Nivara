@@ -5,7 +5,10 @@ import com.nivara.app.data.credential.FileAttemptStore
 import com.nivara.app.data.credential.FileCredentialRecordStore
 import com.nivara.app.data.credential.NivaraCredentialManager
 import com.nivara.app.data.credential.PersistedAttemptTracker
+import com.nivara.app.data.biometric.AndroidBiometricAuthenticator
+import com.nivara.app.data.biometric.BiometricTokenStore
 import com.nivara.app.data.credential.SystemTimeProvider
+import com.nivara.app.data.security.AndroidBiometricKeyStore
 import com.nivara.app.data.security.AndroidDeviceSecurityProvider
 import com.nivara.app.data.security.AndroidKeystoreDeviceKeyStore
 import com.nivara.app.data.security.HkdfRecoveryKeyEnvelopeService
@@ -13,6 +16,9 @@ import com.nivara.app.data.security.JcaEncryptionService
 import com.nivara.app.data.security.NivaraContentKeyWrapper
 import com.nivara.app.data.security.Pbkdf2KeyDerivationService
 import com.nivara.app.domain.credential.CredentialManager
+import com.nivara.app.domain.credential.TimeProvider
+import com.nivara.app.domain.security.BiometricAuthenticator
+import com.nivara.app.domain.security.BiometricThrottlePolicy
 import com.nivara.app.domain.security.ContentKeyWrapper
 import com.nivara.app.domain.security.DeviceKeyStore
 import com.nivara.app.domain.security.DeviceSecurityProvider
@@ -53,6 +59,14 @@ interface AppContainer {
 
     /** Enrolling, verifying and changing the primary authentication credential. */
     val credentialManager: CredentialManager
+
+    /**
+     * Android biometric authentication, as a secondary path beside the primary credential.
+     *
+     * Biometric unlock can only be enabled once a primary credential exists, and it can never
+     * replace one.
+     */
+    val biometricAuthenticator: BiometricAuthenticator
 }
 
 /**
@@ -102,8 +116,26 @@ class DefaultAppContainer(context: Context) : AppContainer {
             store = FileCredentialRecordStore(File(securityDirectory, CREDENTIAL_RECORD_FILE)),
             attemptTracker = PersistedAttemptTracker(
                 store = FileAttemptStore(File(securityDirectory, ATTEMPT_STATE_FILE)),
-                timeProvider = SystemTimeProvider(),
+                timeProvider = timeProvider,
             ),
+        )
+    }
+
+    override val biometricAuthenticator: BiometricAuthenticator by lazy {
+        AndroidBiometricAuthenticator(
+            context = applicationContext,
+            credentialManager = credentialManager,
+            keyStore = AndroidBiometricKeyStore(),
+            tokenStore = BiometricTokenStore(File(securityDirectory, BIOMETRIC_TOKEN_FILE)),
+            // A separate counter file, so a biometric failure can never influence the credential's
+            // own throttling.
+            attempts = PersistedAttemptTracker(
+                store = FileAttemptStore(File(securityDirectory, BIOMETRIC_ATTEMPT_FILE)),
+                timeProvider = timeProvider,
+                policy = BiometricThrottlePolicy.Default,
+            ),
+            random = secureRandomGenerator,
+            timeProvider = timeProvider,
         )
     }
 
@@ -116,9 +148,14 @@ class DefaultAppContainer(context: Context) : AppContainer {
      */
     private val securityDirectory: File by lazy { File(applicationContext.filesDir, SECURITY_DIRECTORY) }
 
+    /** One wall clock for every throttling rule in the application. */
+    private val timeProvider: TimeProvider by lazy { SystemTimeProvider() }
+
     private companion object {
         const val SECURITY_DIRECTORY = "security"
         const val CREDENTIAL_RECORD_FILE = "credential.nvc"
         const val ATTEMPT_STATE_FILE = "credential-attempts.nva"
+        const val BIOMETRIC_TOKEN_FILE = "biometric.token"
+        const val BIOMETRIC_ATTEMPT_FILE = "biometric-attempts.nva"
     }
 }

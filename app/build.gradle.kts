@@ -70,6 +70,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
+    // Android's own biometric prompt; it also contributes the platform biometric permission to
+    // the merged manifest, so the application manifest still requests nothing itself.
+    implementation(libs.androidx.biometric)
     implementation(libs.kotlinx.coroutines.android)
 
     val composeBom = platform(libs.androidx.compose.bom)

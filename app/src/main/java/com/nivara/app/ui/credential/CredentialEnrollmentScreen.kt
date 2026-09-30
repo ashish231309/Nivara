@@ -27,6 +27,8 @@ import com.nivara.app.R
 import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.domain.credential.PrimaryCredentialType
 import com.nivara.app.ui.components.NivaraLoadingState
+import com.nivara.app.ui.components.NivaraMessage
+import com.nivara.app.ui.components.NivaraMessageText
 
 /** First-time enrollment: choose a method, enter it, confirm it, save. */
 @Composable
@@ -185,9 +187,9 @@ private fun ScreenHeading(@StringRes titleRes: Int, @StringRes summaryRes: Int) 
 }
 
 @Composable
-private fun FailureMessage(message: CredentialMessage?) {
+private fun FailureMessage(message: NivaraMessage?) {
     if (message != null) {
-        CredentialMessageText(message = message)
+        NivaraMessageText(message = message)
     }
 }
 

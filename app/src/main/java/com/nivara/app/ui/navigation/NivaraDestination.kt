@@ -49,6 +49,12 @@ sealed interface NivaraDestination {
         override val titleRes: Int = R.string.credential_change_title
     }
 
+    /** Biometric unlock: status, enable, disable and authentication. */
+    data object Biometric : NivaraDestination {
+        override val route: String = "biometric"
+        override val titleRes: Int = R.string.biometric_screen_title
+    }
+
     companion object {
         /**
          * All destinations that exist in the graph.
@@ -56,7 +62,7 @@ sealed interface NivaraDestination {
          * Add the new entry here together with its `composable` block in `NivaraNavHost`.
          */
         val entries: List<NivaraDestination> =
-            listOf(Home, About, CredentialSetup, CredentialVerify, CredentialChange)
+            listOf(Home, About, CredentialSetup, CredentialVerify, CredentialChange, Biometric)
 
         /** Resolves a navigation route back to its destination, or `null` when unknown. */
         fun fromRoute(route: String?): NivaraDestination? = entries.firstOrNull { it.route == route }

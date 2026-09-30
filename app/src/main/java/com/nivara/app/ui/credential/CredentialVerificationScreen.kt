@@ -18,6 +18,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
 import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.ui.components.NivaraLoadingState
+import com.nivara.app.ui.components.NivaraMessageText
 
 /**
  * Verifies the primary credential.
@@ -102,7 +103,7 @@ fun CredentialVerificationScreen(
                         submitLabel = stringResource(id = R.string.credential_action_verify),
                         onSubmit = onSubmit,
                     )
-                    uiState.failure?.let { message -> CredentialMessageText(message = message) }
+                    uiState.failure?.let { message -> NivaraMessageText(message = message) }
                 }
             }
 

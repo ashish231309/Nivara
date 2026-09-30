@@ -10,8 +10,8 @@ frameworks, and no dependencies that are not justified by code that exists.
 
 ## Project status
 
-The repository contains the **foundation release**, the **cryptographic core** and **primary
-credential enrolment**.
+The repository contains the **foundation release**, the **cryptographic core**, **primary
+credential enrolment** and **biometric unlock as a secondary path**.
 
 What works today:
 
@@ -19,14 +19,19 @@ What works today:
 - reporting the device's screen-lock status;
 - enrolling, verifying and changing one primary credential — a PIN, a password or a pattern —
   with a documented storage format and attempt throttling;
+- biometric unlock through Android's own `BiometricPrompt`, gated by a Keystore key that requires
+  a strong biometric for every use, with its own failure policy and explicit handling of an
+  invalidated key;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
 
-There is still no biometric prompt, no session, no app locking, no vault and no recovery flow —
-those are the stages that follow, and they consume the layers described in
-[`docs/crypto/README.md`](docs/crypto/README.md) and
-[`docs/credential/README.md`](docs/credential/README.md).
+Biometric unlock never replaces the primary credential and never unlocks anything by itself. There
+is still no session, no timeout, no app locking, no vault and no recovery flow — those are the
+stages that follow, and they consume the layers described in
+[`docs/crypto/README.md`](docs/crypto/README.md),
+[`docs/credential/README.md`](docs/credential/README.md) and
+[`docs/biometric/README.md`](docs/biometric/README.md).
 
 ## Planned capabilities
 
@@ -65,6 +70,9 @@ app/src/main/java/com/nivara/app/
 ├── core/common/                Types shared across layers (NivaraResult)
 ├── domain/                     Contracts the app depends on (no Android types)
 ├── data/                       Platform-backed implementations of those contracts
+│   ├── credential/             Credential record, counters and verifier
+│   ├── biometric/              Android's prompt, the NVBT record and its store
+│   └── security/               JCA, Android Keystore and device state
 └── ui/                         Compose UI
     ├── NivaraApp.kt            Root composable: app bar + navigation host
     ├── theme/                  Material 3 colour scheme and typography
@@ -72,7 +80,8 @@ app/src/main/java/com/nivara/app/
     ├── components/             Reusable loading and error states
     ├── home/                   Home screen, state and view model
     ├── about/                  About screen
-    └── credential/             Enrolment, verification and change screens
+    ├── credential/             Enrolment, verification and change screens
+    └── biometric/              Biometric settings, state and view model
 ```
 
 The layering is deliberately small: `ui` depends on `domain` contracts, `domain` has no
@@ -126,11 +135,15 @@ RFC 5869 (HKDF) and PBKDF2, randomness lengths, secret-buffer handling, key wrap
 recovery foundation — and the credential layer, which is tested end to end with real PBKDF2 and a
 controlled clock: policy rules, pattern canonicalisation, the on-disk record and counter formats,
 persistence across a fresh store, enrolment, verification, change in every direction, attempt
-throttling and scans proving that no credential or derived key is ever written.
+throttling and scans proving that no credential or derived key is ever written. The biometric layer
+is covered the same way: the status rule, the failure policy, the record format, the translations
+of Android's own result codes, the rule that decides when removal needs another authentication, and
+the screen's state machine — including the separation between Nivara's delay and Android's lockout.
 
 Instrumented tests cover what only a device can prove: Android Keystore key generation,
-non-exportability, invalidation detection and use through a cipher. They are never simulated on the
-JVM.
+non-exportability, invalidation detection and use through a cipher, and that the biometric key
+refuses to produce output until Android has authorised a single operation. They are never simulated
+on the JVM, and the flows that need a person to present a biometric remain manual.
 
 ## Security defaults
 
@@ -195,6 +208,24 @@ and the threat model are documented in
 | Change | Authenticates the current credential first; the previous credential stops working immediately |
 | Attempts | Two free attempts, then a capped exponential delay; reset only on success; never a permanent lock |
 | Reset | Deliberately absent — removal goes through recovery, which is a later stage with its own threat model |
+
+## Biometric unlock
+
+Biometric unlock is a **secondary** path through Android's own `BiometricPrompt`. The primary
+credential stays authoritative: biometrics can only be turned on when a credential exists, they can
+never replace one, and an invalidated key falls back to the credential rather than to a bypass. The
+full design record — including the key parameters, the byte layout of what is stored and the
+handling of an enrolment change — is in [`docs/biometric/README.md`](docs/biometric/README.md).
+
+| Concern | Implementation |
+| --- | --- |
+| Prompt | AndroidX `BiometricPrompt` with a `CryptoObject`; never a Nivara-drawn prompt |
+| Key | AES-256-GCM in the Android Keystore, strong biometric required for **every** use, invalidated by a biometric enrolment change, never exportable |
+| Stored material | One 71-byte record holding an encrypted random token and its IV — no key material, no biometric data |
+| Primary credential | Required before enabling, untouched by disabling, and the fallback in every failure case |
+| Failure policy | Five free failures, then one attempt per 30 seconds; reset by success or by a successful primary-credential authentication |
+| Android's lockout | Reported as the platform's, never bypassed, never shortened, never claimed as clearable |
+| Failures vs credential | Separate counters, separate files, separate types — a biometric failure never counts as a credential failure |
 
 ## Repository checks
 

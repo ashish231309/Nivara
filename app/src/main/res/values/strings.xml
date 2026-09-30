@@ -106,4 +106,66 @@
     <string name="home_credential_setup_action">Set up credential</string>
     <string name="home_credential_verify_action">Verify credential</string>
     <string name="home_credential_change_action">Change credential</string>
+
+    <!-- Home: biometric unlock -->
+    <string name="home_biometric_title">Biometric unlock</string>
+    <string name="home_biometric_action">Open biometric settings</string>
+
+    <!-- Biometric authentication (secondary to the primary credential) -->
+    <string name="biometric_screen_title">Biometric unlock</string>
+    <string name="biometric_screen_intro">Biometric unlock is a faster way to authenticate. It never replaces your primary credential, which keeps working in every situation below.</string>
+    <string name="biometric_action_enable">Turn on biometric unlock</string>
+    <string name="biometric_action_re_enable">Set up biometric unlock again</string>
+    <string name="biometric_action_disable">Turn off biometric unlock</string>
+    <string name="biometric_action_authenticate">Authenticate</string>
+    <string name="biometric_action_use_primary">Use primary credential</string>
+    <string name="biometric_action_cancel">Cancel</string>
+    <string name="biometric_approval_message">Confirm your primary credential to change biometric settings.</string>
+    <string name="biometric_notice_authenticated">Biometric authentication succeeded.</string>
+    <string name="biometric_notice_enabled">Biometric unlock is on.</string>
+    <string name="biometric_notice_disabled">Biometric unlock is off, and its key has been removed.</string>
+    <string name="biometric_notice_delay_cleared">The biometric delay was cleared.</string>
+    <string name="biometric_busy_notice">Waiting for Android to answer</string>
+    <string name="biometric_throttle_notice">Nivara paused biometric attempts. Try again in %1$d s, or use your primary credential below to clear the pause.</string>
+    <string name="biometric_system_lockout_note">Android can lock biometrics on its own after repeated failures. Nivara cannot lift that lockout, and does not try to.</string>
+
+    <string name="biometric_status_enabled">Biometric unlock is on</string>
+    <string name="biometric_status_disabled">Biometric unlock is off</string>
+    <string name="biometric_status_invalidated">Biometric unlock has to be set up again</string>
+    <string name="biometric_status_enabled_summary">Android confirms your identity before this convenience path opens.</string>
+    <string name="biometric_status_disabled_summary">You can turn it on after setting up a primary credential.</string>
+    <string name="biometric_status_invalidated_summary">The device biometric enrolment changed, so the stored key can no longer be used. Your primary credential is unchanged.</string>
+    <string name="biometric_status_unavailable_summary">Biometric unlock stays off. Use your primary credential instead.</string>
+    <string name="biometric_status_unavailable_no_hardware">This device has no biometric sensor</string>
+    <string name="biometric_status_unavailable_hardware">The biometric sensor is not available right now</string>
+    <string name="biometric_status_unavailable_not_enrolled">No biometric is enrolled on this device</string>
+    <string name="biometric_status_unavailable_unsupported">This device cannot use biometrics for this app</string>
+    <string name="biometric_status_unavailable_security_update">Android requires a security update before biometrics can be used</string>
+    <string name="biometric_status_unavailable_unknown">Biometrics are not available right now</string>
+
+    <string name="biometric_fallback_title">Primary credential</string>
+    <string name="biometric_fallback_hint">Enter your %1$s to confirm this change. The credential itself is never stored.</string>
+    <string name="biometric_fallback_submit">Use primary credential</string>
+    <string name="biometric_fallback_no_credential">No primary credential is set up yet. Set one up first: biometric unlock is only a shortcut for it.</string>
+    <string name="biometric_fallback_set_up_credential">Set up primary credential</string>
+
+    <string name="biometric_error_primary_required">Set up your primary credential first. Biometric unlock never replaces it.</string>
+    <string name="biometric_error_failed">That biometric was not recognised.</string>
+    <string name="biometric_error_cancelled">Biometric authentication was cancelled.</string>
+    <string name="biometric_error_app_blocked">Nivara paused biometric attempts. Try again in %1$d s.</string>
+    <string name="biometric_error_system_locked">Android has locked biometrics for now. Nivara cannot lift that lockout. Use your primary credential, or unlock the device with its own screen lock and try again later.</string>
+    <string name="biometric_error_system_locked_permanent">Android has disabled biometrics until the device is unlocked with its own screen lock. Nivara cannot lift that lockout.</string>
+    <string name="biometric_error_not_enabled">Biometric unlock is not on.</string>
+    <string name="biometric_error_invalidated">Biometric unlock can no longer be used, because the device biometric enrolment changed. Your primary credential is unchanged; turn biometric unlock on again to set it up anew.</string>
+    <string name="biometric_error_key_unavailable">Android could not provide the biometric key.</string>
+    <string name="biometric_error_generic">Nivara could not complete that. Try again.</string>
+
+    <!-- Copy shown inside Android's own biometric prompt -->
+    <string name="biometric_prompt_enable_title">Confirm it is you</string>
+    <string name="biometric_prompt_enable_subtitle">Authenticate to turn on biometric unlock.</string>
+    <string name="biometric_prompt_authenticate_title">Biometric unlock</string>
+    <string name="biometric_prompt_authenticate_subtitle">Confirm your identity to continue.</string>
+    <string name="biometric_prompt_disable_title">Confirm it is you</string>
+    <string name="biometric_prompt_disable_subtitle">Authenticate to turn off biometric unlock.</string>
+    <string name="biometric_prompt_negative">Cancel</string>
 </resources>

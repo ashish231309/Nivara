@@ -9,6 +9,7 @@ import com.nivara.app.NivaraApplication
 import com.nivara.app.core.common.valueOrNull
 import com.nivara.app.domain.credential.CredentialManager
 import com.nivara.app.domain.credential.CredentialStatus
+import com.nivara.app.domain.security.BiometricAuthenticator
 import com.nivara.app.domain.security.DeviceSecurityProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,13 +19,16 @@ import kotlinx.coroutines.launch
 /**
  * Presents the home screen.
  *
- * The view model depends on domain contracts — [DeviceSecurityProvider] and [CredentialManager] —
- * rather than on Android or data-layer classes, which keeps it testable on the JVM and independent
- * of how the platform reports device state or stores the credential.
+ * The view model depends on domain contracts — [DeviceSecurityProvider], [CredentialManager] and
+ * [BiometricAuthenticator] — rather than on Android or data-layer classes, which keeps it testable
+ * on the JVM and independent of how the platform reports device state, stores the credential or
+ * performs a biometric match. Biometrics are reported here as a secondary path beside the
+ * credential and never as a replacement for it.
  */
 class HomeViewModel(
     private val deviceSecurityProvider: DeviceSecurityProvider,
     private val credentialManager: CredentialManager,
+    private val biometricAuthenticator: BiometricAuthenticator,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -49,6 +53,7 @@ class HomeViewModel(
             ?: return HomeUiState.Error
         val credentialStatus = credentialManager.status().valueOrNull()
             ?: return HomeUiState.Error
+        val biometricStatus = biometricAuthenticator.state().status
 
         val credentialType = when (credentialStatus) {
             is CredentialStatus.Configured -> credentialStatus.type
@@ -58,6 +63,7 @@ class HomeViewModel(
         return HomeUiState.Ready(
             deviceLockConfigured = deviceLockConfigured,
             credentialType = credentialType,
+            biometricStatus = biometricStatus,
         )
     }
 
@@ -72,6 +78,7 @@ class HomeViewModel(
                 HomeViewModel(
                     deviceSecurityProvider = application.container.deviceSecurityProvider,
                     credentialManager = application.container.credentialManager,
+                    biometricAuthenticator = application.container.biometricAuthenticator,
                 )
             }
         }

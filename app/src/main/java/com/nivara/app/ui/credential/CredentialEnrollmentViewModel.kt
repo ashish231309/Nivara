@@ -14,6 +14,7 @@ import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.domain.credential.CredentialManager
 import com.nivara.app.domain.credential.CredentialStatus
 import com.nivara.app.domain.credential.PrimaryCredentialType
+import com.nivara.app.ui.components.NivaraMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,7 +62,7 @@ data class CredentialEnrollmentUiState(
     val step: CredentialEnrollmentStep = CredentialEnrollmentStep.ChooseType,
     val selectedType: PrimaryCredentialType = PrimaryCredentialType.Pin,
     val configuredType: PrimaryCredentialType? = null,
-    val failure: CredentialMessage? = null,
+    val failure: NivaraMessage? = null,
 )
 
 /**
@@ -206,7 +207,7 @@ class CredentialEnrollmentViewModel(
     }
 
     companion object {
-        private val GENERIC_FAILURE = CredentialMessage(R.string.credential_error_generic)
+        private val GENERIC_FAILURE = NivaraMessage(R.string.credential_error_generic)
 
         /** Supplies the view model from the application container. */
         fun factory(mode: CredentialFlowMode): ViewModelProvider.Factory = viewModelFactory {

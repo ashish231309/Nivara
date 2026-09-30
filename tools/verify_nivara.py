@@ -293,7 +293,8 @@ for path in main_kt:
 
 # ---------------------------------------------------------------- cryptographic hygiene
 security_sources = sorted((ROOT / "app/src/main/java/com/nivara/app/domain/security").glob("*.kt")) + \
-    sorted((ROOT / "app/src/main/java/com/nivara/app/data/security").glob("*.kt"))
+    sorted((ROOT / "app/src/main/java/com/nivara/app/data/security").glob("*.kt")) + \
+    sorted((ROOT / "app/src/main/java/com/nivara/app/data/biometric").glob("*.kt"))
 main_all_kt = sorted((ROOT / "app/src/main").rglob("*.kt"))
 
 for path in security_sources:
@@ -367,14 +368,16 @@ for path in sorted((ROOT / "app/src/main/java/com/nivara/app/domain/security").g
         if not match.group(1).startswith(allowed_platform_apis):
             err(f"{rel}: domain layer imports a platform implementation type ({match.group(1)})")
 
-# every domain security contract must be implemented and wired in the composition root
+# every domain security contract must be implemented and wired in the composition root.
+# The implementation may live anywhere under `data`, because a contract is allowed to be built
+# on the platform prompt (data/biometric) rather than on the key store alone (data/security).
 container = (ROOT / "app/src/main/java/com/nivara/app/di/AppContainer.kt").read_text()
 contracts = sorted(p.stem for p in (ROOT / "app/src/main/java/com/nivara/app/domain/security").glob("*.kt")
-                   if p.stem.endswith(("Service", "Provider", "Store", "Wrapper")))
+                   if p.stem.endswith(("Service", "Provider", "Store", "Wrapper", "Authenticator")))
 for contract in contracts:
     if contract not in container:
         err(f"AppContainer does not expose the '{contract}' contract")
-    implemented = [p for p in (ROOT / "app/src/main/java/com/nivara/app/data/security").glob("*.kt")
+    implemented = [p for p in (ROOT / "app/src/main/java/com/nivara/app/data").rglob("*.kt")
                    if re.search(rf":\s*{contract}\b|,\s*{contract}\b", p.read_text())]
     if not implemented:
         err(f"no data-layer implementation found for '{contract}'")

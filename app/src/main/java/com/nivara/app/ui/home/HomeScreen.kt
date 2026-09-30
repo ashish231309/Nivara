@@ -24,6 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
 import com.nivara.app.domain.credential.PrimaryCredentialType
+import com.nivara.app.domain.security.BiometricStatus
+import com.nivara.app.ui.biometric.biometricStatusRes
 import com.nivara.app.ui.components.NivaraErrorState
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.credential.credentialTypeNameRes
@@ -38,6 +40,7 @@ fun HomeRoute(
     onOpenCredentialSetup: () -> Unit,
     onOpenCredentialVerify: () -> Unit,
     onOpenCredentialChange: () -> Unit,
+    onOpenBiometric: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
@@ -50,6 +53,7 @@ fun HomeRoute(
         onOpenCredentialSetup = onOpenCredentialSetup,
         onOpenCredentialVerify = onOpenCredentialVerify,
         onOpenCredentialChange = onOpenCredentialChange,
+        onOpenBiometric = onOpenBiometric,
         modifier = modifier,
     )
 }
@@ -65,6 +69,7 @@ fun HomeScreen(
     onOpenCredentialSetup: () -> Unit,
     onOpenCredentialVerify: () -> Unit,
     onOpenCredentialChange: () -> Unit,
+    onOpenBiometric: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -73,10 +78,12 @@ fun HomeScreen(
         is HomeUiState.Ready -> HomeContent(
             deviceLockConfigured = uiState.deviceLockConfigured,
             credentialType = uiState.credentialType,
+            biometricStatus = uiState.biometricStatus,
             onOpenAbout = onOpenAbout,
             onOpenCredentialSetup = onOpenCredentialSetup,
             onOpenCredentialVerify = onOpenCredentialVerify,
             onOpenCredentialChange = onOpenCredentialChange,
+            onOpenBiometric = onOpenBiometric,
             modifier = modifier,
         )
     }
@@ -86,10 +93,12 @@ fun HomeScreen(
 private fun HomeContent(
     deviceLockConfigured: Boolean,
     credentialType: PrimaryCredentialType?,
+    biometricStatus: BiometricStatus,
     onOpenAbout: () -> Unit,
     onOpenCredentialSetup: () -> Unit,
     onOpenCredentialVerify: () -> Unit,
     onOpenCredentialChange: () -> Unit,
+    onOpenBiometric: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -122,6 +131,12 @@ private fun HomeContent(
         InfoCard(
             title = stringResource(id = R.string.home_foundation_title),
             body = stringResource(id = R.string.home_foundation_summary),
+        )
+
+        BiometricCard(
+            biometricStatus = biometricStatus,
+            credentialConfigured = credentialType != null,
+            onOpenBiometric = onOpenBiometric,
         )
 
         Button(onClick = onOpenAbout) {
@@ -197,6 +212,37 @@ private fun CredentialCard(
     }
 }
 
+/**
+ * The biometric path's status, and the way into its settings.
+ *
+ * The card reports what Android and Nivara together say about the secondary path; it never claims
+ * that biometrics replace the credential above it, and it stays available even when biometrics
+ * cannot be used at all, because the settings screen is where the user finds out why.
+ */
+@Composable
+private fun BiometricCard(
+    biometricStatus: BiometricStatus,
+    credentialConfigured: Boolean,
+    onOpenBiometric: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        InfoCard(
+            title = stringResource(id = R.string.home_biometric_title),
+            body = stringResource(id = biometricStatusRes(biometricStatus)),
+        )
+        OutlinedButton(
+            onClick = onOpenBiometric,
+            // Without a primary credential there is nothing for biometrics to stand in for, so the
+            // settings entry point is inert rather than misleading.
+            enabled = credentialConfigured,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(text = stringResource(id = R.string.home_biometric_action))
+        }
+    }
+}
+
 @Composable
 private fun InfoCard(
     title: String,
@@ -225,12 +271,17 @@ private fun InfoCard(
 private fun HomeScreenReadyPreview() {
     NivaraTheme {
         HomeScreen(
-            uiState = HomeUiState.Ready(deviceLockConfigured = true, credentialType = null),
+            uiState = HomeUiState.Ready(
+                deviceLockConfigured = true,
+                credentialType = null,
+                biometricStatus = BiometricStatus.Disabled,
+            ),
             onRetry = {},
             onOpenAbout = {},
             onOpenCredentialSetup = {},
             onOpenCredentialVerify = {},
             onOpenCredentialChange = {},
+            onOpenBiometric = {},
         )
     }
 }
@@ -243,12 +294,14 @@ private fun HomeScreenConfiguredPreview() {
             uiState = HomeUiState.Ready(
                 deviceLockConfigured = false,
                 credentialType = PrimaryCredentialType.Pattern,
+                biometricStatus = BiometricStatus.Enabled,
             ),
             onRetry = {},
             onOpenAbout = {},
             onOpenCredentialSetup = {},
             onOpenCredentialVerify = {},
             onOpenCredentialChange = {},
+            onOpenBiometric = {},
         )
     }
 }
@@ -264,6 +317,7 @@ private fun HomeScreenErrorPreview() {
             onOpenCredentialSetup = {},
             onOpenCredentialVerify = {},
             onOpenCredentialChange = {},
+            onOpenBiometric = {},
         )
     }
 }
