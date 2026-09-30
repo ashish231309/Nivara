@@ -7,6 +7,7 @@ import com.nivara.app.domain.security.BiometricFailure
 import com.nivara.app.domain.security.BiometricUnavailability
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -26,7 +27,7 @@ class BiometricPromptMappingTest {
 
     @Test
     fun `a capable device reports no reason to be unavailable`() {
-        assertEquals(null, biometricAvailability(BiometricManager.BIOMETRIC_SUCCESS))
+        assertNull(biometricAvailability(BiometricManager.BIOMETRIC_SUCCESS))
     }
 
     @Test

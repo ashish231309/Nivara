@@ -47,21 +47,22 @@ internal sealed interface PromptResult {
  */
 internal class BiometricPromptRunner(private val activity: FragmentActivity) {
 
-    suspend fun authenticate(cipher: Cipher, copy: PromptCopy): PromptResult =
-        withContext(Dispatchers.Main) {
-            val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                .setTitle(copy.title)
-                .setSubtitle(copy.subtitle)
-                .setNegativeButtonText(copy.negativeButton)
-                // Strong biometrics only, and never a device credential: the crypto object is
-                // authorized for one operation by one biometric match, and the primary credential
-                // stays Nivara's own fallback rather than the platform's.
-                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                .setConfirmationRequired(false)
-                .build()
-                ?: return@withContext PromptResult.Error(BiometricPrompt.ERROR_UNABLE_TO_PROCESS, 0)
+    suspend fun authenticate(cipher: Cipher, copy: PromptCopy): PromptResult {
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(copy.title)
+            .setSubtitle(copy.subtitle)
+            .setNegativeButtonText(copy.negativeButton)
+            // Strong biometrics only, and never a device credential: the crypto object is
+            // authorized for one operation by one biometric match, and the primary credential
+            // stays Nivara's own fallback rather than the platform's.
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .setConfirmationRequired(false)
+            .build()
+            ?: return PromptResult.Error(BiometricPrompt.ERROR_UNABLE_TO_PROCESS, 0)
 
-            suspendCancellableCoroutine { continuation ->
+        // The prompt itself is created and shown on the main thread, as the platform requires.
+        return withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine<PromptResult> { continuation ->
                 val callback = object : BiometricPrompt.AuthenticationCallback() {
 
                     private var failedAttempts = 0
@@ -102,4 +103,5 @@ internal class BiometricPromptRunner(private val activity: FragmentActivity) {
                 }
             }
         }
+    }
 }

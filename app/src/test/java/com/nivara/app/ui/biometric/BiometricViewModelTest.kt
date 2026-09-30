@@ -58,7 +58,7 @@ class BiometricViewModelTest {
     @Test
     fun `the initial state reports what the authenticator says`() = runTest {
         val state = readyState(
-            viewModel(FakeBiometricAuthenticator(state = BiometricState(status = BiometricStatus.Enabled))),
+            viewModel(FakeBiometricAuthenticator(currentState = BiometricState(status = BiometricStatus.Enabled))),
         )
 
         assertEquals(BiometricStatus.Enabled, state.status)
@@ -70,7 +70,7 @@ class BiometricViewModelTest {
 
     @Test
     fun `with no credential the screen says so instead of offering to turn biometrics on`() = runTest {
-        val authenticator = FakeBiometricAuthenticator(state = BiometricState(status = BiometricStatus.Disabled))
+        val authenticator = FakeBiometricAuthenticator(currentState = BiometricState(status = BiometricStatus.Disabled))
         val credentials = FakeCredentialManager(statusResult = NivaraResult.Success(CredentialStatus.NotConfigured))
 
         val state = readyState(viewModel(authenticator, credentials))
@@ -82,7 +82,7 @@ class BiometricViewModelTest {
     @Test
     fun `Nivara's own delay becomes a wait the screen can show`() = runTest {
         val authenticator = FakeBiometricAuthenticator(
-            state = BiometricState(status = BiometricStatus.Enabled, retryAfterMillis = 30_000L),
+            currentState = BiometricState(status = BiometricStatus.Enabled, retryAfterMillis = 30_000L),
         )
 
         val viewModel = viewModel(authenticator)
@@ -95,7 +95,7 @@ class BiometricViewModelTest {
     @Test
     fun `a successful attempt is reported as a success and not as an error`() = runTest {
         val authenticator = FakeBiometricAuthenticator(
-            state = BiometricState(status = BiometricStatus.Enabled),
+            currentState = BiometricState(status = BiometricStatus.Enabled),
             authenticateOutcome = BiometricAuthenticationOutcome.Succeeded,
         )
         val viewModel = viewModel(authenticator)
@@ -111,7 +111,7 @@ class BiometricViewModelTest {
     @Test
     fun `a cancelled prompt is reported as a cancellation`() = runTest {
         val authenticator = FakeBiometricAuthenticator(
-            state = BiometricState(status = BiometricStatus.Enabled),
+            currentState = BiometricState(status = BiometricStatus.Enabled),
             authenticateOutcome = BiometricAuthenticationOutcome.Cancelled,
         )
         val viewModel = viewModel(authenticator)
@@ -127,7 +127,7 @@ class BiometricViewModelTest {
     fun `a rejected biometric is reported as a rejection`() = runTest {
         val viewModel = viewModel(
             FakeBiometricAuthenticator(
-                state = BiometricState(status = BiometricStatus.Enabled),
+                currentState = BiometricState(status = BiometricStatus.Enabled),
                 authenticateOutcome = BiometricAuthenticationOutcome.Failed(
                     attemptsRemaining = 4,
                     blockedForMillis = 0L,
@@ -144,7 +144,7 @@ class BiometricViewModelTest {
     fun `Android's lockout is reported as Android's lockout, never as Nivara's delay`() = runTest {
         val viewModel = viewModel(
             FakeBiometricAuthenticator(
-                state = BiometricState(status = BiometricStatus.Enabled),
+                currentState = BiometricState(status = BiometricStatus.Enabled),
                 authenticateOutcome = BiometricAuthenticationOutcome.SystemBlocked(permanent = false),
             ),
         )
@@ -161,7 +161,7 @@ class BiometricViewModelTest {
     fun `an unusable configuration is reported as the platform's reason`() = runTest {
         val viewModel = viewModel(
             FakeBiometricAuthenticator(
-                state = BiometricState(status = BiometricStatus.Enabled),
+                currentState = BiometricState(status = BiometricStatus.Enabled),
                 authenticateOutcome = BiometricAuthenticationOutcome.Unavailable(
                     BiometricUnavailability.HardwareUnavailable,
                 ),
@@ -179,7 +179,7 @@ class BiometricViewModelTest {
     @Test
     fun `turning biometric unlock on verifies the primary credential first`() = runTest {
         val authenticator = FakeBiometricAuthenticator(
-            state = BiometricState(status = BiometricStatus.Disabled),
+            currentState = BiometricState(status = BiometricStatus.Disabled),
         )
         val credentials = FakeCredentialManager(verifyOutcome = AuthenticationOutcome.Succeeded)
         val viewModel = viewModel(authenticator, credentials)
@@ -199,7 +199,7 @@ class BiometricViewModelTest {
     @Test
     fun `a rejected primary credential changes nothing`() = runTest {
         val authenticator = FakeBiometricAuthenticator(
-            state = BiometricState(status = BiometricStatus.Disabled),
+            currentState = BiometricState(status = BiometricStatus.Disabled),
         )
         val credentials = FakeCredentialManager(
             verifyOutcome = AuthenticationOutcome.Failed(blockedForMillis = 0L),
@@ -220,7 +220,7 @@ class BiometricViewModelTest {
     @Test
     fun `a change the platform refuses is reported and clears the pending change`() = runTest {
         val authenticator = FakeBiometricAuthenticator(
-            state = BiometricState(status = BiometricStatus.Disabled),
+            currentState = BiometricState(status = BiometricStatus.Disabled),
             enableResult = NivaraResult.Failure(BiometricFailure.PrimaryCredentialRequired),
         )
         val viewModel = viewModel(authenticator)
@@ -236,7 +236,7 @@ class BiometricViewModelTest {
     @Test
     fun `turning biometric unlock off is authenticated too`() = runTest {
         val authenticator = FakeBiometricAuthenticator(
-            state = BiometricState(status = BiometricStatus.Enabled),
+            currentState = BiometricState(status = BiometricStatus.Enabled),
         )
         val viewModel = viewModel(authenticator)
 
@@ -250,7 +250,7 @@ class BiometricViewModelTest {
     @Test
     fun `proving the primary credential is what forgets Nivara's biometric failures`() = runTest {
         val authenticator = FakeBiometricAuthenticator(
-            state = BiometricState(status = BiometricStatus.Enabled, retryAfterMillis = 30_000L),
+            currentState = BiometricState(status = BiometricStatus.Enabled, retryAfterMillis = 30_000L),
         )
         val viewModel = viewModel(authenticator)
 
@@ -266,7 +266,7 @@ class BiometricViewModelTest {
     @Test
     fun `backing out of a pending change touches nothing`() = runTest {
         val authenticator = FakeBiometricAuthenticator(
-            state = BiometricState(status = BiometricStatus.Disabled),
+            currentState = BiometricState(status = BiometricStatus.Disabled),
         )
         val credentials = FakeCredentialManager()
         val viewModel = viewModel(authenticator, credentials)
@@ -300,7 +300,7 @@ class BiometricViewModelTest {
     private fun pin(): CredentialInput.Pin = CredentialInput.Pin("2468".toCharArray())
 
     private class FakeBiometricAuthenticator(
-        private var state: BiometricState = BiometricState(status = BiometricStatus.Disabled),
+        private var currentState: BiometricState = BiometricState(status = BiometricStatus.Disabled),
         private var authenticateOutcome: BiometricAuthenticationOutcome =
             BiometricAuthenticationOutcome.Cancelled,
         private var enableResult: NivaraResult<Unit> = NivaraResult.Success(Unit),
@@ -320,12 +320,12 @@ class BiometricViewModelTest {
 
         override fun detachHost(host: BiometricPromptHost) = Unit
 
-        override suspend fun state(): BiometricState = state
+        override suspend fun state(): BiometricState = currentState
 
         override suspend fun enable(): NivaraResult<Unit> {
             enableCalls++
             if (enableResult.isSuccess) {
-                state = BiometricState(status = BiometricStatus.Enabled)
+                currentState = BiometricState(status = BiometricStatus.Enabled)
             }
             return enableResult
         }
@@ -338,14 +338,14 @@ class BiometricViewModelTest {
         override suspend fun disable(): NivaraResult<Unit> {
             disableCalls++
             if (disableResult.isSuccess) {
-                state = BiometricState(status = BiometricStatus.Disabled)
+                currentState = BiometricState(status = BiometricStatus.Disabled)
             }
             return disableResult
         }
 
         override suspend fun clearFailures() {
             clearFailuresCalls++
-            state = state.copy(retryAfterMillis = 0L)
+            currentState = currentState.copy(retryAfterMillis = 0L)
         }
     }
 

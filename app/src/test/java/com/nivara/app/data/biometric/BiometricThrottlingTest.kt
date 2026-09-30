@@ -34,12 +34,19 @@ class BiometricThrottlingTest {
 
     private val time = MutableTimeProvider()
 
-    private val biometrics: AttemptTracker =
-        testAttemptTracker(testAttemptStore(biometricFile), time, BiometricThrottlePolicy.Default)
+    // The tracker is built on demand rather than at construction: the temporary folder does not
+    // exist until JUnit has applied its rule. Each access opens the same file, which is the point —
+    // the state under test lives on disk, not in the tracker object.
+    private val biometrics: AttemptTracker
+        get() = testAttemptTracker(
+            store = testAttemptStore(biometricFile),
+            timeProvider = time,
+            policy = BiometricThrottlePolicy.Default,
+        )
 
     /** The credential's own counter: the default policy, and a different file. */
-    private val credentials: AttemptTracker =
-        testAttemptTracker(testAttemptStore(credentialFile), time)
+    private val credentials: AttemptTracker
+        get() = testAttemptTracker(testAttemptStore(credentialFile), time)
 
     @Test
     fun `four failures leave the next attempt free`() = runTest {
