@@ -73,7 +73,7 @@ class NivaraCredentialManagerTest {
         attemptTracker = attemptTracker,
     )
 
-    private fun storedRecord() = testRecordStore(recordFile).load().valueOrFail()
+    private suspend fun storedRecord() = testRecordStore(recordFile).load().valueOrFail()
 
     // ------------------------------------------------------------------ status and selection
 

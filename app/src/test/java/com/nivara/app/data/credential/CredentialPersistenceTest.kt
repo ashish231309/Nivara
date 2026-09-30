@@ -8,6 +8,8 @@ import com.nivara.app.domain.credential.StoredCredential
 import com.nivara.app.domain.credential.ThrottleState
 import com.nivara.app.domain.security.KeyDerivationAlgorithm
 import com.nivara.app.domain.security.KeyDerivationConfig
+import com.nivara.app.testing.testAttemptStore
+import com.nivara.app.testing.testRecordStore
 import com.nivara.app.testing.valueOrFail
 import java.io.File
 import kotlinx.coroutines.test.runTest
