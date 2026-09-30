@@ -1,12 +1,18 @@
 package com.nivara.app.di
 
 import android.content.Context
+import com.nivara.app.data.credential.FileAttemptStore
+import com.nivara.app.data.credential.FileCredentialRecordStore
+import com.nivara.app.data.credential.NivaraCredentialManager
+import com.nivara.app.data.credential.PersistedAttemptTracker
+import com.nivara.app.data.credential.SystemTimeProvider
 import com.nivara.app.data.security.AndroidDeviceSecurityProvider
 import com.nivara.app.data.security.AndroidKeystoreDeviceKeyStore
 import com.nivara.app.data.security.HkdfRecoveryKeyEnvelopeService
 import com.nivara.app.data.security.JcaEncryptionService
 import com.nivara.app.data.security.NivaraContentKeyWrapper
 import com.nivara.app.data.security.Pbkdf2KeyDerivationService
+import com.nivara.app.domain.credential.CredentialManager
 import com.nivara.app.domain.security.ContentKeyWrapper
 import com.nivara.app.domain.security.DeviceKeyStore
 import com.nivara.app.domain.security.DeviceSecurityProvider
@@ -14,6 +20,7 @@ import com.nivara.app.domain.security.EncryptionService
 import com.nivara.app.domain.security.KeyDerivationService
 import com.nivara.app.domain.security.RecoveryKeyEnvelopeService
 import com.nivara.app.domain.security.SecureRandomGenerator
+import java.io.File
 
 /**
  * Application composition root.
@@ -43,6 +50,9 @@ interface AppContainer {
 
     /** Sealing a content key with an independent recovery key. */
     val recoveryKeyEnvelopeService: RecoveryKeyEnvelopeService
+
+    /** Enrolling, verifying and changing the primary authentication credential. */
+    val credentialManager: CredentialManager
 }
 
 /**
@@ -84,5 +94,31 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val recoveryKeyEnvelopeService: RecoveryKeyEnvelopeService by lazy {
         HkdfRecoveryKeyEnvelopeService(random = secureRandomGenerator)
+    }
+
+    override val credentialManager: CredentialManager by lazy {
+        NivaraCredentialManager(
+            keyDerivationService = keyDerivationService,
+            store = FileCredentialRecordStore(File(securityDirectory, CREDENTIAL_RECORD_FILE)),
+            attemptTracker = PersistedAttemptTracker(
+                store = FileAttemptStore(File(securityDirectory, ATTEMPT_STATE_FILE)),
+                timeProvider = SystemTimeProvider(),
+            ),
+        )
+    }
+
+    /**
+     * Directory holding the credential record and the attempt counters.
+     *
+     * Created on first write. It sits inside the application's private storage, which other
+     * applications cannot read, and it is excluded from backup and device transfer along with
+     * the rest of the application's data.
+     */
+    private val securityDirectory: File by lazy { File(applicationContext.filesDir, SECURITY_DIRECTORY) }
+
+    private companion object {
+        const val SECURITY_DIRECTORY = "security"
+        const val CREDENTIAL_RECORD_FILE = "credential.nvc"
+        const val ATTEMPT_STATE_FILE = "credential-attempts.nva"
     }
 }

@@ -31,13 +31,32 @@ sealed interface NivaraDestination {
         override val titleRes: Int = R.string.about_title
     }
 
+    /** First-time credential enrollment. */
+    data object CredentialSetup : NivaraDestination {
+        override val route: String = "credential-setup"
+        override val titleRes: Int = R.string.credential_setup_title
+    }
+
+    /** Verifying the configured credential. */
+    data object CredentialVerify : NivaraDestination {
+        override val route: String = "credential-verify"
+        override val titleRes: Int = R.string.credential_verify_title
+    }
+
+    /** Replacing the configured credential after authenticating. */
+    data object CredentialChange : NivaraDestination {
+        override val route: String = "credential-change"
+        override val titleRes: Int = R.string.credential_change_title
+    }
+
     companion object {
         /**
          * All destinations that exist in the graph.
          *
          * Add the new entry here together with its `composable` block in `NivaraNavHost`.
          */
-        val entries: List<NivaraDestination> = listOf(Home, About)
+        val entries: List<NivaraDestination> =
+            listOf(Home, About, CredentialSetup, CredentialVerify, CredentialChange)
 
         /** Resolves a navigation route back to its destination, or `null` when unknown. */
         fun fromRoute(route: String?): NivaraDestination? = entries.firstOrNull { it.route == route }

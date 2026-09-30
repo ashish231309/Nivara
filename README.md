@@ -10,20 +10,23 @@ frameworks, and no dependencies that are not justified by code that exists.
 
 ## Project status
 
-The repository contains the **foundation release** and the **cryptographic core**.
+The repository contains the **foundation release**, the **cryptographic core** and **primary
+credential enrolment**.
 
 What works today:
 
 - the application shell — home and about screens, navigation, Material 3 light/dark theme;
 - reporting the device's screen-lock status;
+- enrolling, verifying and changing one primary credential — a PIN, a password or a pattern —
+  with a documented storage format and attempt throttling;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
 
-No user-facing security feature is implemented yet. There is no credential enrolment, no
-biometric prompt, no app locking, no vault and no recovery flow — those are the stages that
-follow, and they consume the cryptographic layer described in
-[`docs/crypto/README.md`](docs/crypto/README.md).
+There is still no biometric prompt, no session, no app locking, no vault and no recovery flow —
+those are the stages that follow, and they consume the layers described in
+[`docs/crypto/README.md`](docs/crypto/README.md) and
+[`docs/credential/README.md`](docs/credential/README.md).
 
 ## Planned capabilities
 
@@ -60,7 +63,7 @@ app/src/main/java/com/nivara/app/
 ├── MainActivity.kt             The single activity; hosts the Compose UI
 ├── di/                         Hand-written composition root (AppContainer)
 ├── core/common/                Types shared across layers (NivaraResult)
-├── domain/                     Contracts the app depends on (DeviceSecurityProvider)
+├── domain/                     Contracts the app depends on (no Android types)
 ├── data/                       Platform-backed implementations of those contracts
 └── ui/                         Compose UI
     ├── NivaraApp.kt            Root composable: app bar + navigation host
@@ -68,7 +71,8 @@ app/src/main/java/com/nivara/app/
     ├── navigation/             Destinations and the navigation graph
     ├── components/             Reusable loading and error states
     ├── home/                   Home screen, state and view model
-    └── about/                  About screen
+    ├── about/                  About screen
+    └── credential/             Enrolment, verification and change screens
 ```
 
 The layering is deliberately small: `ui` depends on `domain` contracts, `domain` has no
@@ -116,10 +120,13 @@ and `local.properties` are excluded by `.gitignore`.
 ```
 
 Unit tests cover the pieces that carry logic but no Android dependency: the result wrapper between
-layers, the home screen state machine, the navigation route table, and the cryptographic layer —
+layers, the home screen state machine, the navigation route table, the cryptographic layer —
 envelope parsing and rejection cases, tamper detection, purpose binding, known-answer vectors from
 RFC 5869 (HKDF) and PBKDF2, randomness lengths, secret-buffer handling, key wrapping and the
-recovery foundation.
+recovery foundation — and the credential layer, which is tested end to end with real PBKDF2 and a
+controlled clock: policy rules, pattern canonicalisation, the on-disk record and counter formats,
+persistence across a fresh store, enrolment, verification, change in every direction, attempt
+throttling and scans proving that no credential or derived key is ever written.
 
 Instrumented tests cover what only a device can prove: Android Keystore key generation,
 non-exportability, invalidation detection and use through a cipher. They are never simulated on the
@@ -171,6 +178,24 @@ Principles the layer is held to:
 - Erasure is best effort. The code clears live buffers and keeps secret lifetimes short, and the
   documentation says plainly that a managed runtime cannot guarantee zeroisation.
 
+## Credential protection
+
+The primary credential — a PIN, a password or a pattern, exactly one of them — is enrolled,
+verified and changed through the `CredentialManager` domain contract. The design, the byte layouts
+and the threat model are documented in
+[`docs/credential/README.md`](docs/credential/README.md).
+
+| Concern | Implementation |
+| --- | --- |
+| Methods | PIN, password or pattern; exactly one active at a time |
+| Derivation | The Stage 2 PBKDF2-HMAC-SHA-256 service; the derived key is never stored |
+| Stored material | Credential type, KDF parameters, random salt and a one-way verifier — `HMAC-SHA-256(derivedKey, label ‖ type)` |
+| Storage | Two small files in the private directory, written atomically; no credential, key or recovery material |
+| Verification | Constant-time comparison; a wrong credential, a wrong type and a tampered record are indistinguishable |
+| Change | Authenticates the current credential first; the previous credential stops working immediately |
+| Attempts | Two free attempts, then a capped exponential delay; reset only on success; never a permanent lock |
+| Reset | Deliberately absent — removal goes through recovery, which is a later stage with its own threat model |
+
 ## Repository checks
 
 `tools/verify_nivara.py` runs a set of fast static checks that need no JDK: resource and version
@@ -193,10 +218,10 @@ the debug and release variants, compiles the instrumented tests, runs the unit t
 lint.
 
 It is intentionally not wired to every push: Gradle builds are expensive and nothing is
-learned by rebuilding the same code repeatedly. A run is triggered when a pull request or a
-push to `main` changes build configuration — Gradle, the version catalog, the wrapper or the
-module build files — and it can also be started manually from the Actions tab
-(`workflow_dispatch`) whenever a change needs verification.
+learned by rebuilding the same code repeatedly. A run is triggered when a change to `main`, or to
+an open pull request, touches build configuration — Gradle, the version catalog, the wrapper or
+the module build files — the repository checks under `tools/`, or the workflow itself. It can also
+be started manually from the Actions tab whenever a change needs verification.
 
 ## Contributing
 

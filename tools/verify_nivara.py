@@ -147,9 +147,14 @@ for path in kt_files:
                 f"({stripped.count(open_ch)} opening vs {stripped.count(close_ch)} closing)")
 
     for m2 in re.finditer(r"^(?:internal |private |public )*(?:sealed |data |enum |abstract |open |annotation )*"
-                          r"(?:class|interface|object)\s+([A-Za-z_]\w*)", text, re.MULTILINE):
+                          r"(?:fun\s+)?(?:class|interface|object)\s+([A-Za-z_]\w*)", text, re.MULTILINE):
         declared_symbols.add(m2.group(1))
     for m2 in re.finditer(r"^(?:internal |private )?(?:inline |suspend )?fun\s+(?:<[^>]*>\s*)?(?:[\w.<>?,*\s]*?\.)?([A-Za-z_]\w*)\s*\(", text, re.MULTILINE):
+        declared_symbols.add(m2.group(1))
+    # Extension properties: `val NivaraResult<*>.isSuccess`. The receiver dot is required, so an
+    # ordinary top-level `val name = …` is not mistaken for a type or a member.
+    for m2 in re.finditer(r"^(?:internal |private |public )*(?:inline )?(?:val|var)\s+"
+                          r"[\w.<>?,*\[\] ]+\.\s*([A-Za-z_]\w*)", text, re.MULTILINE):
         declared_symbols.add(m2.group(1))
 
 for path in kt_files:

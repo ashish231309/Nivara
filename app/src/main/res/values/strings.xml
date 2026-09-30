@@ -29,4 +29,81 @@
     <string name="state_error_summary">Nivara could not load this screen.</string>
     <string name="state_retry_action">Try again</string>
     <string name="navigation_back">Back</string>
+
+    <!-- Credential enrollment and verification -->
+    <string name="credential_setup_title">Set up credential</string>
+    <string name="credential_change_title">Change credential</string>
+    <string name="credential_verify_title">Verify credential</string>
+
+    <string name="credential_type_pin">PIN</string>
+    <string name="credential_type_pin_summary">Digits entered on a keypad.</string>
+    <string name="credential_type_password">Password</string>
+    <string name="credential_type_password_summary">Text entered on the keyboard.</string>
+    <string name="credential_type_pattern">Pattern</string>
+    <string name="credential_type_pattern_summary">A drawing that connects dots on a grid.</string>
+
+    <string name="credential_choose_type_title">Choose a credential</string>
+    <string name="credential_choose_type_summary">One method protects your private space. You can change it later.</string>
+
+    <string name="credential_enter_pin_title">Enter a PIN</string>
+    <string name="credential_enter_pin_summary">At least four digits, and not a repeated or sequential run.</string>
+    <string name="credential_enter_password_title">Enter a password</string>
+    <string name="credential_enter_password_summary">Length matters more than symbols. Eight characters is the minimum.</string>
+    <string name="credential_enter_pattern_title">Draw a pattern</string>
+    <string name="credential_enter_pattern_summary">Connect at least four dots. Dots you cross on the way count too.</string>
+
+    <string name="credential_confirm_title">Enter it again</string>
+    <string name="credential_confirm_summary">Confirming now means a typo cannot lock you out later.</string>
+
+    <string name="credential_verify_current_title">Confirm your current credential</string>
+    <string name="credential_verify_current_summary">The stored credential is replaced only after the current one is accepted.</string>
+
+    <string name="credential_working_message">Protecting your credential…</string>
+    <string name="credential_verifying_message">Checking your credential…</string>
+
+    <string name="credential_saved_title">Credential saved</string>
+    <string name="credential_saved_summary">Nivara will ask for it before it opens protected content.</string>
+
+    <string name="credential_unlock_title">Enter your credential</string>
+    <string name="credential_unlock_summary">Nivara neither shows nor stores what you enter.</string>
+
+    <string name="credential_verified_title">Credential accepted</string>
+    <string name="credential_verified_summary">That matches the credential configured on this device.</string>
+
+    <string name="credential_not_configured_summary">Set a credential up first; there is nothing to check against yet.</string>
+    <string name="credential_invalid_configuration_summary">The stored credential cannot be read. Recovery arrives in a later release.</string>
+
+    <string name="credential_password_label">Password</string>
+    <string name="credential_pin_backspace">Delete digit</string>
+    <string name="credential_pattern_area_description">Pattern area. Drag across the dots to draw your pattern.</string>
+
+    <string name="credential_action_continue">Continue</string>
+    <string name="credential_action_save">Save credential</string>
+    <string name="credential_action_verify">Verify</string>
+    <string name="credential_action_change">Change credential</string>
+    <string name="credential_action_done">Done</string>
+
+    <string name="credential_error_too_short">Too short. The minimum length is %1$d.</string>
+    <string name="credential_error_too_long">Too long. The maximum length is %1$d.</string>
+    <string name="credential_error_invalid_characters">That credential contains characters that are not allowed.</string>
+    <string name="credential_error_too_common">That choice is too easy to guess. Pick another one.</string>
+    <string name="credential_error_pattern_too_short">Connect at least %1$d dots.</string>
+    <string name="credential_error_pattern_invalid">That is not a valid pattern.</string>
+    <string name="credential_error_confirmation_mismatch">The two entries do not match.</string>
+    <string name="credential_error_not_configured">No credential is configured yet.</string>
+    <string name="credential_error_already_configured">A credential is already set up. Use change instead.</string>
+    <string name="credential_error_failed">That credential was not accepted.</string>
+    <string name="credential_error_invalid_configuration">The stored credential cannot be used.</string>
+    <string name="credential_error_blocked">Too many attempts. Try again in %1$d s.</string>
+    <string name="credential_error_generic">Nivara could not complete that. Try again.</string>
+
+    <!-- Home: primary credential -->
+    <string name="home_credential_title">Primary credential</string>
+    <string name="home_credential_none">Not set up</string>
+    <string name="home_credential_none_summary">Choose a PIN, password or pattern to protect your private space.</string>
+    <string name="home_credential_configured">Set up: %1$s</string>
+    <string name="home_credential_configured_summary">Nivara asks for this credential before it opens protected content.</string>
+    <string name="home_credential_setup_action">Set up credential</string>
+    <string name="home_credential_verify_action">Verify credential</string>
+    <string name="home_credential_change_action">Change credential</string>
 </resources>

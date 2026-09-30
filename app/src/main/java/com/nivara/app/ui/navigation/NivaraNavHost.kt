@@ -6,6 +6,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.nivara.app.ui.about.AboutRoute
+import com.nivara.app.ui.credential.CredentialChangeRoute
+import com.nivara.app.ui.credential.CredentialSetupRoute
+import com.nivara.app.ui.credential.CredentialVerifyRoute
 import com.nivara.app.ui.home.HomeRoute
 
 /**
@@ -28,10 +31,24 @@ fun NivaraNavHost(
         composable(route = NivaraDestination.Home.route) {
             HomeRoute(
                 onOpenAbout = { navController.navigateTo(NivaraDestination.About) },
+                onOpenCredentialSetup = { navController.navigateTo(NivaraDestination.CredentialSetup) },
+                onOpenCredentialVerify = { navController.navigateTo(NivaraDestination.CredentialVerify) },
+                onOpenCredentialChange = { navController.navigateTo(NivaraDestination.CredentialChange) },
             )
         }
         composable(route = NivaraDestination.About.route) {
             AboutRoute()
+        }
+        composable(route = NivaraDestination.CredentialSetup.route) {
+            CredentialSetupRoute(onDone = { navController.popBackStack() })
+        }
+        composable(route = NivaraDestination.CredentialVerify.route) {
+            CredentialVerifyRoute(
+                onChangeCredential = { navController.navigateTo(NivaraDestination.CredentialChange) },
+            )
+        }
+        composable(route = NivaraDestination.CredentialChange.route) {
+            CredentialChangeRoute(onDone = { navController.popBackStack() })
         }
     }
 }

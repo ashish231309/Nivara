@@ -1,5 +1,7 @@
 package com.nivara.app.ui.home
 
+import com.nivara.app.domain.credential.PrimaryCredentialType
+
 /**
  * State of the home screen.
  *
@@ -15,8 +17,12 @@ sealed interface HomeUiState {
      * The screen has data to show.
      *
      * @param deviceLockConfigured whether the device currently has a screen lock set.
+     * @param credentialType the configured primary credential, or `null` when none is set up.
      */
-    data class Ready(val deviceLockConfigured: Boolean) : HomeUiState
+    data class Ready(
+        val deviceLockConfigured: Boolean,
+        val credentialType: PrimaryCredentialType?,
+    ) : HomeUiState
 
     /** The screen could not load. The UI offers a retry. */
     data object Error : HomeUiState

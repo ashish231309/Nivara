@@ -2,6 +2,7 @@ package com.nivara.app.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,8 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.domain.credential.PrimaryCredentialType
 import com.nivara.app.ui.components.NivaraErrorState
 import com.nivara.app.ui.components.NivaraLoadingState
+import com.nivara.app.ui.credential.credentialTypeNameRes
 import com.nivara.app.ui.theme.NivaraTheme
 
 /**
@@ -31,6 +35,9 @@ import com.nivara.app.ui.theme.NivaraTheme
 @Composable
 fun HomeRoute(
     onOpenAbout: () -> Unit,
+    onOpenCredentialSetup: () -> Unit,
+    onOpenCredentialVerify: () -> Unit,
+    onOpenCredentialChange: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
@@ -40,6 +47,9 @@ fun HomeRoute(
         uiState = uiState,
         onRetry = viewModel::refresh,
         onOpenAbout = onOpenAbout,
+        onOpenCredentialSetup = onOpenCredentialSetup,
+        onOpenCredentialVerify = onOpenCredentialVerify,
+        onOpenCredentialChange = onOpenCredentialChange,
         modifier = modifier,
     )
 }
@@ -52,6 +62,9 @@ fun HomeScreen(
     uiState: HomeUiState,
     onRetry: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenCredentialSetup: () -> Unit,
+    onOpenCredentialVerify: () -> Unit,
+    onOpenCredentialChange: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -59,7 +72,11 @@ fun HomeScreen(
         HomeUiState.Error -> NivaraErrorState(onRetry = onRetry, modifier = modifier)
         is HomeUiState.Ready -> HomeContent(
             deviceLockConfigured = uiState.deviceLockConfigured,
+            credentialType = uiState.credentialType,
             onOpenAbout = onOpenAbout,
+            onOpenCredentialSetup = onOpenCredentialSetup,
+            onOpenCredentialVerify = onOpenCredentialVerify,
+            onOpenCredentialChange = onOpenCredentialChange,
             modifier = modifier,
         )
     }
@@ -68,7 +85,11 @@ fun HomeScreen(
 @Composable
 private fun HomeContent(
     deviceLockConfigured: Boolean,
+    credentialType: PrimaryCredentialType?,
     onOpenAbout: () -> Unit,
+    onOpenCredentialSetup: () -> Unit,
+    onOpenCredentialVerify: () -> Unit,
+    onOpenCredentialChange: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -90,6 +111,13 @@ private fun HomeContent(
         )
 
         DeviceSecurityCard(deviceLockConfigured = deviceLockConfigured)
+
+        CredentialCard(
+            credentialType = credentialType,
+            onOpenCredentialSetup = onOpenCredentialSetup,
+            onOpenCredentialVerify = onOpenCredentialVerify,
+            onOpenCredentialChange = onOpenCredentialChange,
+        )
 
         InfoCard(
             title = stringResource(id = R.string.home_foundation_title),
@@ -125,6 +153,50 @@ private fun DeviceSecurityCard(
     )
 }
 
+/**
+ * The credential's status, and the actions that make sense for it.
+ *
+ * Only one action can create the credential and only one can replace it; the button shown is
+ * derived from the stored state rather than from anything the user chose on this screen.
+ */
+@Composable
+private fun CredentialCard(
+    credentialType: PrimaryCredentialType?,
+    onOpenCredentialSetup: () -> Unit,
+    onOpenCredentialVerify: () -> Unit,
+    onOpenCredentialChange: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val body = if (credentialType == null) {
+        "${stringResource(id = R.string.home_credential_none)} — " +
+            stringResource(id = R.string.home_credential_none_summary)
+    } else {
+        stringResource(
+            id = R.string.home_credential_configured,
+            stringResource(id = credentialTypeNameRes(credentialType)),
+        ) + " — " + stringResource(id = R.string.home_credential_configured_summary)
+    }
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        InfoCard(title = stringResource(id = R.string.home_credential_title), body = body)
+
+        if (credentialType == null) {
+            Button(onClick = onOpenCredentialSetup, modifier = Modifier.fillMaxWidth()) {
+                Text(text = stringResource(id = R.string.home_credential_setup_action))
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onOpenCredentialVerify, modifier = Modifier.weight(1f)) {
+                    Text(text = stringResource(id = R.string.home_credential_verify_action))
+                }
+                OutlinedButton(onClick = onOpenCredentialChange, modifier = Modifier.weight(1f)) {
+                    Text(text = stringResource(id = R.string.home_credential_change_action))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun InfoCard(
     title: String,
@@ -148,19 +220,36 @@ private fun InfoCard(
     }
 }
 
-@Preview(name = "Home – screen lock set", showBackground = true)
+@Preview(name = "Home – no credential, screen lock set", showBackground = true)
 @Composable
 private fun HomeScreenReadyPreview() {
     NivaraTheme {
-        HomeScreen(uiState = HomeUiState.Ready(deviceLockConfigured = true), onRetry = {}, onOpenAbout = {})
+        HomeScreen(
+            uiState = HomeUiState.Ready(deviceLockConfigured = true, credentialType = null),
+            onRetry = {},
+            onOpenAbout = {},
+            onOpenCredentialSetup = {},
+            onOpenCredentialVerify = {},
+            onOpenCredentialChange = {},
+        )
     }
 }
 
-@Preview(name = "Home – no screen lock", showBackground = true)
+@Preview(name = "Home – credential configured, no screen lock", showBackground = true)
 @Composable
-private fun HomeScreenNoLockPreview() {
+private fun HomeScreenConfiguredPreview() {
     NivaraTheme {
-        HomeScreen(uiState = HomeUiState.Ready(deviceLockConfigured = false), onRetry = {}, onOpenAbout = {})
+        HomeScreen(
+            uiState = HomeUiState.Ready(
+                deviceLockConfigured = false,
+                credentialType = PrimaryCredentialType.Pattern,
+            ),
+            onRetry = {},
+            onOpenAbout = {},
+            onOpenCredentialSetup = {},
+            onOpenCredentialVerify = {},
+            onOpenCredentialChange = {},
+        )
     }
 }
 
@@ -168,6 +257,13 @@ private fun HomeScreenNoLockPreview() {
 @Composable
 private fun HomeScreenErrorPreview() {
     NivaraTheme {
-        HomeScreen(uiState = HomeUiState.Error, onRetry = {}, onOpenAbout = {})
+        HomeScreen(
+            uiState = HomeUiState.Error,
+            onRetry = {},
+            onOpenAbout = {},
+            onOpenCredentialSetup = {},
+            onOpenCredentialVerify = {},
+            onOpenCredentialChange = {},
+        )
     }
 }
