@@ -55,8 +55,15 @@ internal class FakeVaultRootStorage : VaultRootStorage {
     /** Held open to keep a write in flight while a test inspects the root. */
     var writeGate: CompletableDeferred<Unit>? = null
 
+    // Written from whichever thread a test runs the repository on, so a test that waits on one of
+    // them observes the write rather than a value the compiler was free to cache.
+    @Volatile
     var writeCalls: Int = 0
+
+    @Volatile
     var deleteCalls: Int = 0
+
+    @Volatile
     var readCalls: Int = 0
 
     override suspend fun ensureMetadataArea(): NivaraResult<Unit> = ensureDirectory(metadata = true)
