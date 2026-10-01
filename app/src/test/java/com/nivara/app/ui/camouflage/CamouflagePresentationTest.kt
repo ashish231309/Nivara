@@ -79,14 +79,26 @@ class CamouflagePresentationTest {
     }
 
     @Test
-    fun `every identity in the model is covered by the mapping`() {
-        // The `when` expressions are exhaustive at compile time; this is the runtime companion,
-        // which fails if an identity is ever added to the model without a picture to show for it.
-        val covered = CamouflageProfile.entries.map { profile ->
-            listOf(profile.labelRes(), profile.foregroundRes(), profile.backgroundRes())
-        }
-
-        assertEquals(CamouflageProfile.entries.size, covered.size)
-        assertEquals(3, CamouflageProfile.entries.size + 1)
+    fun `the mapping covers exactly the identities the model declares`() {
+        // The `when` expressions are exhaustive at compile time; this is the runtime companion. It
+        // compares the labels the model maps to against the resources this build declares, so an
+        // identity added to the model without a name — or a name left behind by one that was
+        // removed — fails here rather than at a glance at a screen nobody opened.
+        assertEquals(
+            setOf(
+                R.string.camouflage_profile_notes_label,
+                R.string.camouflage_profile_calculator_label,
+                R.string.camouflage_profile_weather_label,
+            ),
+            CamouflageProfile.camouflageProfiles.map { profile -> profile.labelRes() }.toSet(),
+        )
+        assertEquals(
+            setOf(
+                R.drawable.ic_camouflage_notes,
+                R.drawable.ic_camouflage_calculator,
+                R.drawable.ic_camouflage_weather,
+            ),
+            CamouflageProfile.camouflageProfiles.map { profile -> profile.foregroundRes() }.toSet(),
+        )
     }
 }
