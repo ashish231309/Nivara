@@ -196,7 +196,7 @@ class VaultSearchTest {
         assertEquals(
             "and the title finds the album on the albums surface",
             listOf(album),
-            VaultSearch.filter(listOf(album), query("holiday")),
+            VaultSearch.filterAlbums(listOf(album), query("holiday")),
         )
     }
 
@@ -207,7 +207,7 @@ class VaultSearchTest {
         assertTrue(VaultSearch.matches(album, query("holiday")))
         assertTrue(VaultSearch.matches(album, query("SUMMER")))
         assertFalse(VaultSearch.matches(album, query("winter")))
-        assertEquals(listOf(album), VaultSearch.filter(listOf(album), query("2024")))
+        assertEquals(listOf(album), VaultSearch.filterAlbums(listOf(album), query("2024")))
     }
 
     // ------------------------------------------------------------------ the states a search can be in

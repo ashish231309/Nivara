@@ -254,11 +254,12 @@ class NivaraVaultOrganizationRepositoryTest {
     fun `creating an album when the record is full is refused`() = runTest {
         val full = (1..VaultOrganizationLimits.MAXIMUM_ALBUMS).map { seed -> testAlbum(seed = seed, name = "Album $seed") }
         putRecord(albums = full)
+        val writesAfterSeeding = metadata.writeCalls
 
         val result = repository().createAlbum(name = "One more", authorize = ::authorize)
 
         assertEquals(VaultOrganizationFailure.OrganizationFull, result.failure())
-        assertEquals(0, metadata.writeCalls)
+        assertEquals("a refused change writes nothing", writesAfterSeeding, metadata.writeCalls)
     }
 
     @Test
@@ -390,11 +391,12 @@ class NivaraVaultOrganizationRepositoryTest {
     fun `adding to an album that already holds as many items as it can is refused`() = runTest {
         val members = (1..VaultOrganizationLimits.MAXIMUM_MEMBERS_PER_ALBUM).map { seed -> testItemId(seed) }
         putRecord(albums = listOf(testAlbum(seed = 1, name = "Full", itemIds = members)))
+        val writesAfterSeeding = metadata.writeCalls
 
         val result = repository().addItem(albumId = testAlbumId(1), itemId = testItemId(9_999), authorize = ::authorize)
 
         assertEquals(VaultOrganizationFailure.AlbumFull, result.failure())
-        assertEquals(0, metadata.writeCalls)
+        assertEquals("a refused change writes nothing", writesAfterSeeding, metadata.writeCalls)
     }
 
     @Test

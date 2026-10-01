@@ -77,8 +77,14 @@ object VaultSearch {
     fun filter(items: List<VaultItem>, query: VaultSearchQuery): List<VaultItem> =
         if (query.isBlank) items else items.filter { item -> matches(item, query) }
 
-    /** The albums of [albums] that match [query], in the order they were given. */
-    fun filter(albums: List<VaultAlbum>, query: VaultSearchQuery): List<VaultAlbum> =
+    /**
+     * The albums of [albums] that match [query], in the order they were given.
+     *
+     * Named apart from [filter] on purpose: both take a `List`, and [VaultSearchQuery] is an inline
+     * value class, so two `filter` overloads would compile to one JVM signature. A name that says
+     * which collection it filters is clearer than an annotation that exists only for the bytecode.
+     */
+    fun filterAlbums(albums: List<VaultAlbum>, query: VaultSearchQuery): List<VaultAlbum> =
         if (query.isBlank) albums else albums.filter { album -> matches(album, query) }
 
     private fun matchesText(text: String, normalizedNeedle: String): Boolean =

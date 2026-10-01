@@ -764,7 +764,7 @@ class VaultViewModel(
         } else {
             when (this) {
                 is VaultOrganizationState.Ready ->
-                    VaultOrganizationState.Ready(albums = VaultSearch.filter(albums, query))
+                    VaultOrganizationState.Ready(albums = VaultSearch.filterAlbums(albums, query))
 
                 else -> this
             }
