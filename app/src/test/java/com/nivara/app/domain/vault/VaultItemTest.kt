@@ -145,7 +145,10 @@ class VaultItemTest {
         assertNull(VaultContentDigest.fromBytes(ByteArray(31)))
         assertNull(VaultContentDigest.fromBytes(ByteArray(33)))
         assertFalse(VaultContentDigest.isWellFormed(""))
-        assertFalse(VaultContentDigest.isWellFormed("00".repeat(32).uppercase()))
+        // Letters, so case is actually being tested: "00" repeated would be its own uppercase.
+        assertFalse(VaultContentDigest.isWellFormed("AB".repeat(32)))
+        assertFalse(VaultContentDigest.isWellFormed("ab".repeat(31)))
+        assertTrue(VaultContentDigest.isWellFormed("ab".repeat(32)))
     }
 
     // ------------------------------------------------------------------ the item

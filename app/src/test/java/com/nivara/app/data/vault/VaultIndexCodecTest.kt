@@ -176,42 +176,30 @@ class VaultIndexCodecTest {
 
     @Test
     fun `a name a provider could not produce is refused by the payload parser`() {
-        val id = VaultItemId.create(random)
-        val digest = VaultContentDigest.fromBytes(ByteArray(32) { 5 })!!
-        val traversal = VaultItem(id, "..", null, 1L, 1L, 1, digest)
-        val long = VaultItem(VaultItemId.create(random), "a".repeat(300), null, 1L, 1L, 1, digest)
-
-        assertNull(VaultIndexCodec.decodePayload(payloadWith(listOf(traversal)), expectedGeneration = 1))
-        assertNull(VaultIndexCodec.decodePayload(payloadWith(listOf(long)), expectedGeneration = 1))
+        // The model refuses these names, so this code cannot write them — which is exactly why the
+        // parser must refuse them too. The bytes come from storage, and a record that was damaged or
+        // edited must not become a valid item merely because the parser trusted its own format.
+        assertNull(VaultIndexCodec.decodePayload(payloadWithName(".."), expectedGeneration = 1))
+        assertNull(VaultIndexCodec.decodePayload(payloadWithName("a\u0000b"), expectedGeneration = 1))
+        assertNull(VaultIndexCodec.decodePayload(payloadWithName(""), expectedGeneration = 1))
+        assertNull(VaultIndexCodec.decodePayload(payloadWithName("a/b"), expectedGeneration = 1))
+        assertNull(VaultIndexCodec.decodePayload(payloadWithName("a".repeat(201)), expectedGeneration = 1))
     }
 
     @Test
-    fun `an item the format cannot hold is refused instead of half-written`() {
-        val digest = VaultContentDigest.fromBytes(ByteArray(32) { 1 })!!
-        val tooLongAName = VaultItem(
-            VaultItemId.create(random),
-            "a".repeat(1_000),
-            null,
-            1L,
-            1L,
-            1,
-            digest,
-        )
-        val negativeSize = VaultItem(VaultItemId.create(random), "a.txt", null, -1L, 1L, 1, digest)
-        val badDigest = VaultItem(
-            VaultItemId.create(random),
-            "a.txt",
-            null,
-            1L,
-            1L,
-            1,
-            VaultContentDigest("not a digest"),
-        )
+    fun `a list the format cannot hold is refused instead of half-written`() {
+        // An item this format could not describe is unrepresentable rather than merely refused: a
+        // name, a type, a size, a time, a version, an identifier and a digest are all validated when
+        // an item is constructed, so the encoder never sees one. What it can be handed is a list that
+        // is too large, and that is what it must refuse — before writing anything.
+        val tooMany = List(VaultIndexCodec.MAXIMUM_ITEM_COUNT + 1) { item("a.txt", null, 1L, 1L) }
 
-        assertNull(VaultIndexCodec.encodePayload(1, 1, listOf(tooLongAName)))
-        assertNull(VaultIndexCodec.encodePayload(1, 1, listOf(negativeSize)))
-        assertNull(VaultIndexCodec.encodePayload(1, 1, listOf(badDigest)))
-        assertNull(VaultIndexCodec.encodePayload(0, 1, emptyList()))
+        assertNull(VaultIndexCodec.encodePayload(1, 1, tooMany))
+        assertNull("a generation starts at one", VaultIndexCodec.encodePayload(0, 1, emptyList()))
+        assertNull("so does the vault generation", VaultIndexCodec.encodePayload(1, 0, emptyList()))
+        // An empty list is a valid record, not a refusal: a vault that holds nothing yet still has
+        // a list, and writing it is how the first import records that it wrote one.
+        assertNotNull(VaultIndexCodec.encodePayload(1, 1, emptyList()))
     }
 
     @Test
@@ -251,11 +239,35 @@ class VaultIndexCodecTest {
      * This is the only way to check that the parser — not just the writer — is strict, and it is how
      * a record damaged after it was written is simulated.
      */
-    private fun payloadWith(items: List<VaultItem>): ByteArray {
+    private fun payloadWith(items: List<VaultItem>): ByteArray =
+        payloadOf(items.map { item -> encodedItem(item, nameOverride = null) })
+
+    /** A payload whose single name is exactly [name], whatever the model thinks of it. */
+    private fun payloadWithName(name: String): ByteArray =
+        payloadOf(listOf(encodedItem(item("a.txt", null, 1L, 1L), nameOverride = name)))
+
+    private fun payloadOf(itemsBytesList: List<ByteArray>): ByteArray {
+        val itemsBytes = ByteArrayOutputStream()
+        itemsBytesList.forEach { encoded -> itemsBytes.write(encoded) }
+        val body = itemsBytes.toByteArray()
+        val payload = ByteArray(VaultIndexCodec.PAYLOAD_HEADER_LENGTH + body.size)
+        VaultIndexCodec.MAGIC.copyInto(payload, 0)
+        payload[4] = VaultIndexCodec.VERSION.toByte()
+        payload[5] = 0
+        payload[22] = (itemsBytesList.size ushr 8).toByte()
+        payload[23] = itemsBytesList.size.toByte()
+        // generation 1, vault generation 1, most significant bytes first
+        payload[13] = 1
+        payload[21] = 1
+        body.copyInto(payload, VaultIndexCodec.PAYLOAD_HEADER_LENGTH)
+        return payload
+    }
+
+    private fun encodedItem(item: VaultItem, nameOverride: String?): ByteArray {
         val body = ByteArrayOutputStream()
-        for (item in items) {
+        run {
             body.write(item.id.toBytes())
-            val name = item.name.toByteArray(Charsets.UTF_8)
+            val name = (nameOverride ?: item.name).toByteArray(Charsets.UTF_8)
             body.write(byteArrayOf((name.size ushr 8).toByte(), name.size.toByte()))
             body.write(name)
             val mime = item.mimeType?.toByteArray(Charsets.UTF_8)
@@ -275,18 +287,7 @@ class VaultIndexCodecTest {
             body.write(item.contentFormatVersion)
             body.write(hexToBytes(item.contentDigest.value))
         }
-        val itemsBytes = body.toByteArray()
-        val payload = ByteArray(VaultIndexCodec.PAYLOAD_HEADER_LENGTH + itemsBytes.size)
-        VaultIndexCodec.MAGIC.copyInto(payload, 0)
-        payload[4] = VaultIndexCodec.VERSION.toByte()
-        payload[5] = 0
-        payload[22] = (items.size ushr 8).toByte()
-        payload[23] = items.size.toByte()
-        // generation 1, vault generation 1, most significant bytes first
-        payload[13] = 1
-        payload[21] = 1
-        itemsBytes.copyInto(payload, VaultIndexCodec.PAYLOAD_HEADER_LENGTH)
-        return payload
+        return body.toByteArray()
     }
 
     private fun hexToBytes(hex: String): ByteArray = ByteArray(hex.length / 2) { index ->

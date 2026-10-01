@@ -149,6 +149,9 @@ internal object VaultIndexCodec {
         items: List<VaultItem>,
     ): ByteArray? {
         if (generation < FIRST_GENERATION) return null
+        // The reader checks this too, so a writer that did not would produce a record this build
+        // could not read back — which is precisely what a commit must never do.
+        if (vaultGeneration < FIRST_GENERATION) return null
         if (items.size > MAXIMUM_ITEM_COUNT) return null
 
         val encodedItems = mutableListOf<ByteArray>()
