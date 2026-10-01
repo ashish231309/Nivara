@@ -256,13 +256,32 @@ for deferred_permission, reason in (
      "nothing in the current feature set draws above another application"),
     ("android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
      "no battery exemption is justified by the current feature set"),
+    ("android.permission.FOREGROUND_SERVICE",
+     "detection runs as a plain started service; a foreground service must be justified by the "
+     "feature it serves and documented first"),
+    ("android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+     "no foreground service is declared, so no service type is declared either"),
+    ("android.permission.POST_NOTIFICATIONS",
+     "no foreground service and no user-visible notification yet; the notification permission "
+     "belongs with the feature that shows one"),
+    ("android.permission.BIND_ACCESSIBILITY_SERVICE",
+     "detection reads usage events; an accessibility service is not used and would be a much "
+     "broader capability"),
 ):
     if deferred_permission in manifest:
         err(f"manifest declares '{deferred_permission}': {reason}")
 
+# Components that are not entry points are private: a service another application could start or
+# stop would be a remote control for Nivara's background work.
+manifest_root = ET.fromstring(manifest)
+for service in manifest_root.iter("service"):
+    if attr(service, "android:exported") != "false":
+        err(f"manifest service '{attr(service, 'android:name')}' must declare "
+            f"android:exported=\"false\"")
+
 # Package visibility (API 30+): launcher applications are not visible by default, so discovery
 # depends on exactly the intent signature the repository queries.
-queries_element = ET.fromstring(manifest).find("queries")
+queries_element = manifest_root.find("queries")
 if queries_element is None:
     err("manifest has no <queries> element: application discovery is invisible on API 30+")
 else:
@@ -362,7 +381,8 @@ for path in main_kt:
 security_sources = sorted((ROOT / "app/src/main/java/com/nivara/app/domain/security").glob("*.kt")) + \
     sorted((ROOT / "app/src/main/java/com/nivara/app/data/security").glob("*.kt")) + \
     sorted((ROOT / "app/src/main/java/com/nivara/app/data/biometric").glob("*.kt")) + \
-    sorted((ROOT / "app/src/main/java/com/nivara/app/data/session").glob("*.kt"))
+    sorted((ROOT / "app/src/main/java/com/nivara/app/data/session").glob("*.kt")) + \
+    sorted((ROOT / "app/src/main/java/com/nivara/app/data/applock").glob("*.kt"))
 main_all_kt = sorted((ROOT / "app/src/main").rglob("*.kt"))
 
 for path in security_sources:
@@ -439,7 +459,7 @@ for path in sorted((ROOT / "app/src/main/java/com/nivara/app/domain/security").g
 # The App Lock domain packages stay as free of the platform as the security domain does: no
 # Context, no PackageManager, no Intent, no UsageStatsManager, no Uri and no Settings. Those belong
 # to the data layer that implements the contracts.
-for domain_package in ("domain/app", "domain/permissions"):
+for domain_package in ("domain/app", "domain/permissions", "domain/applock"):
     domain_dir = ROOT / f"app/src/main/java/com/nivara/app/{domain_package}"
     if not domain_dir.is_dir():
         err(f"{domain_package} is missing")
@@ -448,6 +468,62 @@ for domain_package in ("domain/app", "domain/permissions"):
         text = strip_comments(path.read_text())
         for match in re.finditer(r"\b(android|androidx|java\.io|java\.net)\.[\w.]+", text):
             err(f"{rel}: domain layer references a platform type ({match.group(0)})")
+
+# Foreground detection reads usage events and nothing else. Aggregate usage statistics are a
+# summary of the device's history, which App Lock does not need and must not collect, and the
+# restricted activity-manager calls would be an attempt to work around the Usage Access grant.
+for path in main_kt:
+    text = strip_comments(path.read_text())
+    for forbidden, reason in (
+        ("queryUsageStats(", "App Lock reads usage events, never aggregate usage history"),
+        ("getRunningTasks(", "the restricted activity-manager call is not a foreground source"),
+        ("getRunningAppProcesses(", "the restricted activity-manager call is not a foreground source"),
+        ("AccessibilityService", "foreground detection uses usage events, not accessibility"),
+    ):
+        if forbidden in text:
+            err(f"{path.relative_to(ROOT)}: {forbidden} — {reason}")
+
+# App Lock keeps one configuration file of package names, written atomically, and no other storage.
+applock_data_dir = ROOT / "app/src/main/java/com/nivara/app/data/applock"
+if not applock_data_dir.is_dir():
+    err("data/applock is missing")
+else:
+    applock_sources = sorted(applock_data_dir.glob("*.kt"))
+    if not applock_sources:
+        err("data/applock holds no sources")
+    for path in applock_sources:
+        rel = path.relative_to(ROOT)
+        text = strip_comments(path.read_text())
+        for forbidden in ("SharedPreferences", "DataStore", "RoomDatabase", "openFileOutput",
+                          "UsageStatsManager.queryUsageStats"):
+            if forbidden in text:
+                err(f"{rel}: App Lock storage must stay a single atomic file of package names "
+                    f"({forbidden})")
+        if ("File(" in text or "FileOutputStream" in text) and "AtomicFiles" not in text:
+            err(f"{rel}: App Lock writes a file without the project's atomic write helper")
+
+# App Lock must consume the existing session gate rather than grow one of its own: no second
+# unlocked flag, no per-application session, no authentication cache.
+for path in sorted(list(applock_data_dir.glob("*.kt")) +
+                   list((ROOT / "app/src/main/java/com/nivara/app/domain/applock").glob("*.kt"))):
+    rel = path.relative_to(ROOT)
+    text = strip_comments(path.read_text())
+    for match in re.finditer(r"^(?:internal |private |public )*(?:sealed |data |enum |abstract |open )*"
+                             r"(?:class|interface|object)\s+([A-Za-z_]\w*)", text, re.MULTILINE):
+        name = match.group(1)
+        if re.search(r"Session|Unlock|Authenticated", name):
+            err(f"{rel}: App Lock declares '{name}'; the session and its unlocked state belong "
+                f"to the existing SessionManager")
+    if "currentState()" not in text and "SessionManager" in text:
+        err(f"{rel}: App Lock reads the session without the gate's authoritative currentState()")
+
+monitor_source = (applock_data_dir / "NivaraAppLockMonitor.kt")
+if not monitor_source.exists():
+    err("the App Lock monitor is missing")
+else:
+    monitor_text = strip_comments(monitor_source.read_text())
+    if "dispatcher" in monitor_text and "Dispatchers.IO" not in monitor_text:
+        warn("the App Lock monitor mentions a dispatcher without the IO dispatcher")
 
 # The UI layer reads capabilities through the view models only. A composable that queried the
 # package manager or the usage-stats services would put permission logic in the presentation layer.
@@ -498,9 +574,9 @@ for contract in contracts:
 # The App Lock contracts follow the same rule: exposed by the container, implemented under data.
 applock_contracts = sorted(
     p.stem
-    for package in ("domain/app", "domain/permissions")
+    for package in ("domain/app", "domain/permissions", "domain/applock")
     for p in (ROOT / f"app/src/main/java/com/nivara/app/{package}").glob("*.kt")
-    if p.stem.endswith("Repository"))
+    if p.stem.endswith(("Repository", "Detector", "Monitor")))
 for contract in applock_contracts:
     if contract not in container:
         err(f"AppContainer does not expose the '{contract}' contract")

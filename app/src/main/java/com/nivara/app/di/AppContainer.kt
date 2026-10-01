@@ -9,9 +9,16 @@ import com.nivara.app.data.biometric.AndroidBiometricAuthenticator
 import com.nivara.app.data.biometric.BiometricTokenStore
 import com.nivara.app.data.credential.SystemTimeProvider
 import com.nivara.app.data.app.AndroidApplicationRepository
+import com.nivara.app.data.applock.AndroidForegroundApplicationDetector
+import com.nivara.app.data.applock.FileProtectedApplicationRepository
+import com.nivara.app.data.applock.NivaraAppLockMonitor
 import com.nivara.app.data.permissions.AndroidUsageAccessRepository
 import com.nivara.app.data.session.InMemorySessionManager
 import com.nivara.app.domain.app.ApplicationRepository
+import com.nivara.app.domain.applock.AppLockMonitor
+import com.nivara.app.domain.applock.ForegroundApplicationDetector
+import com.nivara.app.domain.applock.ProtectedApplicationRepository
+import com.nivara.app.domain.applock.ProtectionDecisionEngine
 import com.nivara.app.domain.permissions.UsageAccessRepository
 import com.nivara.app.data.security.AndroidBiometricKeyStore
 import com.nivara.app.data.security.AndroidDeviceSecurityProvider
@@ -99,6 +106,29 @@ interface AppContainer {
      * Nothing here requests the grant; Usage Access is not a runtime permission.
      */
     val usageAccessRepository: UsageAccessRepository
+
+    /**
+     * Which applications the user asked Nivara to protect.
+     *
+     * Configuration only: it says what to protect, never whether Nivara is unlocked.
+     */
+    val protectedApplicationRepository: ProtectedApplicationRepository
+
+    /**
+     * Reports the application currently in the foreground.
+     *
+     * Exposed for the monitor, which owns the loop; nothing in the UI layer queries it directly.
+     */
+    val foregroundApplicationDetector: ForegroundApplicationDetector
+
+    /**
+     * The single App Lock monitoring loop, shared by the whole process.
+     *
+     * One instance on purpose, like the session gate: two monitors would be two answers to the same
+     * question. Nothing starts it during application start-up — the component that needs it starts
+     * it, and stops it again.
+     */
+    val appLockMonitor: AppLockMonitor
 }
 
 /**
@@ -188,6 +218,29 @@ class DefaultAppContainer(context: Context) : AppContainer {
         AndroidUsageAccessRepository(applicationContext)
     }
 
+    override val protectedApplicationRepository: ProtectedApplicationRepository by lazy {
+        FileProtectedApplicationRepository(File(appLockDirectory, PROTECTED_APPLICATIONS_FILE))
+    }
+
+    override val foregroundApplicationDetector: ForegroundApplicationDetector by lazy {
+        AndroidForegroundApplicationDetector(
+            context = applicationContext,
+            timeProvider = timeProvider,
+        )
+    }
+
+    override val appLockMonitor: AppLockMonitor by lazy {
+        NivaraAppLockMonitor(
+            detector = foregroundApplicationDetector,
+            protectedApplications = protectedApplicationRepository,
+            usageAccess = usageAccessRepository,
+            sessionManager = sessionManager,
+            // Nivara's own package name is injected here, from the platform, so the rule that
+            // excludes Nivara from protection exists in exactly one place.
+            decisions = ProtectionDecisionEngine(nivaraPackageName = applicationContext.packageName),
+        )
+    }
+
     /**
      * Directory holding the credential record and the attempt counters.
      *
@@ -196,6 +249,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
      * the rest of the application's data.
      */
     private val securityDirectory: File by lazy { File(applicationContext.filesDir, SECURITY_DIRECTORY) }
+
+    /**
+     * Directory holding App Lock's configuration.
+     *
+     * Created on first write, inside the application's private storage, and excluded from backup
+     * with the rest of the application's data. It holds package names and nothing else — no
+     * session state, no unlock flag and no authentication material.
+     */
+    private val appLockDirectory: File by lazy { File(applicationContext.filesDir, APP_LOCK_DIRECTORY) }
 
     /** One wall clock for every throttling rule in the application. */
     private val timeProvider: TimeProvider by lazy { SystemTimeProvider() }
@@ -206,5 +268,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         const val ATTEMPT_STATE_FILE = "credential-attempts.nva"
         const val BIOMETRIC_TOKEN_FILE = "biometric.token"
         const val BIOMETRIC_ATTEMPT_FILE = "biometric-attempts.nva"
+        const val APP_LOCK_DIRECTORY = "applock"
+        const val PROTECTED_APPLICATIONS_FILE = "protected-applications.nvl"
     }
 }

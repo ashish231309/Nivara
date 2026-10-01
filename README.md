@@ -24,14 +24,20 @@ What works today:
   invalidated key;
 - one in-memory authentication session, established by a primary-credential success or a
   biometric success, expiring on a fixed timeout and ended immediately by Quick Lock;
+- launcher-application discovery, the Usage Access capability and the preparation screen that
+  reports what App Lock needs;
+- App Lock detection: which application is in the foreground, whether the protected set requires
+  authentication for it, and a published requirement for the layer that will present the prompt;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
 
 Biometric unlock never replaces the primary credential and never unlocks anything by itself, and
 the session is not one either: it is an authorization state held only while the process lives, and
-it holds no credential, no key and nothing on disk. There is still no app locking, no vault, no
-hidden apps and no recovery flow — those are the stages that follow, and they consume the layers
+it holds no credential, no key and nothing on disk. Detection decides and publishes; it draws
+nothing, blocks nothing and authenticates nobody. There is still no authentication prompt over
+another application, no vault, no hidden apps and no recovery flow — those are the stages that
+follow, and they consume the layers
 described in [`docs/crypto/README.md`](docs/crypto/README.md),
 [`docs/credential/README.md`](docs/credential/README.md),
 [`docs/biometric/README.md`](docs/biometric/README.md),
@@ -75,9 +81,11 @@ app/src/main/java/com/nivara/app/
 ├── core/common/                Types shared across layers (NivaraResult)
 ├── domain/                     Contracts the app depends on (no Android types)
 │   ├── app/                    Installed-application model, ordering and search rule
-│   └── permissions/            Usage Access state and the App Lock setup aggregate
+│   ├── permissions/            Usage Access state and the App Lock setup aggregate
+│   └── applock/                Protected set, foreground detection, decision rule
 ├── data/                       Platform-backed implementations of those contracts
 │   ├── app/                    Launcher-entry discovery through the package manager
+│   ├── applock/                Usage-event detector, protected set store, monitor, service
 │   ├── credential/             Credential record, counters and verifier
 │   ├── biometric/              Android's prompt, the NVBT record and its store
 │   ├── permissions/            Usage Access app-op check and its settings entry point
@@ -162,6 +170,16 @@ the aggregation of discovery and Usage Access into a setup state, the mapping fr
 application-operation mode to a permission state, and the preparation screen's state machine —
 including that a successful "open settings" is never treated as a grant.
 
+App Lock detection is covered the same way: the protected-application identity rule, the stored
+format and its atomic replacement (against real files, including a damaged one that must be
+reported rather than read as "nothing is protected"), the mapping from platform event types to
+foreground transitions and the fold that resolves them in time order, the protection decision in
+every combination of foreground application, protected set and session, and the monitoring loop —
+one loop however often it is started, a stopped run that cannot publish, a missing prerequisite
+that is never mistaken for "nothing to protect", a requirement raised once per entry rather than
+once per observation, and expiry and Quick Lock taking effect through the session gate alone. The
+detection policy's interval and window are asserted too, so changing them is a deliberate edit.
+
 Instrumented tests cover what only a device can prove: Android Keystore key generation,
 non-exportability, invalidation detection and use through a cipher, and that the biometric key
 refuses to produce output until Android has authorised a single operation. They are never simulated
@@ -177,6 +195,11 @@ Security behaviour is built into the project's defaults rather than added at the
   extended with a single `<queries>` launcher-intent signature rather than `QUERY_ALL_PACKAGES`.
   Every permission has to be justified by a feature that exists; the reasons are recorded in
   [`docs/applock/README.md`](docs/applock/README.md).
+- **Detection without privileges it does not need.** The App Lock service is a plain, unexported
+  started service: no foreground service, no notification, no accessibility service, and no overlay
+  or battery-exemption permission. Detection reads usage events and never aggregate usage history,
+  keeps no record of what was used, and reports an unavailable prerequisite as unavailable rather
+  than as "nothing needs protecting".
 - **No cleartext traffic.** `android:usesCleartextTraffic="false"` is set on the application.
 - **No backup exposure.** `android:allowBackup="false"`, with
   `res/xml/data_extraction_rules.xml` excluding every storage domain from cloud backup and

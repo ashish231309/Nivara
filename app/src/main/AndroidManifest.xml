@@ -56,6 +56,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          App Lock detection.
+          A plain started service — not a foreground service — so it declares no foreground service
+          type and needs no notification. It owns no logic of its own: it starts and stops the
+          application-scoped monitor, which is the only monitoring loop in the process.
+          android:exported="false" keeps it private to Nivara: nothing outside the application may
+          start it, stop it or observe it. Why a foreground service is not used yet, and what the
+          stage that presents the authentication prompt must decide, are recorded in
+          docs/applock/README.md.
+        -->
+        <service
+            android:name=".data.applock.AppLockDetectionService"
+            android:exported="false" />
     </application>
 
 </manifest>
