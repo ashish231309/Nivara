@@ -75,6 +75,19 @@ sealed interface NivaraDestination {
         override val titleRes: Int = R.string.applock_manage_title
     }
 
+    /**
+     * Hidden applications: the applications Nivara is asked to keep out of sight, and the controls
+     * that change that.
+     *
+     * A destination of its own rather than a second control on the App Lock list, because the two
+     * are separate dimensions: an application can be protected, hidden, both or neither, and a
+     * screen that offered both would invite the reader to assume one implies the other.
+     */
+    data object HiddenApps : NivaraDestination {
+        override val route: String = "apphide"
+        override val titleRes: Int = R.string.apphide_manage_title
+    }
+
     companion object {
         /**
          * All destinations that exist in the graph.
@@ -82,7 +95,17 @@ sealed interface NivaraDestination {
          * Add the new entry here together with its `composable` block in `NivaraNavHost`.
          */
         val entries: List<NivaraDestination> =
-            listOf(Home, About, CredentialSetup, CredentialVerify, CredentialChange, Biometric, AppLockSetup, AppLock)
+            listOf(
+                Home,
+                About,
+                CredentialSetup,
+                CredentialVerify,
+                CredentialChange,
+                Biometric,
+                AppLockSetup,
+                AppLock,
+                HiddenApps,
+            )
 
         /** Resolves a navigation route back to its destination, or `null` when unknown. */
         fun fromRoute(route: String?): NivaraDestination? = entries.firstOrNull { it.route == route }

@@ -46,6 +46,7 @@ fun HomeRoute(
     onOpenCredentialChange: () -> Unit,
     onOpenBiometric: () -> Unit,
     onOpenAppLock: () -> Unit,
+    onOpenHiddenApps: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
@@ -61,6 +62,7 @@ fun HomeRoute(
         onOpenCredentialChange = onOpenCredentialChange,
         onOpenBiometric = onOpenBiometric,
         onOpenAppLock = onOpenAppLock,
+        onOpenHiddenApps = onOpenHiddenApps,
         modifier = modifier,
     )
 }
@@ -79,6 +81,7 @@ fun HomeScreen(
     onOpenCredentialChange: () -> Unit,
     onOpenBiometric: () -> Unit,
     onOpenAppLock: () -> Unit,
+    onOpenHiddenApps: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -97,6 +100,7 @@ fun HomeScreen(
             onOpenCredentialChange = onOpenCredentialChange,
             onOpenBiometric = onOpenBiometric,
             onOpenAppLock = onOpenAppLock,
+            onOpenHiddenApps = onOpenHiddenApps,
             modifier = modifier,
         )
     }
@@ -116,6 +120,7 @@ private fun HomeContent(
     onOpenCredentialChange: () -> Unit,
     onOpenBiometric: () -> Unit,
     onOpenAppLock: () -> Unit,
+    onOpenHiddenApps: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -163,6 +168,8 @@ private fun HomeContent(
         )
 
         AppLockCard(onOpenAppLock = onOpenAppLock)
+
+        HiddenAppsCard(onOpenHiddenApps = onOpenHiddenApps)
 
         Button(onClick = onOpenAbout) {
             Text(text = stringResource(id = R.string.home_about_action))
@@ -314,6 +321,29 @@ private fun SessionCard(
 }
 
 /**
+ * The way into hidden-application management.
+ *
+ * The card says what hiding is and, just as importantly, what it is not: a Nivara preference whose
+ * effect is Nivara's own launcher, with Android's launcher unchanged. A user who reads only this card
+ * must not come away believing applications have been removed from the device.
+ */
+@Composable
+private fun HiddenAppsCard(
+    onOpenHiddenApps: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        InfoCard(
+            title = stringResource(id = R.string.home_apphide_title),
+            body = stringResource(id = R.string.home_apphide_summary),
+        )
+        OutlinedButton(onClick = onOpenHiddenApps, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(id = R.string.home_apphide_action))
+        }
+    }
+}
+
+/**
  * The way into App Lock.
  *
  * The card states what the feature does, and it leads to the screen where the protected
@@ -379,6 +409,7 @@ private fun HomeScreenReadyPreview() {
             onOpenCredentialChange = {},
             onOpenBiometric = {},
             onOpenAppLock = {},
+            onOpenHiddenApps = {},
         )
     }
 }
@@ -406,6 +437,7 @@ private fun HomeScreenConfiguredPreview() {
             onOpenCredentialChange = {},
             onOpenBiometric = {},
             onOpenAppLock = {},
+            onOpenHiddenApps = {},
         )
     }
 }
@@ -424,6 +456,7 @@ private fun HomeScreenErrorPreview() {
             onOpenCredentialChange = {},
             onOpenBiometric = {},
             onOpenAppLock = {},
+            onOpenHiddenApps = {},
         )
     }
 }
