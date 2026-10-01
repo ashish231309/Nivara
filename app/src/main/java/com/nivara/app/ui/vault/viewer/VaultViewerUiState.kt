@@ -45,11 +45,11 @@ internal sealed interface VaultViewerUiState {
     data object Closed : VaultViewerUiState
 
     /** The item is being authorized, opened and prepared. */
-    data class Opening(val item: VaultViewerItem) : VaultViewerUiState
+    data class Opening(override val item: VaultViewerItem) : VaultViewerUiState
 
     /** A decoded image is on screen. */
     data class Image(
-        val item: VaultViewerItem,
+        override val item: VaultViewerItem,
         val width: Int,
         val height: Int,
         /** Whether the decode was reduced to fit the viewer's bound, so the screen can say so. */
@@ -58,7 +58,7 @@ internal sealed interface VaultViewerUiState {
 
     /** A video is prepared, playing or paused. */
     data class Video(
-        val item: VaultViewerItem,
+        override val item: VaultViewerItem,
         val playing: Boolean,
         val positionMillis: Long,
         val durationMillis: Long,
@@ -66,7 +66,7 @@ internal sealed interface VaultViewerUiState {
 
     /** Audio is prepared, playing or paused. */
     data class Audio(
-        val item: VaultViewerItem,
+        override val item: VaultViewerItem,
         val playing: Boolean,
         val positionMillis: Long,
         val durationMillis: Long,
@@ -74,35 +74,35 @@ internal sealed interface VaultViewerUiState {
 
     /** A text document is on screen, bounded, and possibly longer than what is shown. */
     data class Text(
-        val item: VaultViewerItem,
+        override val item: VaultViewerItem,
         val characters: Int,
         val truncated: Boolean,
     ) : VaultViewerUiState
 
     /** A rendered document is on screen, one page at a time. */
     data class Document(
-        val item: VaultViewerItem,
+        override val item: VaultViewerItem,
         val page: Int,
         val pageCount: Int,
     ) : VaultViewerUiState
 
     /** This stage has no viewer for the item's type. The item is described, not shown. */
-    data class Unsupported(val item: VaultViewerItem) : VaultViewerUiState
+    data class Unsupported(override val item: VaultViewerItem) : VaultViewerUiState
 
     /** The index names this item and its encrypted object is not in the vault. */
-    data class Missing(val item: VaultViewerItem) : VaultViewerUiState
+    data class Missing(override val item: VaultViewerItem) : VaultViewerUiState
 
     /** The vault's storage could not be reached, or refused the read. */
-    data class Unreadable(val item: VaultViewerItem) : VaultViewerUiState
+    data class Unreadable(override val item: VaultViewerItem) : VaultViewerUiState
 
     /** The bytes authenticated as the wrong thing: the object is not shown at all. */
-    data class Corrupt(val item: VaultViewerItem) : VaultViewerUiState
+    data class Corrupt(override val item: VaultViewerItem) : VaultViewerUiState
 
     /** The content was read and the platform could not render or play it. */
-    data class Failed(val item: VaultViewerItem) : VaultViewerUiState
+    data class Failed(override val item: VaultViewerItem) : VaultViewerUiState
 
     /** The session ended while the viewer was open, or was not open when it was asked for. */
-    data class Locked(val item: VaultViewerItem?) : VaultViewerUiState
+    data class Locked(override val item: VaultViewerItem?) : VaultViewerUiState
 
     /** The item the state is about, when it is about one. */
     val item: VaultViewerItem?

@@ -8,7 +8,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
 import android.os.ProxyFileDescriptorCallback
-import android.os.StorageManager
+import android.os.storage.StorageManager
 import android.system.ErrnoException
 import android.system.OsConstants
 import com.nivara.app.core.common.NivaraResult
@@ -212,7 +212,7 @@ internal class NivaraVaultDocumentEngine(
     }
 
     override fun release() {
-        session?.releaseResources()
+        session?.release()
         session = null
         borrow?.cancel()
         borrow = null
@@ -281,7 +281,8 @@ internal class NivaraVaultDocumentEngine(
             finished.await()
         }
 
-        fun releaseResources() {
+        /** The contract's release: the renderer, the descriptor and the borrow's signal, once. */
+        override fun release() {
             if (finished.isCompleted) return
             runCatching { renderer.close() }
             runCatching { descriptors.close() }

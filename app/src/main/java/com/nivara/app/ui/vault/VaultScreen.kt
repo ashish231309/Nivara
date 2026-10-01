@@ -59,8 +59,11 @@ fun VaultRoute(
     onUnlock: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: VaultViewModel = viewModel(factory = VaultViewModel.Factory),
-    viewerViewModel: VaultViewerViewModel = viewModel(factory = VaultViewerViewModel.Factory),
 ) {
+    // The viewer's own view model, created for this destination next to the vault's. It is taken from
+    // here rather than passed in because it is the screen's own type: a public route exposes the
+    // states it draws, not the machinery that holds decrypted content.
+    val viewerViewModel: VaultViewerViewModel = viewModel(factory = VaultViewerViewModel.Factory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val viewerState by viewerViewModel.uiState.collectAsStateWithLifecycle()
 
@@ -169,6 +172,7 @@ fun VaultScreen(
             state = uiState,
             onChooseRoot = onChooseRoot,
             onImport = onImport,
+            onOpenItem = onOpenItem,
             onInitialize = onInitialize,
             onReplaceUnreadable = onReplaceUnreadable,
             onRetry = onRetry,

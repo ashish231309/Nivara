@@ -271,13 +271,13 @@ interface AppContainer {
      * Shared, because a decode is a call rather than a session: it borrows the vault's key, reads the
      * image within that borrow, and keeps nothing but the decoded bitmap the viewer releases.
      */
-    val vaultImageEngine: VaultImageEngine
+    internal val vaultImageEngine: VaultImageEngine
 
     /** Creates the media engine for one viewer. */
-    val vaultMediaEngines: VaultMediaEngineFactory
+    internal val vaultMediaEngines: VaultMediaEngineFactory
 
     /** Creates the document engine for one viewer. */
-    val vaultDocumentEngines: VaultDocumentEngineFactory
+    internal val vaultDocumentEngines: VaultDocumentEngineFactory
 }
 
 /**
@@ -549,15 +549,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
      * engine *holds* a borrow for as long as a viewer is open: one is created per viewer, and that
      * viewer releases it.
      */
-    override val vaultImageEngine: VaultImageEngine by lazy {
+    internal override val vaultImageEngine: VaultImageEngine by lazy {
         NivaraVaultImageEngine(reader = nivaraVaultIndex)
     }
 
-    override val vaultMediaEngines: VaultMediaEngineFactory by lazy {
+    internal override val vaultMediaEngines: VaultMediaEngineFactory by lazy {
         NivaraMediaEngineFactory(reader = nivaraVaultIndex)
     }
 
-    override val vaultDocumentEngines: VaultDocumentEngineFactory by lazy {
+    internal override val vaultDocumentEngines: VaultDocumentEngineFactory by lazy {
         NivaraDocumentEngineFactory(context = applicationContext, reader = nivaraVaultIndex)
     }
 

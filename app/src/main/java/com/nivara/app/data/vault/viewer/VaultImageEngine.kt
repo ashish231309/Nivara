@@ -3,6 +3,7 @@ package com.nivara.app.data.vault.viewer
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.nivara.app.core.common.NivaraResult
+import com.nivara.app.data.vault.VaultContentInputStream
 import com.nivara.app.domain.vault.VaultContentHandle
 import com.nivara.app.domain.vault.VaultContentReader
 import com.nivara.app.domain.vault.VaultItemId

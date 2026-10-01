@@ -1,6 +1,7 @@
 package com.nivara.app.data.vault
 
 import com.nivara.app.core.common.NivaraResult
+import com.nivara.app.core.common.valueOrNull
 import com.nivara.app.domain.security.CryptographicFailure
 import com.nivara.app.domain.security.EncryptionContext
 import com.nivara.app.domain.security.EncryptionKey
