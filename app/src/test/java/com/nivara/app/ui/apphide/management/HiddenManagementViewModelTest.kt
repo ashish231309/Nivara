@@ -10,7 +10,7 @@ import com.nivara.app.domain.apphide.HiddenApplicationFailure
 import com.nivara.app.domain.apphide.HiddenApplicationRepository
 import com.nivara.app.domain.apphide.HiddenApplicationsRead
 import com.nivara.app.domain.credential.AuthenticationOutcome
-import com.nivara.app.domain.credential.BiometricAuthenticationOutcome
+import com.nivara.app.domain.security.BiometricAuthenticationOutcome
 import com.nivara.app.domain.credential.TimeProvider
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.security.SessionState
