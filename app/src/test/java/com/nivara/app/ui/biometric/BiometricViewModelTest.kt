@@ -8,6 +8,7 @@ import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.domain.credential.CredentialManager
 import com.nivara.app.domain.credential.CredentialStatus
 import com.nivara.app.domain.credential.PrimaryCredentialType
+import com.nivara.app.domain.security.AuthenticationSource
 import com.nivara.app.domain.security.BiometricAuthenticationOutcome
 import com.nivara.app.domain.security.BiometricAuthenticator
 import com.nivara.app.domain.security.BiometricFailure

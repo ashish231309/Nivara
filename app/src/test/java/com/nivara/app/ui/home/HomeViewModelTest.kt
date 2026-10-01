@@ -29,7 +29,6 @@ import com.nivara.app.testing.testSessionManager
 import com.nivara.app.testing.testSessionPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -224,11 +223,13 @@ class HomeViewModelTest {
 
     @Test
     fun `a session that expires updates the card without being asked`() {
-        val scheduler = TestCoroutineScheduler()
+        // The timer runs on a clock this test controls, so the expiry can be reached without
+        // waiting for one.
+        val timerDispatcher = UnconfinedTestDispatcher()
         val manager = InMemorySessionManager(
             timeProvider = time,
             policy = testSessionPolicy(),
-            scope = CoroutineScope(UnconfinedTestDispatcher(scheduler) + SupervisorJob()),
+            scope = CoroutineScope(timerDispatcher + SupervisorJob()),
         )
         manager.establish(AuthenticationOutcome.Succeeded)
         val viewModel = HomeViewModel(
@@ -241,8 +242,8 @@ class HomeViewModelTest {
 
         // The clock and the timer both move, as they would while the screen is open.
         time.advanceBy(TEST_SESSION_TIMEOUT_MILLIS)
-        scheduler.advanceTimeBy(TEST_SESSION_TIMEOUT_MILLIS)
-        scheduler.runCurrent()
+        timerDispatcher.scheduler.advanceTimeBy(TEST_SESSION_TIMEOUT_MILLIS)
+        timerDispatcher.scheduler.runCurrent()
 
         assertFalse((viewModel.uiState.value as HomeUiState.Ready).session.isAuthenticated)
     }

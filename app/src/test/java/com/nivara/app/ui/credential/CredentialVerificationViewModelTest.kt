@@ -17,7 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
@@ -145,7 +145,7 @@ class CredentialVerificationViewModelTest {
 
     @Test
     fun `the timeout returns the screen to asking for the credential`() = runTest {
-        val manager = sessionManager(testScheduler)
+        val manager = sessionManager(UnconfinedTestDispatcher(testScheduler))
         val viewModel = viewModel(sessionManager = manager)
         viewModel.submit(pin())
         assertEquals(CredentialVerificationStep.Succeeded, readyState(viewModel).step)
@@ -195,22 +195,17 @@ class CredentialVerificationViewModelTest {
     /**
      * The real session manager.
      *
-     * With no [scheduler] its timer runs on a private virtual clock that nothing advances, so a
-     * test that is not about the timeout cannot be surprised by it. The timeout test passes the
-     * test's own scheduler so it can move that clock deliberately.
+     * With no [timerDispatcher] its timer runs on a private virtual clock that nothing advances, so
+     * a test that is not about the timeout cannot be surprised by it. The timeout test passes a
+     * dispatcher built on the test's scheduler so it can move that clock deliberately.
      */
-    private fun sessionManager(scheduler: TestCoroutineScheduler? = null): InMemorySessionManager =
-        InMemorySessionManager(
-            timeProvider = time,
-            policy = testSessionPolicy(),
-            scope = CoroutineScope(
-                if (scheduler == null) {
-                    UnconfinedTestDispatcher() + SupervisorJob()
-                } else {
-                    UnconfinedTestDispatcher(scheduler) + SupervisorJob()
-                },
-            ),
-        )
+    private fun sessionManager(
+        timerDispatcher: TestDispatcher = UnconfinedTestDispatcher(),
+    ): InMemorySessionManager = InMemorySessionManager(
+        timeProvider = time,
+        policy = testSessionPolicy(),
+        scope = CoroutineScope(timerDispatcher + SupervisorJob()),
+    )
 
     private fun viewModel(
         credentials: FakeCredentialManager = FakeCredentialManager(),
