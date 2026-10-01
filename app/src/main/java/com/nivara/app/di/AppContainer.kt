@@ -20,6 +20,9 @@ import com.nivara.app.data.camouflage.AndroidCamouflageRepository
 import com.nivara.app.data.permissions.AndroidOverlayCapabilityRepository
 import com.nivara.app.data.permissions.AndroidUsageAccessRepository
 import com.nivara.app.data.session.InMemorySessionManager
+import com.nivara.app.data.vault.FileVaultLocationStore
+import com.nivara.app.data.vault.NivaraVaultRepository
+import com.nivara.app.data.vault.SafVaultRootStorage
 import com.nivara.app.domain.app.ApplicationLauncher
 import com.nivara.app.domain.app.ApplicationRepository
 import com.nivara.app.domain.applock.AppLockMonitor
@@ -53,6 +56,8 @@ import com.nivara.app.domain.security.RecoveryKeyEnvelopeService
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.security.SessionTimeoutPolicy
 import com.nivara.app.domain.security.SecureRandomGenerator
+import com.nivara.app.domain.vault.VaultLocationStore
+import com.nivara.app.domain.vault.VaultRepository
 import com.nivara.app.ui.applications.ApplicationIconLoader
 import com.nivara.app.ui.applock.overlay.AppLockSurfaceController
 import com.nivara.app.ui.applock.overlay.WindowManagerOverlaySurface
@@ -221,6 +226,25 @@ interface AppContainer {
      * on screen is the implementation's business.
      */
     val appLockProtectionRunner: AppLockProtectionRunner
+
+    /**
+     * The vault: which folder holds it, and what is at that folder.
+     *
+     * Creating and inspecting a vault is storage work, so it is reported as state and typed failures
+     * rather than by throwing, and the directory itself is the platform's to manage — the reference the
+     * user granted is the only thing Nivara keeps. See docs/vault/README.md.
+     */
+    val vaultRepository: VaultRepository
+
+    /**
+     * The one owner of the durable reference to the user's chosen vault folder.
+     *
+     * Exposed because the vault screen adopts a new selection through it directly: granting durable
+     * access and storing the reference is its own transaction, and it must succeed before anything
+     * tries to read a vault at the new folder. Holding the reference is not holding a key — the folder
+     * is not a secret, and what protects the vault is its encryption.
+     */
+    val vaultLocationStore: VaultLocationStore
 }
 
 /**
@@ -407,6 +431,37 @@ class DefaultAppContainer(context: Context) : AppContainer {
      */
     private val appHideDirectory: File by lazy { File(applicationContext.filesDir, APP_HIDE_DIRECTORY) }
 
+    /**
+     * Directory holding the record of which folder holds the vault.
+     *
+     * Created on first write, inside the application's private storage. It holds one platform
+     * reference and nothing else: no key material, no credential, no copy of the vault's metadata.
+     * The vault itself is never here — it is on the storage the user chose.
+     */
+    private val vaultDirectory: File by lazy { File(applicationContext.filesDir, VAULT_DIRECTORY) }
+
+    override val vaultLocationStore: VaultLocationStore by lazy {
+        FileVaultLocationStore(
+            context = applicationContext,
+            file = File(vaultDirectory, VAULT_LOCATION_FILE),
+        )
+    }
+
+    override val vaultRepository: VaultRepository by lazy {
+        NivaraVaultRepository(
+            locationStore = vaultLocationStore,
+            // Storage handles are built from the stored reference only when they are needed, so
+            // inspecting a vault touches the user's storage and nothing else.
+            storageFactory = { location ->
+                SafVaultRootStorage(context = applicationContext, location = location)
+            },
+            deviceKeyStore = deviceKeyStore,
+            contentKeyWrapper = contentKeyWrapper,
+            encryptionService = encryptionService,
+            random = secureRandomGenerator,
+        )
+    }
+
     /** One wall clock for every throttling rule in the application. */
     private val timeProvider: TimeProvider by lazy { SystemTimeProvider() }
 
@@ -420,5 +475,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         const val PROTECTED_APPLICATIONS_FILE = "protected-applications.nvl"
         const val APP_HIDE_DIRECTORY = "apphide"
         const val HIDDEN_APPLICATIONS_FILE = "hidden-applications.nvh"
+        const val VAULT_DIRECTORY = "vault"
+        const val VAULT_LOCATION_FILE = "vault-location.nvl"
     }
 }
