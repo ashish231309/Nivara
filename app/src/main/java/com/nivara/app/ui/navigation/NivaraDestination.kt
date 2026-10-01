@@ -55,6 +55,15 @@ sealed interface NivaraDestination {
         override val titleRes: Int = R.string.biometric_screen_title
     }
 
+    /**
+     * App Lock preparation: what Nivara can see on the device, and the Usage Access capability it
+     * needs before apps can be locked. The App Lock screen itself is a later destination.
+     */
+    data object AppLockSetup : NivaraDestination {
+        override val route: String = "applock-setup"
+        override val titleRes: Int = R.string.applock_setup_title
+    }
+
     companion object {
         /**
          * All destinations that exist in the graph.
@@ -62,7 +71,7 @@ sealed interface NivaraDestination {
          * Add the new entry here together with its `composable` block in `NivaraNavHost`.
          */
         val entries: List<NivaraDestination> =
-            listOf(Home, About, CredentialSetup, CredentialVerify, CredentialChange, Biometric)
+            listOf(Home, About, CredentialSetup, CredentialVerify, CredentialChange, Biometric, AppLockSetup)
 
         /** Resolves a navigation route back to its destination, or `null` when unknown. */
         fun fromRoute(route: String?): NivaraDestination? = entries.firstOrNull { it.route == route }

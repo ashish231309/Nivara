@@ -8,7 +8,11 @@ import com.nivara.app.data.credential.PersistedAttemptTracker
 import com.nivara.app.data.biometric.AndroidBiometricAuthenticator
 import com.nivara.app.data.biometric.BiometricTokenStore
 import com.nivara.app.data.credential.SystemTimeProvider
+import com.nivara.app.data.app.AndroidApplicationRepository
+import com.nivara.app.data.permissions.AndroidUsageAccessRepository
 import com.nivara.app.data.session.InMemorySessionManager
+import com.nivara.app.domain.app.ApplicationRepository
+import com.nivara.app.domain.permissions.UsageAccessRepository
 import com.nivara.app.data.security.AndroidBiometricKeyStore
 import com.nivara.app.data.security.AndroidDeviceSecurityProvider
 import com.nivara.app.data.security.AndroidKeystoreDeviceKeyStore
@@ -79,6 +83,22 @@ interface AppContainer {
      * ends the session.
      */
     val sessionManager: SessionManager
+
+    /**
+     * Applications the user can launch on this device, discovered from the launcher entries.
+     *
+     * The list is built on demand and kept in memory only: it is never cached, persisted or sent
+     * anywhere.
+     */
+    val applicationRepository: ApplicationRepository
+
+    /**
+     * Android's Usage Access capability for Nivara: whether the grant exists, and the settings
+     * screen where the user changes it.
+     *
+     * Nothing here requests the grant; Usage Access is not a runtime permission.
+     */
+    val usageAccessRepository: UsageAccessRepository
 }
 
 /**
@@ -158,6 +178,14 @@ class DefaultAppContainer(context: Context) : AppContainer {
             timeProvider = timeProvider,
             policy = SessionTimeoutPolicy.Default,
         )
+    }
+
+    override val applicationRepository: ApplicationRepository by lazy {
+        AndroidApplicationRepository(applicationContext)
+    }
+
+    override val usageAccessRepository: UsageAccessRepository by lazy {
+        AndroidUsageAccessRepository(applicationContext)
     }
 
     /**

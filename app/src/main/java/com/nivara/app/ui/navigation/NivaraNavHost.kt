@@ -6,6 +6,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.nivara.app.ui.about.AboutRoute
+import com.nivara.app.ui.applock.AppLockSetupRoute
 import com.nivara.app.ui.biometric.BiometricRoute
 import com.nivara.app.ui.credential.CredentialChangeRoute
 import com.nivara.app.ui.credential.CredentialSetupRoute
@@ -36,6 +37,7 @@ fun NivaraNavHost(
                 onOpenCredentialVerify = { navController.navigateTo(NivaraDestination.CredentialVerify) },
                 onOpenCredentialChange = { navController.navigateTo(NivaraDestination.CredentialChange) },
                 onOpenBiometric = { navController.navigateTo(NivaraDestination.Biometric) },
+                onOpenAppLockSetup = { navController.navigateTo(NivaraDestination.AppLockSetup) },
             )
         }
         composable(route = NivaraDestination.About.route) {
@@ -56,6 +58,9 @@ fun NivaraNavHost(
             BiometricRoute(
                 onOpenCredentialSetup = { navController.navigateTo(NivaraDestination.CredentialSetup) },
             )
+        }
+        composable(route = NivaraDestination.AppLockSetup.route) {
+            AppLockSetupRoute()
         }
     }
 }

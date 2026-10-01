@@ -175,6 +175,9 @@ for path in kt_files:
 
 notes.append(f"{len(kt_files)} Kotlin files (main {len(main_kt)}, test {len(test_kt)}, androidTest {len(androidtest_kt)}), "
              f"{len(declared_symbols)} declared symbols")
+jvm_test_methods = sum(len(re.findall(r"@Test\b", p.read_text())) for p in test_kt)
+notes.append(f"{jvm_test_methods} JVM test methods; {len(androidtest_kt)} instrumented test files "
+             f"(compiled, executed only when a device is attached)")
 
 # ---------------------------------------------------------------- string resources
 strings_root = ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()
@@ -221,8 +224,57 @@ for m in re.finditer(r'@(drawable|mipmap|color|style|xml|string)/([\w.]+)', mani
     elif not resource_exists(kind, name):
         err(f"manifest references missing resource @{kind}/{name}")
 
-if "<uses-permission" in manifest:
-    err("manifest declares permissions; the foundation release must request none")
+# Permissions are allowed only when a feature that exists requires them. Each entry is recorded
+# here with its reason and must also be justified in docs/applock/README.md; the list is a ceiling,
+# so adding a permission means changing this dictionary deliberately, in the change that needs it.
+justified_permissions = {
+    "android.permission.PACKAGE_USAGE_STATS":
+        "App Lock: makes Nivara visible in Android's Usage Access list and lets the detection stage "
+        "read usage statistics; granted by the user in Android's settings, never requested at runtime",
+}
+applock_docs_path = ROOT / "docs/applock/README.md"
+if not applock_docs_path.exists():
+    err("docs/applock/README.md is missing: the App Lock platform decisions are not documented")
+    applock_docs = ""
+else:
+    applock_docs = applock_docs_path.read_text()
+
+declared_permissions = re.findall(r'<uses-permission[^>]*android:name="([^"]+)"', manifest)
+for permission in sorted(set(declared_permissions)):
+    if permission not in justified_permissions:
+        err(f"manifest declares '{permission}', which is not on the justified allow-list")
+    elif permission not in applock_docs:
+        err(f"'{permission}' is declared but not justified in docs/applock/README.md")
+notes.append(f"manifest: {len(declared_permissions)} permission(s), all on the justified allow-list")
+
+# The deferred permission decisions are as important as the declared ones: overlay and battery
+# exemptions are not part of the current feature set, and package visibility must stay narrow.
+for deferred_permission, reason in (
+    ("android.permission.QUERY_ALL_PACKAGES",
+     "the launcher-intent <queries> element is the narrow mechanism for launcher discovery"),
+    ("android.permission.SYSTEM_ALERT_WINDOW",
+     "nothing in the current feature set draws above another application"),
+    ("android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+     "no battery exemption is justified by the current feature set"),
+):
+    if deferred_permission in manifest:
+        err(f"manifest declares '{deferred_permission}': {reason}")
+
+# Package visibility (API 30+): launcher applications are not visible by default, so discovery
+# depends on exactly the intent signature the repository queries.
+queries_element = ET.fromstring(manifest).find("queries")
+if queries_element is None:
+    err("manifest has no <queries> element: application discovery is invisible on API 30+")
+else:
+    query_actions = {attr(el, "name") for el in queries_element.iter("action")}
+    query_categories = {attr(el, "name") for el in queries_element.iter("category")}
+    if ("android.intent.action.MAIN" not in query_actions
+            or "android.intent.category.LAUNCHER" not in query_categories):
+        err("manifest <queries> does not declare the launcher intent (MAIN + LAUNCHER)")
+    extra_query_packages = {attr(el, "name") for el in queries_element.iter("package")}
+    if extra_query_packages:
+        warn(f"manifest <queries> exposes whole packages: {sorted(extra_query_packages)}")
+
 if 'android:usesCleartextTraffic="false"' not in manifest:
     err("manifest does not disable cleartext traffic")
 if 'android:allowBackup="false"' not in manifest:
@@ -243,6 +295,15 @@ for style_file in sorted(res_dir.glob("values*/themes.xml")):
             if kind in {"color", "drawable", "style"} and not resource_exists(kind, name):
                 err(f"{style_file.parent.name}/{style_file.name}: '{style.attrib['name']}' item "
                     f"'{attr(item, 'name')}' references missing resource {value}")
+
+# Usage Access is not a runtime permission: it is granted in Android's settings, and Nivara calls
+# no runtime permission request for any of its features. A genuine runtime permission added later
+# must change this rule deliberately, in the same change.
+for path in main_kt:
+    text = strip_comments(path.read_text())
+    if "requestPermissions(" in text:
+        err(f"{path.relative_to(ROOT)}: runtime permission request; Usage Access is granted in "
+            f"Android's settings and Nivara asks for nothing at runtime")
 
 # every R.<type>.<name> reference from code must exist as a resource
 for path in kt_files:
@@ -375,6 +436,52 @@ for path in sorted((ROOT / "app/src/main/java/com/nivara/app/domain/security").g
         if not match.group(1).startswith(allowed_platform_apis):
             err(f"{rel}: domain layer imports a platform implementation type ({match.group(1)})")
 
+# The App Lock domain packages stay as free of the platform as the security domain does: no
+# Context, no PackageManager, no Intent, no UsageStatsManager, no Uri and no Settings. Those belong
+# to the data layer that implements the contracts.
+for domain_package in ("domain/app", "domain/permissions"):
+    domain_dir = ROOT / f"app/src/main/java/com/nivara/app/{domain_package}"
+    if not domain_dir.is_dir():
+        err(f"{domain_package} is missing")
+    for path in sorted(domain_dir.glob("*.kt")):
+        rel = path.relative_to(ROOT)
+        text = strip_comments(path.read_text())
+        for match in re.finditer(r"\b(android|androidx|java\.io|java\.net)\.[\w.]+", text):
+            err(f"{rel}: domain layer references a platform type ({match.group(0)})")
+
+# The UI layer reads capabilities through the view models only. A composable that queried the
+# package manager or the usage-stats services would put permission logic in the presentation layer.
+for path in sorted((ROOT / "app/src/main/java/com/nivara/app/ui").rglob("*.kt")):
+    text = strip_comments(path.read_text())
+    for forbidden in ("PackageManager", "UsageStatsManager", "AppOpsManager", "checkOpNoThrow",
+                      "Settings.ACTION"):
+        if forbidden in text:
+            err(f"{path.relative_to(ROOT)}: platform capability used from the UI layer ({forbidden})")
+
+# The preparation screen is a sensitive screen: it must use the one screenshot-protection
+# implementation, and that implementation must stay the only one.
+setup_screen = ROOT / "app/src/main/java/com/nivara/app/ui/applock/AppLockSetupScreen.kt"
+if not setup_screen.exists():
+    err("the App Lock preparation screen is missing")
+elif "SecureScreenEffect()" not in setup_screen.read_text():
+    err("the App Lock preparation screen does not apply SecureScreenEffect()")
+flag_secure_files = [p for p in main_kt if "FLAG_SECURE" in p.read_text()]
+if len(flag_secure_files) != 1:
+    err(f"FLAG_SECURE appears in {len(flag_secure_files)} files; there must be exactly one "
+        f"implementation (SecureScreenEffect)")
+
+# Discovery is rebuilt on demand and kept in memory: no cache, no file and no database may appear
+# behind it.
+app_discovery_dir = ROOT / "app/src/main/java/com/nivara/app/data/app"
+if not app_discovery_dir.is_dir():
+    err("data/app is missing")
+for path in sorted(app_discovery_dir.glob("*.kt")):
+    text = strip_comments(path.read_text())
+    for pattern in (r"SharedPreferences", r"DataStore", r"RoomDatabase", r"openFileOutput",
+                    r"FileOutputStream", r"\bFile\("):
+        if re.search(pattern, text):
+            err(f"{path.relative_to(ROOT)}: application discovery persists data ({pattern})")
+
 # every domain security contract must be implemented and wired in the composition root.
 # The implementation may live anywhere under `data`, because a contract is allowed to be built
 # on the platform prompt (data/biometric) rather than on the key store alone (data/security).
@@ -388,7 +495,21 @@ for contract in contracts:
                    if re.search(rf":\s*{contract}\b|,\s*{contract}\b", p.read_text())]
     if not implemented:
         err(f"no data-layer implementation found for '{contract}'")
+# The App Lock contracts follow the same rule: exposed by the container, implemented under data.
+applock_contracts = sorted(
+    p.stem
+    for package in ("domain/app", "domain/permissions")
+    for p in (ROOT / f"app/src/main/java/com/nivara/app/{package}").glob("*.kt")
+    if p.stem.endswith("Repository"))
+for contract in applock_contracts:
+    if contract not in container:
+        err(f"AppContainer does not expose the '{contract}' contract")
+    implemented = [p for p in (ROOT / "app/src/main/java/com/nivara/app/data").rglob("*.kt")
+                   if re.search(rf":\s*{contract}\b|,\s*{contract}\b", p.read_text())]
+    if not implemented:
+        err(f"no data-layer implementation found for '{contract}'")
 notes.append(f"security review: {len(security_sources)} security sources, {len(contracts)} contracts wired")
+notes.append(f"app lock review: {len(applock_contracts)} contracts wired ({', '.join(applock_contracts)})")
 
 # documentation that the code refers to must exist
 for doc in ("docs/crypto/envelope-format.md", "docs/crypto/README.md", "tools/crypto_reference.py"):

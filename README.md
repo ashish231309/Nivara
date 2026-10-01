@@ -34,8 +34,9 @@ it holds no credential, no key and nothing on disk. There is still no app lockin
 hidden apps and no recovery flow — those are the stages that follow, and they consume the layers
 described in [`docs/crypto/README.md`](docs/crypto/README.md),
 [`docs/credential/README.md`](docs/credential/README.md),
-[`docs/biometric/README.md`](docs/biometric/README.md) and
-[`docs/session/README.md`](docs/session/README.md).
+[`docs/biometric/README.md`](docs/biometric/README.md),
+[`docs/session/README.md`](docs/session/README.md) and
+[`docs/applock/README.md`](docs/applock/README.md).
 
 ## Planned capabilities
 
@@ -73,9 +74,13 @@ app/src/main/java/com/nivara/app/
 ├── di/                         Hand-written composition root (AppContainer)
 ├── core/common/                Types shared across layers (NivaraResult)
 ├── domain/                     Contracts the app depends on (no Android types)
+│   ├── app/                    Installed-application model, ordering and search rule
+│   └── permissions/            Usage Access state and the App Lock setup aggregate
 ├── data/                       Platform-backed implementations of those contracts
+│   ├── app/                    Launcher-entry discovery through the package manager
 │   ├── credential/             Credential record, counters and verifier
 │   ├── biometric/              Android's prompt, the NVBT record and its store
+│   ├── permissions/            Usage Access app-op check and its settings entry point
 │   ├── session/                The in-memory session manager
 │   └── security/               JCA, Android Keystore and device state
 └── ui/                         Compose UI
@@ -87,6 +92,7 @@ app/src/main/java/com/nivara/app/
     ├── about/                  About screen
     ├── credential/             Enrolment, verification and change screens
     ├── biometric/              Biometric settings, state and view model
+    ├── applock/                App Lock preparation screen, state and view model
     └── session/                Session text shared by the screens that show it
 ```
 
@@ -150,6 +156,12 @@ The session layer is covered the same way: establishment from a success and from
 validity either side of the expiry boundary, the timer closing the gate on its own, Quick Lock's
 immediacy and idempotency, and the separation between the session and both throttling counters.
 
+The App Lock preparation layer is covered the same way: the application model and its
+package-name identity rule, the default ordering and its tie-breaker, the search matching rule,
+the aggregation of discovery and Usage Access into a setup state, the mapping from an
+application-operation mode to a permission state, and the preparation screen's state machine —
+including that a successful "open settings" is never treated as a grant.
+
 Instrumented tests cover what only a device can prove: Android Keystore key generation,
 non-exportability, invalidation detection and use through a cipher, and that the biometric key
 refuses to produce output until Android has authorised a single operation. They are never simulated
@@ -159,8 +171,12 @@ on the JVM, and the flows that need a person to present a biometric remain manua
 
 Security behaviour is built into the project's defaults rather than added at the end:
 
-- **No permissions.** The manifest declares none. Every future permission has to be justified
-  by a feature that exists.
+- **One permission, justified.** The manifest declares `PACKAGE_USAGE_STATS`, which makes Nivara
+  visible in Android's Usage Access list and lets App Lock read usage statistics; the user grants
+  it in Android's own settings and Nivara never requests it at runtime. Package visibility is
+  extended with a single `<queries>` launcher-intent signature rather than `QUERY_ALL_PACKAGES`.
+  Every permission has to be justified by a feature that exists; the reasons are recorded in
+  [`docs/applock/README.md`](docs/applock/README.md).
 - **No cleartext traffic.** `android:usesCleartextTraffic="false"` is set on the application.
 - **No backup exposure.** `android:allowBackup="false"`, with
   `res/xml/data_extraction_rules.xml` excluding every storage domain from cloud backup and

@@ -45,6 +45,7 @@ fun HomeRoute(
     onOpenCredentialVerify: () -> Unit,
     onOpenCredentialChange: () -> Unit,
     onOpenBiometric: () -> Unit,
+    onOpenAppLockSetup: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
@@ -59,6 +60,7 @@ fun HomeRoute(
         onOpenCredentialVerify = onOpenCredentialVerify,
         onOpenCredentialChange = onOpenCredentialChange,
         onOpenBiometric = onOpenBiometric,
+        onOpenAppLockSetup = onOpenAppLockSetup,
         modifier = modifier,
     )
 }
@@ -76,6 +78,7 @@ fun HomeScreen(
     onOpenCredentialVerify: () -> Unit,
     onOpenCredentialChange: () -> Unit,
     onOpenBiometric: () -> Unit,
+    onOpenAppLockSetup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -93,6 +96,7 @@ fun HomeScreen(
             onOpenCredentialVerify = onOpenCredentialVerify,
             onOpenCredentialChange = onOpenCredentialChange,
             onOpenBiometric = onOpenBiometric,
+            onOpenAppLockSetup = onOpenAppLockSetup,
             modifier = modifier,
         )
     }
@@ -111,6 +115,7 @@ private fun HomeContent(
     onOpenCredentialVerify: () -> Unit,
     onOpenCredentialChange: () -> Unit,
     onOpenBiometric: () -> Unit,
+    onOpenAppLockSetup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -156,6 +161,8 @@ private fun HomeContent(
             credentialConfigured = credentialType != null,
             onOpenBiometric = onOpenBiometric,
         )
+
+        AppLockCard(onOpenAppLockSetup = onOpenAppLockSetup)
 
         Button(onClick = onOpenAbout) {
             Text(text = stringResource(id = R.string.home_about_action))
@@ -306,6 +313,28 @@ private fun SessionCard(
     }
 }
 
+/**
+ * The way into App Lock preparation.
+ *
+ * It reports nothing about App Lock's state — the preparation screen owns that — and it promises
+ * nothing: the entry point says what the screen checks, not that locking works yet.
+ */
+@Composable
+private fun AppLockCard(
+    onOpenAppLockSetup: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        InfoCard(
+            title = stringResource(id = R.string.home_applock_title),
+            body = stringResource(id = R.string.home_applock_summary),
+        )
+        OutlinedButton(onClick = onOpenAppLockSetup, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(id = R.string.home_applock_action))
+        }
+    }
+}
+
 @Composable
 private fun InfoCard(
     title: String,
@@ -347,6 +376,7 @@ private fun HomeScreenReadyPreview() {
             onOpenCredentialVerify = {},
             onOpenCredentialChange = {},
             onOpenBiometric = {},
+            onOpenAppLockSetup = {},
         )
     }
 }
@@ -373,6 +403,7 @@ private fun HomeScreenConfiguredPreview() {
             onOpenCredentialVerify = {},
             onOpenCredentialChange = {},
             onOpenBiometric = {},
+            onOpenAppLockSetup = {},
         )
     }
 }
@@ -390,6 +421,7 @@ private fun HomeScreenErrorPreview() {
             onOpenCredentialVerify = {},
             onOpenCredentialChange = {},
             onOpenBiometric = {},
+            onOpenAppLockSetup = {},
         )
     }
 }

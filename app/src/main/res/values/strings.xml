@@ -13,6 +13,9 @@
     <string name="home_foundation_title">Foundation release</string>
     <string name="home_foundation_summary">This build contains the application shell only. Security modules are added in the releases that follow.</string>
     <string name="home_about_action">About Nivara</string>
+    <string name="home_applock_title">App Lock</string>
+    <string name="home_applock_summary">Check what App Lock needs: the applications Nivara can see, and Android\'s Usage Access grant.</string>
+    <string name="home_applock_action">App Lock preparation</string>
 
     <!-- About -->
     <string name="about_title">About</string>
@@ -21,7 +24,7 @@
     <string name="about_package_label">Application ID</string>
     <string name="about_platform_label">Android API level</string>
     <string name="about_privacy_title">Privacy defaults</string>
-    <string name="about_privacy_summary">Nivara requests no permissions, blocks cleartext network traffic and disables cloud backup of application data.</string>
+    <string name="about_privacy_summary">Nivara asks for one permission — Usage Access, which you grant in Android\'s settings for App Lock. It blocks cleartext network traffic and disables cloud backup of application data.</string>
 
     <!-- Shared states -->
     <string name="state_loading">Loading…</string>
@@ -180,4 +183,37 @@
     <string name="session_notice_locked">Nivara is locked. Authenticate again to continue.</string>
     <string name="session_notice_ended">The session ended. Authenticate again to continue.</string>
     <string name="session_locked_note">This is Nivara\'s own session, not the device\'s screen lock: locking it does not touch your credential, your biometric enrolment or any stored file.</string>
+
+    <!-- App Lock preparation: discovery, Usage Access and the setup state -->
+    <string name="applock_setup_title">App Lock preparation</string>
+    <string name="applock_setup_intro">App Lock needs two things before it can protect your applications. This screen checks both, and shows what is still missing.</string>
+
+    <string name="applock_setup_readiness_title">Preparation status</string>
+    <string name="applock_setup_readiness_ready">Everything App Lock needs is in place.</string>
+    <string name="applock_setup_readiness_missing">Still needed: %1$s</string>
+    <string name="applock_setup_prerequisite_discovery">application discovery</string>
+    <string name="applock_setup_prerequisite_usage_access">Usage Access</string>
+
+    <string name="applock_setup_discovery_title">Application discovery</string>
+    <string name="applock_setup_discovery_count">Applications Nivara can see: %1$d</string>
+    <string name="applock_setup_discovery_summary">These are the applications you can open from your launcher. Each one is identified by its package name, never by the name shown here.</string>
+    <string name="applock_setup_discovery_preview_title">First few</string>
+    <string name="applock_setup_discovery_preview_more">and %1$d more</string>
+    <string name="applock_setup_discovery_preview_note">The full list, search and sorting arrive with App Lock.</string>
+    <string name="applock_setup_discovery_unavailable">Nivara could not read the list of installed applications</string>
+    <string name="applock_setup_discovery_unavailable_summary">Android did not answer the query this time. Try again; if it keeps failing, restart the device.</string>
+    <string name="applock_setup_discovery_retry">Try again</string>
+
+    <string name="applock_setup_usage_access_title">Usage Access</string>
+    <string name="applock_setup_usage_access_granted">Granted</string>
+    <string name="applock_setup_usage_access_not_granted">Not granted</string>
+    <string name="applock_setup_usage_access_unavailable">Unavailable</string>
+    <string name="applock_setup_usage_access_summary">App Lock uses Usage Access to recognise which application is in the foreground, so it can protect that application when you open it.</string>
+    <string name="applock_setup_usage_access_explanation">Android grants Usage Access in its own settings, not with a dialog inside Nivara. Nivara cannot switch it on for you, and it will never show you a prompt that claims to.</string>
+    <string name="applock_setup_usage_access_action">Open Usage Access settings</string>
+    <string name="applock_setup_usage_access_settings_note">That screen belongs to Android. Nivara only reads whether the grant exists, and checks again when you come back.</string>
+    <string name="applock_setup_usage_access_granted_notice">Usage Access is on.</string>
+    <string name="applock_setup_settings_unavailable">Nivara could not open Android\'s settings screen on this device.</string>
+
+    <string name="applock_setup_scope_note">App Lock itself — choosing applications and locking them — arrives in a later release. This screen only checks what it needs.</string>
 </resources>

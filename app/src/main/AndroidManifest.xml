@@ -1,12 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-      Nivara requests no permissions. Every future permission must be justified by a feature that
-      actually exists, added in the stage that introduces it. The AndroidX biometric library
-      contributes the platform's biometric permission in the merged manifest, which is why
-      biometric authentication works without a declaration here.
+      Nivara asks for as little as it can, and every entry here is tied to a feature that exists.
+      The AndroidX biometric library contributes the platform's biometric permission in the merged
+      manifest, which is why biometric authentication works without a declaration here.
+
+      PACKAGE_USAGE_STATS is the one declaration. It is not a runtime permission and Nivara never
+      calls requestPermissions() for it: it makes Nivara visible in Android's Usage Access list and
+      lets a later stage read usage statistics, and the user grants it in Android's own settings.
+      The preparation screen only reads whether the grant exists and opens that settings screen.
+      tools:ignore silences lint's protected-permission warning: the permission is protected on
+      purpose, and the user — not the application — is the one who grants it.
     -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!--
+      Package visibility (API 30+).
+      Installed applications are hidden from a query by default. This declares exactly one intent
+      signature — applications with a launcher entry point — which is the set App Lock offers to
+      lock and the set the device's own launcher shows.
+      QUERY_ALL_PACKAGES is deliberately not requested: it would expose every package on the device
+      to answer a question about launcher entries, and Android treats the installed-application
+      list as personal data.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:name=".NivaraApplication"
