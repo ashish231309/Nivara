@@ -14,6 +14,7 @@ import com.nivara.app.testing.randomKey
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -45,19 +46,29 @@ class NivaraVaultRepositoryTest {
     private val locationStore = FakeVaultLocationStore(VaultLocationRead.Present(location))
     private val storage = FakeVaultRootStorage()
 
-    private fun repository(): NivaraVaultRepository = NivaraVaultRepository(
-        locationStore = locationStore,
-        storageFactory = { storage },
-        deviceKeyStore = deviceKeyStore,
-        contentKeyWrapper = contentKeyWrapper,
-        encryptionService = encryptionService,
-        random = random,
-    )
+    /**
+     * The repository under test, created once per test.
+     *
+     * One instance, because that is what the application has: a single composition-root repository
+     * whose lock is what makes a read during a write impossible and two initializations unable to race.
+     * Building a new one per call would give each call a lock of its own, and the concurrency tests
+     * below would then prove nothing.
+     */
+    private val repository: NivaraVaultRepository by lazy {
+        NivaraVaultRepository(
+            locationStore = locationStore,
+            storageFactory = { storage },
+            deviceKeyStore = deviceKeyStore,
+            contentKeyWrapper = contentKeyWrapper,
+            encryptionService = encryptionService,
+            random = random,
+        )
+    }
 
     private suspend fun initialize(replaceUnreadable: Boolean = false): NivaraResult<Unit> =
-        repository().initialize(replaceUnreadable = replaceUnreadable)
+        repository.initialize(replaceUnreadable = replaceUnreadable)
 
-    private suspend fun inspect(): VaultState = repository().inspect()
+    private suspend fun inspect(): VaultState = repository.inspect()
 
     private fun slot(index: Int): String = VaultStructure.SLOT_NAMES[index]
 
@@ -137,6 +148,9 @@ class NivaraVaultRepositoryTest {
     @Test
     fun `a record that cannot be read at all is damage`() = runTest {
         storage.metadataDirectory = true
+        // The document is there in the area's listing and cannot be read: something with a slot's name
+        // exists, and Nivara cannot say what it holds.
+        storage.documents[slot(0)] = ByteArray(4)
         storage.unreadableDocuments += slot(0)
 
         assertEquals(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged), inspect())
@@ -582,10 +596,15 @@ class NivaraVaultRepositoryTest {
 
         val creating = async { initialize() }
         val observed = async { inspect() }
+        // Let both coroutines run until they are waiting: one on the held write, the other on the
+        // repository's lock.
+        yield()
 
         // The write is in flight and held. Nothing may answer from underneath it: the inspection waits
-        // for the same lock, so the only states reachable are the ones before and after the commit.
-        assertEquals("the write is held", false, gate.isCompleted)
+        // for the same lock, so the only states reachable are the ones before and after the commit —
+        // and a repository whose lock guarded nothing would answer here, from a half-written vault.
+        assertFalse("the write is held", gate.isCompleted)
+        assertFalse("the inspection answered from underneath the write", observed.isCompleted)
         gate.complete(Unit)
         assertTrue(creating.await() is NivaraResult.Success)
         assertTrue("after the commit the vault is there", observed.await() is VaultState.Ready)
