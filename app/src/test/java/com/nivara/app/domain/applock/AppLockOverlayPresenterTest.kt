@@ -352,7 +352,7 @@ class AppLockOverlayPresenterTest {
         // Detection speaks again about the same occasion. The capability is granted, so the old
         // retry rule would have returned the requirement to Required and had the window owner try to
         // attach again on every wake-up: exactly the re-attachment loop this design refuses.
-        monitor.reannounce()
+        reannounce(monitor)
         runCurrent()
 
         assertEquals(
