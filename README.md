@@ -21,7 +21,8 @@ leaves hidden applications out and can show them again for as long as Nivara is 
 **application identity**: the name and icon Nivara's launcher entry presents, and the ordinary route
 back to Nivara's own — and the **vault**: the folder the user chooses, the authenticated record that
 says a vault is there, the encrypted store imported files go into, opening one of those files again,
-and organising what is in it — albums, search and the order of the list.
+organising what is in it — albums, search and the order of the list — and moving a file out of the
+active collection to trash and back again, with everything about the file kept exactly as it was.
 
 What works today:
 
@@ -79,9 +80,12 @@ What works today:
   of a file's facts — the list is **searched** by name, type and kind (and albums by title), and it is
   **ordered** by name, size, arrival time or type, either way. An album is a list and nothing else:
   deleting one, or taking a file out of one, cannot delete, move or re-encrypt a file, and the
-  confirmation says so. Searching, sorting and opening albums never decrypt anything, no album state
-  is ever drawn as "no albums" when it cannot be read, and trash, restore and sharing are later
-  stages, so the screen says nothing it does not do;
+  confirmation says so. Searching, sorting and opening albums never decrypt anything, and no album
+  state is ever drawn as "no albums" when it cannot be read. A file can then be moved to **Trash**
+  and restored: the move is a state and nothing more — the encrypted file stays where it is with its
+  name, its albums and its identity, nothing is deleted, nothing expires, and a trash record that
+  cannot be read is never drawn as an empty trash; sharing is a later stage, so the screen says
+  nothing it does not do;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
@@ -126,7 +130,8 @@ project is clear; each one is implemented in its own release and is not present 
 - External encrypted vault storage — delivered
 - Importing files into the vault, and opening them again — delivered
 - Organising an encrypted file vault: albums, search and sorting — delivered
-- A recycle bin for the vault: trash, restore and permanent deletion — not started
+- A trash for the vault: moving files out of the active collection and restoring them — delivered,
+  as a state change only; permanent deletion is deliberately not part of it
 - Recovery and session management
 - Security settings, themes and the final visual design
 
@@ -528,14 +533,17 @@ devices.
 | What an album can do | Create, rename, delete, add a file to one, take a file out of one; a file may be in none, one or several, and an album that was made on purpose is not tidied away when it empties |
 | What deleting an album does | Deletes that list. The encrypted objects, the index and every other album's membership are untouched, and the confirmation says so before it happens |
 | A file the vault no longer lists | Shown where an album holds it, as no longer in the vault, and kept until somebody takes it out of that album on purpose — nothing repairs it silently |
-| Searching and sorting | In memory, over the metadata that was read: no decryption, no second read of the vault, no fuzzy matching, no ranking and no record of what was searched or opened |
+| Moving a file to Trash | A state, not a deletion: the file leaves the list, the search and the albums' active contents, and its encrypted object, its name, its identity and its album memberships stay exactly as they were |
+| What the trash is | One small authenticated record of its own beside the index — identifiers and the moment they left the active collection, sealed under its own purpose with the vault's one key, never a copy of a file's facts |
+| Restoring a file | The reference leaves the record and the file is active again, under the same identity, in its albums as before; a record that cannot be read is never drawn as an empty trash, and nothing in the vault permanently deletes, empties or expires a file |
+| Searching and sorting | In memory, over the metadata that was read: no decryption, no second read of the vault, no fuzzy matching, no ranking and no record of what was searched or opened; the trash has its own search and its own order, both over the trash alone |
 | The order | Total and reproducible: every comparison ends in the file's own identifier, so two files that look identical still come out in the same sequence every time |
 | Opening a file | Read back through the same streaming decryption that wrote it, in bounded pieces, with the session asked before each one and no plaintext copy on disk |
 | What can be shown | JPEG, PNG, WebP, GIF, BMP, HEIC and HEIF pictures (bounded decode); MP4, WebM, 3GPP, MPEG and Matroska video; MP3, AAC/M4A, WAV, OGG, FLAC and Opus audio through the platform's player; plain text, CSV, Markdown, XML and JSON as a bounded preview; PDF as rendered pages |
 | What is described instead | Office documents, archives, and any file whose declared type is missing, malformed or unfamiliar: the facts are shown and the screen says plainly that this build has no viewer |
 | When the session ends | Playback stops, every decoder and the content are released, and the viewer says the vault is locked; Quick Lock does the same instantly, and reopening goes through the credential screen that already exists |
 | What it never does | No key, cipher or storage handle reaches a screen; no plaintext temporary file, cache or thumbnail is ever written; and no sharing, exporting or "open with" exists anywhere in the application |
-| What it is not | A gallery, a trash or a restore, a second password, or a hidden route: the vault is reached from the home screen like any other settings screen |
+| What it is not | A gallery, a second password, or a hidden route: the vault is reached from the home screen like any other settings screen, and its trash is a state a file is in — never a deletion, never an expiry |
 
 The full contract — the structure, the metadata format, the content format, the index format, the
 album record's own format, the import pipeline, the classification rules, what each viewer does, the

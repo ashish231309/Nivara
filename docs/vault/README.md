@@ -1123,3 +1123,198 @@ surface on a real screen, TalkBack traversal of the new controls, and how a very
 behaves while it is being drawn. The instrumented suite covers the albums surface's composition — each
 state, its words and its controls — and is **compiled but not executed** in continuous integration,
 because no device or emulator is attached.
+
+# Stage 17: trash, restore and what is kept
+
+## Purpose
+
+A vault accumulates, and at some point a file should be able to leave the screen without leaving the
+vault. Trash is that: a **state**, not a place. Moving a file to Trash takes it out of the active
+collection — the list, the search, the albums' contents — and restoring it puts it back. Nothing in
+between touches the file itself: the encrypted object is not opened, moved, renamed, re-encrypted or
+deleted, the item keeps the identifier it always had, its metadata stays where the index holds it, and
+every album that names it keeps naming it.
+
+The one thing Trash is not is a deletion. Nothing in this feature can express permanent deletion,
+secure erase, emptying the trash or an expiry: the record says which files are out of sight, and the
+only way out of that state is restoring. A file in the trash is as recoverable as it was before, by
+the same identity, through the same vault.
+
+## What moving to Trash means
+
+One line is written into one small authenticated record: the item's identifier — the same one it has
+while active — and the instant it left the active collection. That is the whole of the change.
+
+The entry is deliberately not a copy of the item. No name, no type, no size, no digest, no content
+location is stored beside it, because the index already holds all of that, authenticated, and a second
+copy would be a second thing that could disagree. Every detail the trash list shows about a file is
+read from the vault's index at the moment it is shown, exactly as it is for a file in an album.
+
+## What restoring means
+
+The line is removed from the record. The item's identifier is unchanged, its metadata is unchanged,
+its encrypted object is unchanged and every album membership is effective again the moment it is back
+in the active collection — because the memberships never went anywhere. Restoring does not claim the
+file's content is present: if the encrypted object was already missing, the vault's list says so and
+opening the file reports exactly what it reported before the file was trashed.
+
+Both operations are idempotent where that is honest: moving a file that is already in the trash
+changes nothing and is reported as done, and restoring a file that is not in the trash changes nothing
+and is reported as done. Neither path can create a second item for one file.
+
+## The trash record (version 1)
+
+The record lives beside the index and the album record, built on the same pattern:
+
+- two dedicated slots in the vault's metadata area, `trash.0.nvt` and `trash.1.nvt`;
+- a clear header carrying Nivara's trash marker `NVTR`, the format version, a reserved byte and the
+  generation — distinct from the index's `NVIN` and the album record's `NVAO`;
+- a sealed payload holding the marker again, the version, the generation, an entry count and the
+  entries themselves, each exactly an identifier and a moment.
+
+The payload is sealed under its own purpose in the existing encryption context, tag `0x09` — the same
+vault key, the same encryption service, the same authenticated envelope as everything else in the
+vault. There is no second key and no second cipher; the purpose alone keeps a ciphertext made for the
+index or the albums from ever being read as a trash record, and the marker says what the bytes are
+before anyone holds a key.
+
+The format is bounded and strict. A count read from untrusted bytes is a claim: it is checked against
+the format's own limits before anything is allocated from it, identifiers must be exactly sixteen
+bytes of lower-case hex, entries must be in strictly increasing identifier order (which makes a
+duplicate impossible to express), a moment before the epoch is refused, and trailing bytes are refused
+rather than ignored. One set of entries has exactly one encoding, so a read-back can be compared byte
+for byte with what was intended. A record Nivara cannot read is never interpreted as an empty trash:
+the decoder answers nothing at all, and the state says the record is unreadable.
+
+The bounds: at most 20 000 entries in one record, and the sealed record itself is never read past one
+megabyte. A vault that one day needs more raises the format's version rather than growing past what
+it promises to read.
+
+## The order that makes a change true
+
+Every change follows the same protocol the album record follows, because a trash change is the same
+kind of promise:
+
+1. the session is asked, before anything is read;
+2. the vault is opened — a vault that cannot be opened cannot have its trash changed;
+3. for a move to trash, the vault's list is read, because the change must prove the file is there;
+4. the current trash record is read, never rebuilt;
+5. the item is checked to be where the change says it is;
+6. the new list of entries is calculated, validated and put in canonical order;
+7. it is sealed as the next generation under the trash purpose;
+8. it is written into the slot that is not authoritative;
+9. it is read back, authenticated, decoded and compared with what was intended;
+10. only then is the superseded slot pruned — and pruning stays best-effort, because the newer
+    generation already wins on the next read.
+
+A failure anywhere leaves the previous committed record intact, and nothing is reported as done
+before the read-back verifies. The session is asked again at the moment the vault would change, so a
+session that ends while the person is looking at the trash cannot produce a change. Every mutation
+runs under the repository's existing lock, so two changes cannot interleave their generations and a
+read never lands between the write and its verification.
+
+## Albums and trash
+
+Album memberships survive the trash and the restore, because an album is a list of identifiers and the
+trash never edits it. While a file is trashed, an album that names it reports it apart: the album's
+count includes it, the album's surface never draws it as active content, and opening the album shows
+the active members with the trashed one named separately. Deleting an album deletes that list and
+nothing else — a trashed file is as untouched by it as an active one. An unreadable album record does
+not make the trash unreadable, and an unreadable trash record does not remove anything from an album:
+each record is its own fact.
+
+## The active collection
+
+The list the screen draws is the index's items minus the identifiers the trash record names — computed
+once, before the search and before the order, so no list, result or count can disagree about what is
+active. When the trash record cannot be read, Nivara cannot say which files are out of sight, and the
+screen says exactly that instead of drawing the list as if every file in it were active.
+
+## Search and order
+
+On every surface but the trash, the search box asks about the active collection and nothing else: a
+query that matches only a trashed file answers "nothing matches". On the trash surface the same box
+asks about the trash alone, with the same normalization — case, Unicode form and whitespace — applied
+to the file's name, type and kind as read from the index. Nothing is decrypted for it, nothing is
+remembered, and there is no second engine.
+
+The trash list has its own order: by when it was trashed, by name, by size, by arrival time or by
+kind, either direction, and every comparison ends in the item's identifier. Two files trashed in the
+same millisecond come out in the same sequence every time. The moment is a display order and nothing
+more: nothing expires because of it, and nothing is ranked by it.
+
+## Missing content
+
+A file whose encrypted object is missing can still be moved to trash and back, because the state is
+about the item, not the object. The list says the content is missing exactly as it said it before, the
+trash row says so too, and restoring makes no promise the vault cannot keep: opening the file goes
+through the same content reader and reports the same missing-content failure it always did. Metadata
+is never dropped because an object is absent, and the trash never deletes, repairs or finishes
+anything — unindexed and unfinished objects stay outside the item-level trash, as before.
+
+## The screen
+
+The vault surface has three collections: **All Items**, **Albums** and **Trash**. The trash card says
+what the record says — in its own words for every state — and each row shows the file's name, type,
+size and when it was moved, with one action: restore. The card says in as many words that moving a file
+to Trash is not deleting it: the encrypted file stays in the vault with its name, its albums and
+everything else until it is restored. There is no destructive control anywhere on the surface: no
+empty-trash, no delete-forever, no expiry.
+
+## The session, and what a change requires
+
+Moving a file to trash and restoring it are durable changes, so they require what every other durable
+change requires: an open vault, a readable trash record and the existing session, asked at the moment
+of the action and again at the moment the vault would change. There is no trash password, no second
+prompt, no session extension and no route around the credential screen: when the session is closed the
+screen sends the person there, and nothing else.
+
+## Failure states
+
+Every unreadable fact keeps its own name. A trash record that cannot be opened is *unreadable*, with
+its own title and its own sentence — and it is never drawn as "Nothing is in the trash", because that
+is the one misreading this feature exists to prevent. A record written by a newer Nivara is reported
+with its version and never written over. Unreachable storage, a revoked grant and a vault that is not
+ready are each their own state. A change that failed names its reason in fixed, non-secret copy, and
+the record is read again whatever happened, so the screen shows the trash that is actually committed.
+
+## Security and privacy boundaries
+
+The trash record is sealed by the vault's existing encryption under its own purpose; it holds no key,
+no plaintext and nothing secret in the clear. No trash state reaches a screen with anything but display
+facts. Nothing here adds a permission, a network call, a log line with a name or an identifier in it,
+a cache, a thumbnail, a background service, or an export of any kind.
+
+## Scope
+
+Delivered: the trash entry, state and failure contracts; the record's codec and repository on the
+two-slot generational write with a verified read-back before pruning; the join of the trash with the
+index; the trash ordering; the trash surface inside the vault screen (list, restore, search, sort and
+every state's own words); the active list, the search and the albums drawn with the trash subtracted;
+the verifier rules and the test suites.
+
+Deliberately **not** in this stage: permanent deletion, secure erase, emptying the trash and automatic
+expiry — none of them exists anywhere in Nivara; recovery after reinstalling, backup and cloud sync;
+sharing, exporting or opening a file elsewhere; favourites, tags, usage history and recently-opened
+lists; content-based search, OCR and text extraction; thumbnails, previews and persistent caches;
+background work or a media service; and new permissions, a second password or a second session.
+
+## Runtime verification status
+
+The trash entry and its join with the index, the ordering rules (every field, both directions, the
+tie-break and its determinism), the record's codec (round trips, canonical order, duplicates, invalid
+identifiers, moments before the epoch, impossible counts, oversized records, unsupported versions,
+generation mismatches, truncated payloads and trailing bytes), the repository (trashing, restoring,
+idempotence, refused sessions, sessions ending mid-change, unreadable records, records from newer
+builds, refused and swallowed writes, read-back verification, two-slot generations and the previous
+record surviving a failed change), and the screen's state machine and wording are verified by local
+JVM suites — 99 tests across six suites — together with the static checks, which run on every change.
+The verifier's Stage 17 rules are themselves negative-tested: each one is broken on purpose and seen
+to fail, and the repository is restored byte for byte afterwards.
+
+What is **not** verified by those suites, and is therefore not claimed anywhere: the writing and
+reading of a real trash record through the Storage Access Framework on a device, the behaviour of the
+trash surface on a real screen, TalkBack traversal of the new controls, and how a very full trash
+behaves while it is being drawn. The instrumented suite covers the trash card's composition — each
+state, its words and its one action — and is **compiled but not executed** in continuous integration,
+because no device or emulator is attached.

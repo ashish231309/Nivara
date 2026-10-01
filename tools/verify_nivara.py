@@ -2089,8 +2089,6 @@ vault_sources = vault_domain_sources + vault_data_sources + vault_ui_sources + v
 for path in vault_sources:
     code = strip_comments(path.read_text())
     for pattern, why in (
-        (r"\bTrash\w*", "trash"),
-        (r"\bRestore\w*", "restore"),
         (r"\bRecovery\w*|\bReinstall\w*", "recovery"),
         (r"\bBackup\w*|\bCloudSync\w*", "backup"),
         (r"\bExport\w*|\bShareAction\b|\bShareSheet\b", "export"),
@@ -2110,6 +2108,16 @@ viewer_suites = (
     "app/src/test/java/com/nivara/app/ui/vault/viewer/VaultViewerViewModelTest.kt",
     "app/src/test/java/com/nivara/app/ui/vault/viewer/VaultViewerPresentationTest.kt",
 )
+for path in viewer_sources:
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bTrash\w*", "trash"),
+        (r"\bRestore\w*", "restore"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the viewer must not grow a {why} path of its own "
+                f"('{pattern}')")
+
 for suite in viewer_suites:
     if not (ROOT / suite).exists():
         err(f"the vault viewing test suite is missing: {suite}")
@@ -2423,6 +2431,253 @@ for topic in ("album", "Album", "order", "search"):
 
 notes.append(f"vault organisation review: {len(org_domain_sources)} domain, {len(org_data_sources)} data "
              f"and {len(org_ui_sources)} presentation sources; {org_tests} organisation tests")
+
+# ---------------------------------------------------------------- vault trash (stage 17)
+#
+# Trash is a *state*, not a place: a fourth purpose-separated authenticated record beside the index and
+# the albums, holding nothing but `VaultItemId` references and the instant each left the active
+# collection. Content is never opened, moved, renamed, re-encrypted or deleted by it, and the active
+# collection is derived — the index minus this set — rather than stored twice.
+trash_domain_dir = ROOT / "app/src/main/java/com/nivara/app/domain/vault"
+trash_data_dir = ROOT / "app/src/main/java/com/nivara/app/data/vault"
+trash_ui_dir = ROOT / "app/src/main/java/com/nivara/app/ui/vault"
+trash_domain_sources = sorted(trash_domain_dir.glob("VaultTrash*.kt"))
+trash_data_sources = sorted(trash_data_dir.glob("*VaultTrash*.kt"))
+trash_ui_sources = sorted(trash_ui_dir.glob("VaultTrash*.kt"))
+trash_sources = trash_domain_sources + trash_data_sources + trash_ui_sources
+
+for path in [
+    trash_domain_dir / "VaultTrash.kt",
+    trash_domain_dir / "VaultTrashOrdering.kt",
+    trash_data_dir / "VaultTrashCodec.kt",
+    trash_data_dir / "NivaraVaultTrashRepository.kt",
+    trash_ui_dir / "VaultTrashUiState.kt",
+    trash_ui_dir / "VaultTrashSection.kt",
+]:
+    if not path.exists():
+        err(f"the trash source is missing: {path.relative_to(ROOT)}")
+
+trash_domain_code = (trash_domain_dir / "VaultTrash.kt").read_text() \
+    if (trash_domain_dir / "VaultTrash.kt").exists() else ""
+trash_ordering_code = (trash_domain_dir / "VaultTrashOrdering.kt").read_text() \
+    if (trash_domain_dir / "VaultTrashOrdering.kt").exists() else ""
+trash_codec_code = (trash_data_dir / "VaultTrashCodec.kt").read_text() \
+    if (trash_data_dir / "VaultTrashCodec.kt").exists() else ""
+trash_repository_code = (trash_data_dir / "NivaraVaultTrashRepository.kt").read_text() \
+    if (trash_data_dir / "NivaraVaultTrashRepository.kt").exists() else ""
+trash_ui_code = "\n".join(path.read_text() for path in trash_ui_sources)
+trash_all_code = "\n".join(path.read_text() for path in trash_sources)
+
+# Stable identity: an entry is a reference and a moment, and the codec writes exactly those two
+# fields. A name, a type or a size stored beside them would be a second copy of the index's metadata,
+# and the two copies would eventually disagree.
+for token, why in (
+    ("VaultItemId", "the entry must name the item by its stable identifier"),
+    ("trashedAtEpochMillis", "the entry must carry when it was trashed"),
+    ("ENTRY_SIZE: Int = ID_SIZE + TIME_SIZE", "an entry must be exactly an id and a moment"),
+    ("resolveAgainst(", "a trashed entry must be joined with the index, not copied from it"),
+    ("VaultTrashItemStatus.NoLongerInVault", "an item the list no longer names must stay visible"),
+    ("VaultListUnreadable", "an unreadable list must not be drawn as an absent item"),
+):
+    if token not in trash_all_code:
+        err(f"the trash sources are missing that {why} ('{token}')")
+
+for pattern, why in (
+    ("name = ", "a name stored in the trash record"),
+    ("mimeType", "a type stored in the trash record"),
+    ("sizeBytes", "a size stored in the trash record"),
+):
+    if pattern in trash_codec_code:
+        err(f"the trash record must not carry {why} ('{pattern}')")
+
+# Purpose separation: the record is sealed under a purpose of its own, with the next free tag, through
+# the one encryption service the vault already has.
+encryption_context_code = (ROOT / "app/src/main/java/com/nivara/app/domain/security/EncryptionContext.kt").read_text()
+if not re.search(r"VaultTrash\(tag = 0x09\)", encryption_context_code):
+    err("the trash record must have its own encryption purpose, tag 0x09")
+if "EncryptionContext.VaultTrash" not in trash_repository_code:
+    err("the trash repository must seal its record under the trash purpose")
+if "EncryptionContext.VaultIndex" in trash_repository_code or "EncryptionContext.VaultOrganization" in trash_repository_code:
+    err("a trash record must never be sealed under the index's or the albums' purpose")
+
+# The same primitives, and nothing new: no second key, cipher, keystore, random source, session,
+# credential or Android context. The record and its codec are where a second one could hide, so the ban
+# is checked there; the screen is Android's by nature and keeps only the context a composable is given.
+for path in trash_domain_sources + trash_data_sources:
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bCipher\b|\bKeyGenerator\b|\bSecretKey\b|\bKeyStore\b", "a cryptographic service of its own"),
+        (r"\bSecureRandom\b|\bRandom\b", "randomness of its own"),
+        (r"\bSessionManager\b|\bBiometric\w*|\bCredential\w*|\bestablish\s*\(", "a second session or credential path"),
+        (r"\bContext\b|\bActivity\b", "an Android context"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the trash must not introduce {why} ('{pattern}')")
+
+# No permanent deletion, secure erase, empty-trash or expiry, anywhere in the trash feature: content is
+# never touched, and the record that names an item is the only thing a change rewrites.
+for path in trash_sources:
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bdeleteObject\s*\(|\bdeleteDocument\s*\(|\bdeleteContent\b", "a deletion of content"),
+        (r"\bcontentStorage\b|\.nvo\b|\bcontentStorageFactory\b", "a pointer to the content area"),
+        (r"\bshred\w*|\bwipe\w*|\berase\w*|\boverwrite\w*", "a secure erase"),
+        (r"\bexpir\w*|\bretention\b|\bttl\b|\bautoDelete\w*", "an expiration rule"),
+        (r"\bpurge\w*|\bemptyTrash\w*|\bEmptyTrash\w*", "an empty-trash operation"),
+        (r"\blistFiles\s*\(|\bwalk\w*\s*\(|\bscan\w*\s*\(", "a rescan of storage"),
+        (r"\bfilename\w*|\bFile\s*\(", "a filesystem name or path"),
+        (r"\bExport\w*|\bShare\w*|\bRecovery\w*|\bReinstall\w*", "a later stage's feature"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the trash must not contain {why} ('{pattern}')")
+
+# Two-slot durability with a verified read-back before the superseded record is pruned, and the same
+# authorization asked before the read and again at the moment the vault would change.
+for token, why in (
+    ("VaultStructure.TRASH_SLOT_NAMES", "its own pair of dedicated slots"),
+    ("mutationLock.withLock", "the repository's existing serialization"),
+    ("if (!authorize())", "authorization before reading and again before writing"),
+    ("VaultTrashFailure.NotAuthorized", "a change without a session must be refused, not attempted"),
+    ("encryptionService.encrypt(", "the vault's one encryption service"),
+    ("encryptionService.decrypt(", "the vault's one decryption path"),
+    ("writeMetadata(target", "the write into the slot that is not authoritative"),
+    ("readMetadata(target)", "the read-back of what was written"),
+    ("recordValidates(readBack", "a written record must be authenticated and compared before it is kept"),
+    ("deleteMetadata(target)", "a record that did not verify must not be left behind"),
+    ("deleteMetadata(name)", "only the superseded slot may be pruned"),
+    ("targetSlot(", "the slot rule must be the same one the other records follow"),
+):
+    if token not in trash_repository_code:
+        err(f"the trash repository is missing that {why} ('{token}')")
+
+if "TRASH_SLOT_NAMES: List<String> = listOf(\"trash.0.nvt\", \"trash.1.nvt\")" not in \
+        (ROOT / "app/src/main/java/com/nivara/app/data/vault/VaultRootStorage.kt").read_text():
+    err("the trash record must have its own dedicated pair of slots")
+
+# Bounded, strict decoding: every bound is checked before anything is sized from it, and a malformed
+# record is refused rather than read as an empty trash.
+for token, why in (
+    ("VaultTrashLimits.MAXIMUM_TRASHED_ITEMS", "the bound on how many entries a record may name"),
+    ("VaultTrashLimits.MAXIMUM_RECORD_BYTES", "the bound on the record's size"),
+    ("MAXIMUM_ENTRY_COUNT", "the bound fixed by the format's own count"),
+    ("count > VaultTrashLimits.MAXIMUM_TRASHED_ITEMS", "a count checked before it is used"),
+    ("generation != expectedGeneration", "a payload that disagrees with its own header"),
+    ("distinct().size != entries.size", "a duplicate identifier refused by the writer"),
+    ("itemId.value <= previous", "a record out of order or naming one item twice"),
+    ("offset != bytes.size", "trailing bytes refused rather than ignored"),
+    ("reserved != 0", "a reserved byte that must be zero"),
+    ("version != VERSION", "a version this build does not know"),
+):
+    if token not in trash_codec_code:
+        err(f"the trash codec is missing that {why} ('{token}')")
+
+# The active collection is the index minus the trash set — computed where the list is drawn, before the
+# search and before the order — so no list, result or count can disagree about what is active.
+index_ui_code = (trash_ui_dir / "VaultIndexUiState.kt").read_text()
+if "trashedItemIds: Set<VaultItemId> = emptySet()" not in index_ui_code:
+    err("the drawn list must be told which items are out of the active collection")
+if "filterNot { item -> item.id in trashedItemIds }" not in index_ui_code:
+    err("trashed items must be removed from the drawn list before it is searched and ordered")
+if "trashStateUnknown" not in (trash_ui_dir / "VaultUiState.kt").read_text():
+    err("a trash record that cannot be read must be said, not drawn as an active list")
+
+album_code = (trash_domain_dir / "VaultAlbum.kt").read_text()
+if "trashedItemIds: List<VaultItemId> = emptyList()" not in album_code:
+    err("an album must keep naming a member that is in the trash")
+if "itemId in trashedItemIds -> trashed += itemId" not in album_code:
+    err("a trashed member must be reported apart, never drawn as active and never dropped")
+
+view_model_code = (trash_ui_dir / "VaultViewModel.kt").read_text()
+for token, why in (
+    ("trashRepository", "the view model must read the trash record"),
+    ("onTrashItemRequested", "moving a file to trash must be an action the screen can ask for"),
+    ("onRestoreRequested", "restoring a file must be an action the screen can ask for"),
+    ("activeTrashedItemIds()", "the active collection must be derived from the trash record"),
+    ("canChangeTrash()", "a trash change must pass the same boundary check the albums do"),
+):
+    if token not in view_model_code:
+        err(f"the trash view model is missing that {why} ('{token}')")
+
+strings = (ROOT / "app/src/main/res/values/strings.xml").read_text()
+for token, why in (
+    ("vault_section_trash", "the trash section's own name"),
+    ("not deleted", "the explanation that trashing is not a deletion"),
+    ("vault_trash_restore_action", "the one action a trashed row offers"),
+    ("vault_trash_unreadable_body", "an unreadable record's own explanation"),
+    ("vault_trash_empty", "an empty trash worded as itself"),
+    ("vault_album_member_count_trashed_format", "an album saying a member is out of sight"),
+):
+    if token not in strings:
+        err(f"the trash wording is missing {why} ('{token}')")
+
+for forbidden in ("vault_trash_empty_all", "vault_trash_delete", "vault_trash_empty_action",
+                  "vault_trash_erase", "vault_trash_expire"):
+    if forbidden in strings:
+        err(f"the trash must not offer {forbidden}")
+
+# The suites: the domain, the codec, the repository, the screen's state machine and its wording, and
+# one instrumented suite that compiles wherever there is no device to run it.
+trash_jvm_suites = (
+    "app/src/test/java/com/nivara/app/domain/vault/VaultTrashTest.kt",
+    "app/src/test/java/com/nivara/app/domain/vault/VaultTrashOrderingTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/VaultTrashCodecTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/NivaraVaultTrashRepositoryTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/VaultTrashViewModelTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/VaultTrashPresentationTest.kt",
+)
+for suite in trash_jvm_suites:
+    if not (ROOT / suite).exists():
+        err(f"the trash test suite is missing: {suite}")
+instrumented_trash_suite = "app/src/androidTest/java/com/nivara/app/ui/vault/VaultTrashScreenTest.kt"
+if not (ROOT / instrumented_trash_suite).exists():
+    err(f"the trash instrumented suite is missing: {instrumented_trash_suite}")
+
+codec_suite_code = (ROOT / trash_jvm_suites[2]).read_text() if (ROOT / trash_jvm_suites[2]).exists() else ""
+for rule, why in (
+    ("generation", "a generation that disagrees with its header must be tested"),
+    ("duplicate", "a duplicate identifier must be tested"),
+    ("trailing", "trailing bytes must be tested"),
+    ("MAXIMUM_RECORD_BYTES", "the record's size bound must be tested"),
+    ("version", "an unknown version must be tested"),
+    ("reserved", "the reserved byte must be tested"),
+):
+    if rule not in codec_suite_code:
+        err(f"the trash codec suite must check that {why} ('{rule}')")
+
+repository_suite_code = (ROOT / trash_jvm_suites[3]).read_text() if (ROOT / trash_jvm_suites[3]).exists() else ""
+for rule, why in (
+    ("trash(", "moving an item to trash must be exercised"),
+    ("restore(", "restoring an item must be exercised"),
+    ("NotAuthorized", "a change without a session must be refused"),
+    ("readCalls", "a change must be shown to read the record back"),
+    ("Unreadable", "a record that cannot be read must not be written over"),
+    ("UnsupportedVersion", "a record from a newer build must not be written over"),
+    ("deleteCalls", "the superseded slot and a failed write must be shown to be pruned"),
+):
+    if rule not in repository_suite_code:
+        err(f"the trash repository suite must check that {why} ('{rule}')")
+
+view_model_suite_code = (ROOT / trash_jvm_suites[4]).read_text() if (ROOT / trash_jvm_suites[4]).exists() else ""
+for rule, why in (
+    ("unlockRequired", "a change without a session must ask for the existing gate"),
+    ("trashedItemIds", "the active list must be shown to exclude what the trash names"),
+    ("CannotSearch", "an unreadable record must not be drawn as no matches"),
+    ("readCalls", "filtering and sorting must be shown not to read the vault again"),
+):
+    if rule not in view_model_suite_code:
+        err(f"the trash view model suite must cover that {why} ('{rule}')")
+
+trash_tests = sum(len(re.findall(r"@Test\b", (ROOT / suite).read_text()))
+                  for suite in trash_jvm_suites if (ROOT / suite).exists())
+if trash_tests < 40:
+    err(f"the trash suites are too thin: {trash_tests} tests")
+
+for topic in ("Trash", "restore", "not deleted"):
+    if topic not in (ROOT / "docs/vault/README.md").read_text():
+        err(f"docs/vault/README.md does not describe {topic}")
+
+notes.append(f"vault trash review: {len(trash_domain_sources)} domain, {len(trash_data_sources)} data "
+             f"and {len(trash_ui_sources)} presentation sources; {trash_tests} trash tests")
 
 # ---------------------------------------------------------------- wrapper / hygiene
 wrapper_props = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()
