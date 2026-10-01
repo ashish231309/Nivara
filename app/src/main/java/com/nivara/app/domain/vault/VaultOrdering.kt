@@ -58,19 +58,28 @@ data class VaultOrdering(
 ) {
 
     /** The comparison this ordering describes, ending in the item identifier so it is total. */
-    val comparator: Comparator<VaultItem>
-        get() {
-            val primary: Comparator<VaultItem> = when (field) {
-                VaultSortField.Name -> compareBy { item -> item.name.lowercase() }
-                    .thenBy { item -> item.name }
-                VaultSortField.Size -> compareBy { item -> item.sizeBytes }
-                VaultSortField.ImportedAt -> compareBy { item -> item.importedAtEpochMillis }
-                VaultSortField.Kind -> compareBy { item -> kindRank(item) }
-                    .thenBy { item -> item.name.lowercase() }
-            }
-            val total = primary.thenBy { item -> item.id.value }
-            return if (direction == VaultSortDirection.Ascending) total else total.reversed()
+    val comparator: Comparator<VaultItem> get() = orderedByFieldThenIdentifier()
+
+    /**
+     * The comparison itself, as a function rather than a getter body.
+     *
+     * The type argument is written out on every `compareBy` because the field it compares is known
+     * only from the enum branch it belongs to — the compiler has nothing else to infer from — and the
+     * tie-breaker at the end needs no argument because the receiver already fixes it.
+     */
+    private fun orderedByFieldThenIdentifier(): Comparator<VaultItem> {
+        val primary: Comparator<VaultItem> = when (field) {
+            VaultSortField.Name -> compareBy<VaultItem> { item -> item.name.lowercase() }
+                .thenBy<VaultItem> { item -> item.name }
+
+            VaultSortField.Size -> compareBy<VaultItem> { item -> item.sizeBytes }
+            VaultSortField.ImportedAt -> compareBy<VaultItem> { item -> item.importedAtEpochMillis }
+            VaultSortField.Kind -> compareBy<VaultItem> { item -> kindRank(item) }
+                .thenBy<VaultItem> { item -> item.name.lowercase() }
         }
+        val total = primary.thenBy { item -> item.id.value }
+        return if (direction == VaultSortDirection.Ascending) total else total.reversed()
+    }
 
     /** The same field, the other direction. */
     fun toggled(): VaultOrdering = copy(direction = direction.reversed())

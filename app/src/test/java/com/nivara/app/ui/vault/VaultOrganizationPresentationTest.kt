@@ -8,6 +8,7 @@ import com.nivara.app.domain.vault.VaultOrganizationFailure
 import com.nivara.app.domain.vault.VaultOrganizationState
 import com.nivara.app.domain.vault.VaultOrganizationUnreadable
 import com.nivara.app.domain.vault.VaultState
+import com.nivara.app.domain.vault.resolveAgainst
 import com.nivara.app.testing.testAlbum
 import com.nivara.app.testing.testAlbumId
 import com.nivara.app.testing.testItem

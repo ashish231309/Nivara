@@ -21,6 +21,7 @@ import com.nivara.app.domain.vault.VaultItemId
 import com.nivara.app.domain.vault.VaultLocation
 import com.nivara.app.domain.vault.VaultLocationStore
 import com.nivara.app.domain.vault.VaultOrdering
+import com.nivara.app.domain.vault.VaultOrganizationFailure
 import com.nivara.app.domain.vault.VaultOrganizationRepository
 import com.nivara.app.domain.vault.VaultOrganizationState
 import com.nivara.app.domain.vault.VaultRepository
@@ -29,9 +30,11 @@ import com.nivara.app.domain.vault.VaultSearchQuery
 import com.nivara.app.domain.vault.VaultSearchResult
 import com.nivara.app.domain.vault.VaultSortField
 import com.nivara.app.domain.vault.VaultSourceReference
+import com.nivara.app.domain.vault.asOrganizationFailure
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.inOrder
 import com.nivara.app.domain.vault.resolveAgainst
+import com.nivara.app.domain.vault.search
 import com.nivara.app.ui.components.NivaraMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -568,7 +571,9 @@ class VaultViewModel(
                 result == null -> failure = vaultAlbumChangeFailedMessage()
 
                 result is NivaraResult.Failure -> {
-                    val typed = result.error as? VaultOrganizationFailure
+                    // How a thrown failure becomes a typed one is the domain's own rule, not the
+                    // screen's: the same reading is used everywhere a result is turned into a message.
+                    val typed = result.error.asOrganizationFailure()
                     if (typed == VaultOrganizationFailure.NotAuthorized) unlockRequired = true
                     failure = typed?.asMessage() ?: vaultAlbumChangeFailedMessage()
                     noticeRes = null
@@ -716,8 +721,10 @@ class VaultViewModel(
      * vault rather than the visible rows — missing content, unindexed and unfinished objects — are
      * taken from the index as a whole and are not affected by a query.
      */
-    private fun drawnIndex(): VaultIndexUiState =
-        (domainIndex ?: return VaultIndexUiState.Loading).toUiState(ordering = ordering, query = query)
+    private fun drawnIndex(): VaultIndexUiState {
+        val index = domainIndex ?: return VaultIndexUiState.Loading
+        return index.toUiState(ordering = ordering, query = query)
+    }
 
     /**
      * Reads the vault's albums.
