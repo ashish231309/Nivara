@@ -258,13 +258,27 @@ launcher is in front.
   the rest of Nivara, entered at the launcher destination — so there is no second copy of any settings
   screen.
 
+## What an application identity changes here, and what it does not
+
+Nivara's launcher entry — the one the user's own home screen shows — can present a different name and
+icon; that is the application-identity feature of
+[`docs/camouflage/README.md`](../camouflage/README.md), and it changes nothing in this document.
+
+The Home contract is deliberately outside it. `LauncherActivity` keeps its own name, keeps the Home
+intent it declares, and is never enabled, disabled or re-pointed by an identity: at most one of the
+*application's* launcher entries is ever toggled, and the Home activity is not one of them. Nivara's
+own launcher surface keeps working exactly as described above, and its route into Nivara's settings
+stays where it is — which also means that a user who set Nivara as Home still has an ordinary way
+back to Nivara's settings whatever its launcher entry is currently called.
+
 ## Security and privacy
 
 * **No new permission.** Displaying applications, opening them, being Home and filtering hidden ones
   need none. The manifest still declares exactly the two Stage 8 capabilities, both justified by App
   Lock.
 * **Nothing new is exported.** One Home activity, with one intent filter; the verifier refuses any
-  other exported component that is not the application's own launcher entry.
+  other exported component that is not the application's own launcher entry or a declared
+  application identity.
 * **No storage, no parsing, no logging.** The launcher sources may not name storage, a codec, a file
   name, a codec path or a log call; the verifier enforces it.
 * **No network, no analytics, no usage history.**

@@ -822,7 +822,8 @@ for path in main_kt:
     text = strip_comments(path.read_text())
     for forbidden, reason in (
         ("setApplicationEnabledSetting", "Nivara never changes an application's enabled state"),
-        ("setComponentEnabledSetting", "Nivara never disables another application's components"),
+        ("setApplicationLabel", "an identity is presented through a declared component; the "
+                                "platform's record of the application's own name is never rewritten"),
         ("killBackgroundProcesses", "Nivara never kills another application's process"),
         ("addPreferredActivity", "Nivara never selects a Home application: the user does"),
         ("clearPackagePreferredActivities", "Nivara never changes a launcher preference"),
@@ -830,6 +831,17 @@ for path in main_kt:
     ):
         if forbidden in text:
             err(f"{path.relative_to(ROOT)}: {forbidden} — {reason}")
+
+# A component's enabled state is changed in exactly one place, and that place only ever changes one
+# of Nivara's own launcher entries. Anywhere else — and in particular anything aimed at another
+# application's components — it stays forbidden.
+identity_component_owner = ROOT / "app/src/main/java/com/nivara/app/data/camouflage"
+for path in main_kt:
+    if "setComponentEnabledSetting" in strip_comments(path.read_text()):
+        if identity_component_owner not in path.parents:
+            err(f"{path.relative_to(ROOT)}: setComponentEnabledSetting outside the identity "
+                f"implementation — only the camouflage identity may change a component's state, and "
+                f"only for Nivara's own launcher entries")
 
 # The launcher draws what the domain's rule produced and owns no state of its own: no hidden list, no
 # session, no persistence, and no second discovery scanner.
@@ -994,6 +1006,251 @@ else:
 notes.append(f"security review: {len(security_sources)} security sources, {len(contracts)} contracts wired")
 notes.append(f"app lock review: {len(applock_contracts)} contracts wired ({', '.join(applock_contracts)})")
 
+# ---------------------------------------------------------------- application identity (camouflage)
+# Camouflage is presentation: the name and icon of the launcher entry that starts Nivara. These rules
+# pin what an identity is allowed to be — a declared component with a benign name and icon — and what
+# it may never become: application hiding, a second launcher, a second authentication, a store of its
+# own, or a change to Android's record of the application.
+identity_domain_dir = ROOT / "app/src/main/java/com/nivara/app/domain/camouflage"
+identity_data_dir = ROOT / "app/src/main/java/com/nivara/app/data/camouflage"
+identity_ui_dir = ROOT / "app/src/main/java/com/nivara/app/ui/camouflage"
+identity_dirs = (identity_domain_dir, identity_data_dir, identity_ui_dir)
+for directory in identity_dirs:
+    if not directory.is_dir():
+        err(f"the application-identity layer is missing: {directory.relative_to(ROOT)}")
+identity_sources = sorted(
+    path for directory in identity_dirs if directory.is_dir()
+    for path in directory.glob("*.kt")
+)
+if not identity_sources:
+    err("no application-identity sources were found")
+
+# The identities are declared once, in the domain model, and the manifest has to agree with it: an
+# alias for an identity the model does not declare would be an entry nothing can select, and an
+# identity without an alias would be a choice that cannot be presented.
+profile_source = (identity_domain_dir / "CamouflageProfile.kt")
+if not profile_source.exists():
+    err("the camouflage identity model is missing")
+    declared_profiles = {}
+else:
+    declared_profiles = dict(re.findall(
+        r'^\s*([A-Z]\w*)\("([a-z][a-z0-9_]*)"\),?$',
+        profile_source.read_text(),
+        re.MULTILINE,
+    ))
+if "Nivara" not in declared_profiles:
+    err("the identity model must declare Nivara's own identity")
+elif declared_profiles["Nivara"] != "nivara":
+    err("Nivara's own identity must use the identifier 'nivara'")
+camouflage_identifiers = {name: identifier for name, identifier in declared_profiles.items()
+                          if name != "Nivara"}
+if not camouflage_identifiers:
+    err("the identity model declares no camouflage identity")
+
+manifest_aliases = {attr(alias, "android:name"): alias for alias in manifest_root.iter("activity-alias")}
+expected_aliases = {
+    f".Camouflage{name}": identifier for name, identifier in camouflage_identifiers.items()
+}
+missing_aliases = sorted(set(expected_aliases) - set(manifest_aliases))
+extra_aliases = sorted(set(manifest_aliases) - set(expected_aliases))
+if missing_aliases:
+    err(f"the manifest declares no component for these identities: {missing_aliases}")
+if extra_aliases:
+    err(f"the manifest declares camouflage components for no declared identity: {extra_aliases}")
+
+for name, alias in sorted(manifest_aliases.items()):
+    identifier = expected_aliases.get(name)
+    if identifier is None:
+        continue
+    # Every alias presents the same activity: an identity is not a second screen, a second task or a
+    # second implementation, and only a component that already exists may be presented.
+    if attr(alias, "android:targetActivity") != ".MainActivity":
+        err(f"the alias '{name}' must target Nivara's own entry activity, not "
+            f"'{attr(alias, 'android:targetActivity')}'")
+    # Enabled-by-declaration would put every identity in the launcher on a fresh install, and the
+    # default is Nivara's own identity.
+    if attr(alias, "android:enabled") != "false":
+        err(f"the alias '{name}' must be declared android:enabled=\"false\": the shipped default is "
+            f"Nivara's own identity")
+    if attr(alias, "android:exported") != "true":
+        err(f"the alias '{name}' must be exported: the launcher has to be able to start it")
+    if attr(alias, "android:icon") != f"@mipmap/ic_camouflage_{identifier}":
+        err(f"the alias '{name}' must carry the {identifier} icon")
+    if attr(alias, "android:label") != f"@string/camouflage_profile_{identifier}_label":
+        err(f"the alias '{name}' must carry the {identifier} label")
+    alias_actions = {attr(el, "name") for el in alias.iter("action")}
+    alias_categories = {attr(el, "name") for el in alias.iter("category")}
+    alias_data = [el for el in alias.iter("data")]
+    if alias_actions != {"android.intent.action.MAIN"}:
+        err(f"the alias '{name}' must declare exactly the launcher action MAIN, not "
+            f"{sorted(alias_actions)}")
+    if alias_categories != {"android.intent.category.LAUNCHER"}:
+        err(f"the alias '{name}' must declare exactly the launcher category, not "
+            f"{sorted(alias_categories)}")
+    if alias_data:
+        err(f"the alias '{name}' declares a data element: a launcher entry carries no URI")
+
+# Nivara's own entry stays exactly what it was: enabled, exported, and labelled with the application's
+# own name and icon. It is the entry that always exists, so it can never be the one a change removes.
+real_entry = None
+for activity in manifest_root.iter("activity"):
+    if attr(activity, "android:name") == ".MainActivity":
+        real_entry = activity
+if real_entry is None:
+    err("the manifest has no MainActivity: the application's own entry is what camouflage always keeps")
+else:
+    if attr(real_entry, "android:enabled") == "false":
+        err("MainActivity must not be declared disabled: that is the launcher entry the user can "
+            "always return to")
+    if attr(real_entry, "android:exported") != "true":
+        err("MainActivity must stay exported: it is the application's own entry point")
+    if attr(real_entry, "android:label") != "@string/app_name":
+        err("MainActivity must keep the application's own label")
+    if attr(real_entry, "android:icon") not in (None, "@mipmap/ic_launcher"):
+        err("MainActivity must keep the application's own icon")
+    entry_categories = {attr(el, "name") for el in real_entry.iter("category")}
+    if "android.intent.category.LAUNCHER" not in entry_categories:
+        err("MainActivity must keep its launcher category: an identity change must never leave the "
+            "application with no launcher entry at all")
+
+# What camouflage may not touch, and what it may not become.
+for path in identity_sources:
+    rel = path.relative_to(ROOT)
+    text = strip_comments(path.read_text())
+    for forbidden, reason in (
+        ("LauncherActivity", "the Home contract is Stage 11's and is never part of an identity"),
+        ("setApplicationEnabledSetting", "an identity is presentation, not application hiding"),
+        ("setApplicationLabel", "the platform's record of the application's own name is never rewritten"),
+        ("queryIntentActivities", "an identity does not enumerate anything"),
+        ("getInstalledApplications", "an identity does not enumerate anything"),
+        ("getInstalledPackages", "an identity does not enumerate anything"),
+        ("QUERY_ALL_PACKAGES", "no package visibility is added for an identity"),
+        ("HiddenApplication", "identity and hiding are separate dimensions"),
+        ("ProtectedApplication", "identity and protection are separate dimensions"),
+        ("ProtectedApplicationRepository", "the protected set is not the identity's business"),
+        ("AppLockMonitor", "App Lock is not the identity's business"),
+        ("AppLockOverlay", "the protection surface is not the identity's business"),
+        ("SharedPreferences", "an identity keeps no Nivara-owned state: the platform holds it"),
+        ("DataStore", "an identity keeps no Nivara-owned state: the platform holds it"),
+        ("RoomDatabase", "an identity keeps no Nivara-owned state: the platform holds it"),
+        ("openFileOutput", "an identity keeps no Nivara-owned state: the platform holds it"),
+        ("AtomicFiles", "an identity keeps no Nivara-owned state: the platform holds it"),
+        ("File(", "an identity keeps no Nivara-owned state: the platform holds it"),
+        ("javax.crypto", "an identity is not cryptography and adds none"),
+        ("java.security", "an identity is not cryptography and adds none"),
+        ("Cipher", "an identity is not cryptography and adds none"),
+        ("EncryptionService", "an identity is not cryptography and adds none"),
+        ("credentialManager", "camouflage never handles a credential"),
+        ("biometricAuthenticator", "camouflage never handles an authentication"),
+        ("UsageStatsManager", "an identity reads no usage history"),
+        ("AccessibilityService", "an identity reads no screen"),
+        ("Log.", "camouflage logs nothing"),
+        ("println(", "camouflage logs nothing"),
+        ("HttpURLConnection", "camouflage transmits nothing"),
+        ("okhttp", "camouflage transmits nothing"),
+    ):
+        if forbidden in text:
+            err(f"{rel}: {forbidden} — {reason}")
+
+# No second authentication, session or credential mechanism may grow inside camouflage.
+for path in identity_sources:
+    rel = path.relative_to(ROOT)
+    text = strip_comments(path.read_text())
+    for match in re.finditer(
+        r"^(?:internal |private |public )*(?:sealed |data |enum |abstract |open )*"
+        r"(?:class|interface|object)\s+([A-Za-z_]\w*)",
+        text,
+        re.MULTILINE,
+    ):
+        name = match.group(1)
+        if re.search(r"Session|Unlock|Password|Passcode|Credential|Authenticat", name):
+            err(f"{rel}: camouflage declares '{name}'; changing an identity uses the existing "
+                f"SessionManager and the existing credential flow, and nothing else")
+
+identity_view_model = (identity_ui_dir / "CamouflageViewModel.kt")
+if not identity_view_model.exists():
+    err("the application-identity view model is missing")
+else:
+    text = strip_comments(identity_view_model.read_text())
+    if "SessionManager" not in text or "currentState()" not in text:
+        err(f"{identity_view_model.relative_to(ROOT)}: a change must be gated on the existing "
+            f"session gate through its authoritative currentState()")
+
+# Presentation: every declared identity has a name and an icon, and the screen draws the two things
+# that keep the feature honest — what it does not do, and how to get back to Nivara.
+identity_strings = (res_dir / "values" / "strings.xml").read_text()
+colours_source = (res_dir / "values" / "colors.xml").read_text()
+for name, identifier in sorted(camouflage_identifiers.items()):
+    if f'name="camouflage_profile_{identifier}_label"' not in identity_strings:
+        err(f"the {name} identity has no label resource")
+    if f'name="ic_camouflage_{identifier}_background"' not in colours_source:
+        err(f"the {name} identity has no icon background colour")
+    for kind in ("drawable", "mipmap"):
+        if not (res_dir / f"{kind}-anydpi-v26" / f"ic_camouflage_{identifier}.xml").exists() \
+                and not (res_dir / kind / f"ic_camouflage_{identifier}.xml").exists():
+            err(f"the {name} identity has no {kind} resource (ic_camouflage_{identifier})")
+
+identity_screen = (identity_ui_dir / "CamouflageScreen.kt")
+if not identity_screen.exists():
+    err("the application-identity screen is missing")
+else:
+    screen_text = identity_screen.read_text()
+    for required, reason in (
+        (r"R\.string\.camouflage_limitation(?![\w])",
+         "the screen must state what an identity change does not do"),
+        (r"R\.string\.camouflage_recovery(?![\w])",
+         "the screen must state how to get back to Nivara"),
+    ):
+        if not re.search(required, screen_text):
+            err(f"{identity_screen.relative_to(ROOT)}: {reason}")
+    # Nivara's own identity is one of the choices, and it is offered as an identity like the others
+    # rather than as a separate "turn it off" path: restoring it is the ordinary way back.
+    if "R.string.app_name" not in "".join(
+        path.read_text() for path in sorted(identity_ui_dir.glob("*.kt"))
+    ):
+        err("the identity screens must offer Nivara's own identity as a choice")
+
+# A secret way in is refused wherever it could appear in code: recovery is an ordinary screen in the
+# existing graph, and Nivara owns no dialler or special-code entry.
+for path in sorted((ROOT / "app/src/main/java").rglob("*.kt")):
+    if re.search(r"\*#\*#|ACTION_DIAL|ACTION_CALL|TelephonyManager|SecretCode", path.read_text()):
+        err(f"{path.relative_to(ROOT)}: Nivara has no dialler or secret-code entry — recovery is an "
+            f"ordinary screen")
+
+# The copy a user reads may not claim that camouflage cannot be found. This is checked where the
+# claim would be made — the strings the product ships and the document that describes them — rather
+# than over every source file, where the same words appear in honest negations.
+for path in [res_dir / "values" / "strings.xml", ROOT / "docs/camouflage/README.md"]:
+    text = path.read_text()
+    for pattern in (r"(?i)\binvisible\b", r"(?i)\bundetectable\b", r"(?i)\buntraceable\b",
+                    r"(?i)anti-forensic", r"(?i)\bguaranteed? (secrecy|hidden)\b"):
+        if re.search(pattern, text):
+            err(f"{path.relative_to(ROOT)}: camouflage changes presentation and may not claim that "
+                f"the application cannot be found ({pattern})")
+
+# Recovery: the identity screen is reachable from the home screen like every other settings screen,
+# and the Home contract keeps working exactly as Stage 11 left it.
+home_screen = ROOT / "app/src/main/java/com/nivara/app/ui/home/HomeScreen.kt"
+graph_source_path = ROOT / "app/src/main/java/com/nivara/app/ui/navigation/NivaraNavHost.kt"
+if "onOpenCamouflage" not in home_screen.read_text():
+    err("the home screen does not offer the application-identity screen: recovery must be an "
+        "ordinary route")
+if "NivaraDestination.Camouflage.route" not in graph_source_path.read_text():
+    err("the identity destination is not registered in the navigation graph")
+
+# Hiding and identity stay independent in both directions: camouflage never reads or writes the
+# hidden set, and nothing in the hidden-application feature reads or writes the identity.
+for directory in ("app/src/main/java/com/nivara/app/domain/apphide",
+                  "app/src/main/java/com/nivara/app/data/apphide",
+                  "app/src/main/java/com/nivara/app/ui/apphide"):
+    for path in sorted((ROOT / directory).rglob("*.kt")):
+        if "Camouflage" in strip_comments(path.read_text()):
+            err(f"{path.relative_to(ROOT)}: the hidden-application feature must not read the "
+                f"camouflage identity: hiding and identity are separate dimensions")
+
+notes.append(f"application identity: {len(camouflage_identifiers)} camouflage identities declared, "
+             f"{len(manifest_aliases)} components in the manifest")
+
 # Every declared destination must be registered in the navigation graph: a destination with no
 # composable is a route nobody can reach, and nothing at runtime says so until it is navigated to.
 destination_source = (ROOT / "app/src/main/java/com/nivara/app/ui/navigation/NivaraDestination.kt").read_text()
@@ -1010,7 +1267,7 @@ for name in declared_destinations:
 
 # documentation that the code refers to must exist
 for doc in ("docs/crypto/envelope-format.md", "docs/crypto/README.md", "docs/apphide/README.md",
-            "docs/launcher/README.md", "tools/crypto_reference.py"):
+            "docs/launcher/README.md", "docs/camouflage/README.md", "tools/crypto_reference.py"):
     if not (ROOT / doc).exists():
         err(f"documentation or tooling referenced by the code is missing: {doc}")
 

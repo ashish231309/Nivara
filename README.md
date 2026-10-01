@@ -16,8 +16,10 @@ credential enrolment**, **biometric unlock as a secondary path**, the **session 
 detection, the protection surface that presents the requirement and routes authentication into the
 session, and the settings screen that chooses which applications are protected — the
 **hidden-app layer**: the record of which applications Nivara keeps out of sight, the screen that
-manages it, and the **launcher**: Nivara as the device's Home application, with an app drawer that
-leaves hidden applications out and can show them again for as long as Nivara is unlocked.
+manages it, the **launcher**: Nivara as the device's Home application, with an app drawer that
+leaves hidden applications out and can show them again for as long as Nivara is unlocked — and the
+**application identity**: the name and icon Nivara's launcher entry presents, and the ordinary route
+back to Nivara's own.
 
 What works today:
 
@@ -50,6 +52,13 @@ What works today:
   applications opened through the platform's own launcher facilities, and a normal route into
   Nivara's settings — the drawer failing closed, and drawing nothing at all, when the hidden set
   cannot be read;
+- an application identity: Nivara's launcher entry can present a benign, ordinary name and icon —
+  a notes application, a calculator, a weather application — instead of its own, so a glance at the
+  home screen does not announce what the application is for. It is presentation and nothing more:
+  the package, the data and the signature are unchanged, Android's settings and the package manager
+  still list Nivara, and the screen that offers it says so. What protects Nivara is unchanged too:
+  the credential, biometric unlock, App Lock and the session timeout, none of which camouflage
+  bypasses and none of which it weakens;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
@@ -58,17 +67,19 @@ Biometric unlock never replaces the primary credential and never unlocks anythin
 the session is not one either: it is an authorization state held only while the process lives, and
 it holds no credential, no key and nothing on disk. Detection decides and publishes; the surface
 that presents a requirement is separate from it, holds no credential of its own and can do exactly
-one thing with an authentication result — hand it to the session gate. There is still no vault, no
-recovery flow and no camouflage — those are the stages that follow, and they consume the layers
-described in [`docs/crypto/README.md`](docs/crypto/README.md),
+one thing with an authentication result — hand it to the session gate. There is still no vault — that is
+the stage that follows, and it consumes the layers described in
+[`docs/crypto/README.md`](docs/crypto/README.md),
 [`docs/credential/README.md`](docs/credential/README.md),
 [`docs/biometric/README.md`](docs/biometric/README.md),
 [`docs/session/README.md`](docs/session/README.md),
 [`docs/applock/README.md`](docs/applock/README.md),
-[`docs/apphide/README.md`](docs/apphide/README.md) and
-[`docs/launcher/README.md`](docs/launcher/README.md). Hiding an application means Nivara's own drawer
-leaves it out; Android's launcher still shows every application, and both the screens and the
-documentation say so.
+[`docs/apphide/README.md`](docs/apphide/README.md),
+[`docs/launcher/README.md`](docs/launcher/README.md) and
+[`docs/camouflage/README.md`](docs/camouflage/README.md). Hiding an application means Nivara's own
+drawer leaves it out; Android's launcher still shows every application, and both the screens and the
+documentation say so. Camouflage means Nivara's own launcher entry shows a different name and icon;
+Android still lists Nivara by its package, and the screen that offers it says that too.
 
 ## Planned capabilities
 
@@ -80,8 +91,11 @@ project is clear; each one is implemented in its own release and is not present 
 - Recording which applications are hidden — delivered
 - An optional home-screen (launcher) experience — delivered, as a launcher Android can be asked to
   use; choosing it is the user's decision in Android's own Home settings
-- App identity camouflage and a recovery entry point — not started; nothing about Nivara pretends to
-  be another application
+- App identity camouflage and a recovery entry point — delivered, as presentation: a benign name and
+  icon for Nivara's launcher entry, with Nivara's own identity one selection away and reachable from
+  Android's application list at any time. Camouflage is not a security boundary, hides nothing from
+  Android, and does not pretend to be a different application: it changes what the home screen shows
+- External encrypted vault storage — not started
 - An encrypted file vault, including media, albums and a recycle bin
 - Recovery and session management
 - Security settings, themes and the final visual design
@@ -114,7 +128,8 @@ app/src/main/java/com/nivara/app/
 │   ├── permissions/            Usage Access and overlay capabilities, setup aggregate
 │   ├── applock/                Protected set, detection, decision rule, overlay contract
 │   ├── apphide/                Hidden set, its repository contract and its failure cases
-│   └── launcher/               What a launcher may draw, and the fail-closed rule for it
+│   ├── launcher/               What a launcher may draw, and the fail-closed rule for it
+│   └── camouflage/             What an identity is, and which one the device is presenting
 ├── data/                       Platform-backed implementations of those contracts
 │   ├── app/                    Launcher-entry discovery through the package manager
 │   ├── applock/                Usage-event detector, protected set store, monitor, service
@@ -139,6 +154,7 @@ app/src/main/java/com/nivara/app/
     │   └── overlay/            The protection window, its lifecycle and its content
     ├── apphide/                Choosing which applications Nivara keeps out of sight
     ├── launcher/               The Home activity, the home surface and the app drawer
+    ├── camouflage/             Choosing the name and icon Nivara presents under
     └── session/                Session text shared by the screens that show it
 ```
 
@@ -432,6 +448,25 @@ system setting. The full contract is in [`docs/launcher/README.md`](docs/launche
 | Stored state | Never written by the launcher; hiding and revealing change the device in no way |
 | App Lock | Untouched and independent: a hidden application that is protected is still protected when opened |
 | Android's own launcher | Unchanged. Hiding means Nivara's drawer leaves an application out, nothing more |
+
+## Application identity
+
+Nivara's launcher entry can present a benign, ordinary identity — a notes application, a calculator,
+a weather application — instead of its own name and icon. Choosing one is an ordinary settings screen,
+reached from the home screen and protected by the same session every other configuration change uses.
+
+| Concern | Behaviour |
+| --- | --- |
+| What changes | The name and icon of the launcher entry that starts Nivara, and nothing else |
+| What does not change | The package, the signature, the data, the credential, App Lock, hidden applications, the session timeout, the Home contract |
+| Where the selection lives | In the platform's component state; Nivara keeps no file, no preference and no copy of it |
+| Identities | Nivara's own, plus Notes, Calculator and Weather — a fixed set declared in the manifest |
+| The default | Nivara's own identity, on a fresh install and after any state Nivara cannot vouch for |
+| A device state that names no identity | Repaired to Nivara's own identity on the next read, never guessed at |
+| Getting back | Always possible: from the launcher entry (one is always enabled), or from Android's application list, where Nivara is still Nivara |
+| What it is not | A security boundary, a way to hide the application, or a way to hide anything from Android |
+
+The full contract is in [`docs/camouflage/README.md`](docs/camouflage/README.md).
 
 ## Repository checks
 
