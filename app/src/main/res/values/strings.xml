@@ -160,7 +160,7 @@
     <string name="biometric_error_key_unavailable">Android could not provide the biometric key.</string>
     <string name="biometric_error_generic">Nivara could not complete that. Try again.</string>
 
-    <!-- Copy shown inside Android's own biometric prompt -->
+    <!-- Copy shown inside Android\'s own biometric prompt -->
     <string name="biometric_prompt_enable_title">Confirm it is you</string>
     <string name="biometric_prompt_enable_subtitle">Authenticate to turn on biometric unlock.</string>
     <string name="biometric_prompt_authenticate_title">Biometric unlock</string>
@@ -179,5 +179,5 @@
     <string name="session_action_lock">Lock now</string>
     <string name="session_notice_locked">Nivara is locked. Authenticate again to continue.</string>
     <string name="session_notice_ended">The session ended. Authenticate again to continue.</string>
-    <string name="session_locked_note">This is Nivara's own session, not the device's screen lock: locking it does not touch your credential, your biometric enrolment or any stored file.</string>
+    <string name="session_locked_note">This is Nivara\'s own session, not the device\'s screen lock: locking it does not touch your credential, your biometric enrolment or any stored file.</string>
 </resources>
