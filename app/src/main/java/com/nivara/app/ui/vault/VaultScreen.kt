@@ -408,7 +408,7 @@ private fun VaultContent(
                 VaultSection.AllItems -> VaultIndexCard(
                     index = state.index,
                     onOpenItem = onOpenItem,
-                    onTrashItem = if (state.trash.acceptsChanges) onTrashItem else null,
+                    onTrashItem = if (state.trash.acceptsChanges) { item -> onTrashItem(item.id) } else null,
                 )
 
                 VaultSection.Trash -> VaultTrashCard(
@@ -439,7 +439,7 @@ private fun VaultContent(
                     onAddItem = onAlbumItemAdded,
                     onRemoveItem = onAlbumItemRemoved,
                     onOpenItem = onOpenItem,
-                    onTrashItem = if (state.trash.acceptsChanges) onTrashItem else null,
+                    onTrashItem = if (state.trash.acceptsChanges) { item -> onTrashItem(item.id) } else null,
                 )
             }
         }
