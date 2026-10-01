@@ -10,6 +10,9 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.nivara.app.NivaraApplication
 import com.nivara.app.core.common.NivaraResult
 import com.nivara.app.core.common.valueOrNull
+import com.nivara.app.data.vault.viewer.NivaraDocumentEngineFactory
+import com.nivara.app.data.vault.viewer.NivaraMediaEngineFactory
+import com.nivara.app.data.vault.viewer.NivaraVaultImageEngine
 import com.nivara.app.data.vault.viewer.VaultDocumentEngine
 import com.nivara.app.data.vault.viewer.VaultDocumentEngineFactory
 import com.nivara.app.data.vault.viewer.VaultImageEngine
@@ -476,10 +479,14 @@ internal class VaultViewerViewModel(
                 val application =
                     this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NivaraApplication
                 val container = application.container
+                // The engines are made here, one set per viewer, from the single content reader the
+                // container exposes: an engine holds a borrow of the vault's key for as long as its
+                // viewer is open, so it belongs to that viewer and is released with it.
+                val reader = container.vaultContentReader
                 VaultViewerViewModel(
-                    mediaEngines = container.vaultMediaEngines,
-                    imageEngine = container.vaultImageEngine,
-                    documentEngines = container.vaultDocumentEngines,
+                    mediaEngines = NivaraMediaEngineFactory(reader = reader),
+                    imageEngine = NivaraVaultImageEngine(reader = reader),
+                    documentEngines = NivaraDocumentEngineFactory(context = application, reader = reader),
                     sessionManager = container.sessionManager,
                 )
             }

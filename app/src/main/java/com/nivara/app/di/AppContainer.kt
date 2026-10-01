@@ -26,12 +26,6 @@ import com.nivara.app.data.vault.NivaraVaultRepository
 import com.nivara.app.data.vault.SafDocumentSourceOpener
 import com.nivara.app.data.vault.SafVaultContentStorage
 import com.nivara.app.data.vault.SafVaultRootStorage
-import com.nivara.app.data.vault.viewer.NivaraDocumentEngineFactory
-import com.nivara.app.data.vault.viewer.NivaraMediaEngineFactory
-import com.nivara.app.data.vault.viewer.NivaraVaultImageEngine
-import com.nivara.app.data.vault.viewer.VaultDocumentEngineFactory
-import com.nivara.app.data.vault.viewer.VaultImageEngine
-import com.nivara.app.data.vault.viewer.VaultMediaEngineFactory
 import com.nivara.app.domain.app.ApplicationLauncher
 import com.nivara.app.domain.app.ApplicationRepository
 import com.nivara.app.domain.applock.AppLockMonitor
@@ -65,6 +59,7 @@ import com.nivara.app.domain.security.RecoveryKeyEnvelopeService
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.security.SessionTimeoutPolicy
 import com.nivara.app.domain.security.SecureRandomGenerator
+import com.nivara.app.domain.vault.VaultContentReader
 import com.nivara.app.domain.vault.VaultIndexRepository
 import com.nivara.app.domain.vault.VaultLocationStore
 import com.nivara.app.domain.vault.VaultRepository
@@ -266,18 +261,14 @@ interface AppContainer {
     val vaultIndexRepository: VaultIndexRepository
 
     /**
-     * The engine that decodes an imported image, inside the viewer's memory bound.
+     * The vault's content, opened for reading.
      *
-     * Shared, because a decode is a call rather than a session: it borrows the vault's key, reads the
-     * image within that borrow, and keeps nothing but the decoded bitmap the viewer releases.
+     * The same repository the index comes from, seen as the contract a viewer reads through. It is
+     * exposed so the viewing engines are built from exactly this object: every viewer in the
+     * application then reads through the vault's one decryption path, and an engine never needs to
+     * know where the content is or how it is protected. See docs/vault/README.md.
      */
-    internal val vaultImageEngine: VaultImageEngine
-
-    /** Creates the media engine for one viewer. */
-    internal val vaultMediaEngines: VaultMediaEngineFactory
-
-    /** Creates the document engine for one viewer. */
-    internal val vaultDocumentEngines: VaultDocumentEngineFactory
+    val vaultContentReader: VaultContentReader
 }
 
 /**
@@ -549,17 +540,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
      * engine *holds* a borrow for as long as a viewer is open: one is created per viewer, and that
      * viewer releases it.
      */
-    internal override val vaultImageEngine: VaultImageEngine by lazy {
-        NivaraVaultImageEngine(reader = nivaraVaultIndex)
-    }
-
-    internal override val vaultMediaEngines: VaultMediaEngineFactory by lazy {
-        NivaraMediaEngineFactory(reader = nivaraVaultIndex)
-    }
-
-    internal override val vaultDocumentEngines: VaultDocumentEngineFactory by lazy {
-        NivaraDocumentEngineFactory(context = applicationContext, reader = nivaraVaultIndex)
-    }
+    override val vaultContentReader: VaultContentReader get() = nivaraVaultIndex
 
     /** One wall clock for every throttling rule in the application. */
     private val timeProvider: TimeProvider by lazy { SystemTimeProvider() }
