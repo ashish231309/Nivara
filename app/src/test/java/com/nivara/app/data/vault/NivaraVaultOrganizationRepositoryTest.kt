@@ -18,11 +18,15 @@ import com.nivara.app.testing.testAlbumId
 import com.nivara.app.testing.testItemId
 import com.nivara.app.testing.valueOrFail
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -86,6 +90,13 @@ class NivaraVaultOrganizationRepositoryTest {
 
     private fun bytesOf(name: String): List<Int> =
         metadata.documents.getValue(name).map { byte -> byte.toInt() and 0xFF }
+
+    /** Waits until the storage double has recorded a write past [before], or fails the test. */
+    private suspend fun awaitWriteAfterMoreThan(before: Int) {
+        withTimeout(10_000) {
+            while (metadata.writeCalls <= before) delay(5)
+        }
+    }
 
     /** Puts a record into a slot without going through the repository, as a previous generation would. */
     private suspend fun putRecord(
@@ -693,27 +704,28 @@ class NivaraVaultOrganizationRepositoryTest {
     // ------------------------------------------------------------------ while a change is in flight
 
     @Test
-    fun `a read while a change is being written still sees the record that is committed`() =
-        runTest(UnconfinedTestDispatcher()) {
-            val repository = repository()
-            val first = repository.createAlbum(name = "First", authorize = ::authorize).valueOrFail()
-            val gate = CompletableDeferred<Unit>()
-            metadata.writeGate = gate
+    fun `a read while a change is being written still sees the record that is committed`() = runBlocking {
+        val repository = repository()
+        val first = repository.createAlbum(name = "First", authorize = ::authorize).valueOrFail()
+        val gate = CompletableDeferred<Unit>()
+        metadata.writeGate = gate
 
-            val writing = async { repository.createAlbum(name = "Second", authorize = ::authorize) }
-            // The commit is held inside the write, so nothing has been replaced yet.
-            val duringWrite = repository.read()
-            gate.complete(Unit)
-            val committed = writing.await().valueOrFail()
+        val writing = async(Dispatchers.Default) { repository.createAlbum(name = "Second", authorize = ::authorize) }
+        // The double counts the write before it waits, so waiting for the count is waiting for the
+        // commit to be held inside the write — no assumption about which thread got there first.
+        awaitWriteAfterMoreThan(metadata.writeCalls)
+        val duringWrite = repository.read()
+        metadata.writeGate = null
+        gate.complete(Unit)
+        val committed = writing.await().valueOrFail()
 
-            assertEquals(VaultOrganizationState.Ready(listOf(first)), duringWrite)
-            assertEquals("Second", committed.name)
-            metadata.writeGate = null
-            assertEquals(
-                listOf("First", "Second"),
-                repository().read().readable().map { album -> album.name },
-            )
-        }
+        assertEquals("the record that is committed is the one a reader sees", VaultOrganizationState.Ready(listOf(first)), duringWrite)
+        assertEquals("Second", committed.name)
+        assertEquals(
+            listOf("First", "Second"),
+            repository().read().readable().map { album -> album.name },
+        )
+    }
 
     @Test
     fun `two changes in a row leave the record holding both of them`() = runTest {
@@ -749,28 +761,26 @@ class NivaraVaultOrganizationRepositoryTest {
     }
 
     @Test
-    fun `a cancelled change is not retried behind the caller's back`() =
-        runTest(UnconfinedTestDispatcher()) {
-            val repository = repository()
-            val gate = CompletableDeferred<Unit>()
-            metadata.writeGate = gate
-            val writesBefore = metadata.writeCalls
+    fun `a cancelled change is not retried behind the caller's back`() = runBlocking {
+        val repository = repository()
+        val gate = CompletableDeferred<Unit>()
+        metadata.writeGate = gate
+        val writesBefore = metadata.writeCalls
 
-            val job = launch { repository.createAlbum(name = "Trip", authorize = ::authorize) }
-            // The change has reached the write and is held there.
-            assertEquals(writesBefore + 1, metadata.writeCalls)
-            job.cancel()
-            metadata.writeGate = null
-            gate.complete(Unit)
-            job.join()
+        val job = launch(Dispatchers.Default) { repository.createAlbum(name = "Trip", authorize = ::authorize) }
+        // Held inside the write, which is where a cancellation has something to interrupt.
+        awaitWriteAfterMoreThan(writesBefore)
+        job.cancelAndJoin()
+        metadata.writeGate = null
+        gate.complete(Unit)
 
-            assertEquals("the change was attempted once", writesBefore + 1, metadata.writeCalls)
-            assertEquals(
-                "and nothing was committed",
-                VaultOrganizationState.Missing,
-                repository().read(),
-            )
-        }
+        assertEquals("the change was attempted once", writesBefore + 1, metadata.writeCalls)
+        assertEquals(
+            "and nothing was committed",
+            VaultOrganizationState.Missing,
+            repository().read(),
+        )
+    }
 
     @Test
     fun `the albums a change writes are the albums a later change reads`() = runTest {

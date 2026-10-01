@@ -196,12 +196,14 @@ class VaultOrganizationViewModelTest {
     fun `reversing the order keeps the field and reverses the list`() = runTest {
         val (_, listOfFiles) = readableIndex(1, 2)
         val model = viewModel(index = listOfFiles)
+        val descending = drawnNames(readyState(model))
 
         model.onSortDirectionToggled()
 
         val state = readyState(model)
+        assertEquals(VaultSortField.ImportedAt, state.ordering.field)
         assertEquals(VaultSortDirection.Ascending, state.ordering.direction)
-        assertEquals(listOf("file-1.bin", "file-2.bin"), drawnNames(state))
+        assertEquals("the same list, the other way round", descending.reversed(), drawnNames(state))
     }
 
     @Test

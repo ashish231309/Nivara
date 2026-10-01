@@ -58,7 +58,7 @@ class VaultSearchTest {
     @Test
     fun `a match may be anywhere in the name, not only at the start`() {
         assertEquals(listOf(holiday), results("trip"))
-        assertEquals(listOf(holiday), results("lip"))
+        assertEquals(listOf(holiday), results("iday"))
     }
 
     @Test
@@ -69,7 +69,11 @@ class VaultSearchTest {
 
     @Test
     fun `a query with several words matches a name containing them in that order`() {
-        assertEquals(listOf(holiday), results("trip jpg"))
+        assertEquals(listOf(holiday), results("holiday trip"))
+        assertTrue(
+            "the same words in another order are a different query",
+            results("trip holiday").isEmpty(),
+        )
     }
 
     @Test
