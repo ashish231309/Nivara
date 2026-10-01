@@ -1,7 +1,6 @@
 package com.nivara.app.ui.launcher
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -164,6 +163,7 @@ class LauncherScreenTest {
     )
 }
 
+@Composable
 private fun launcherContent(
     state: LauncherUiState,
     drawerOpen: Boolean = false,

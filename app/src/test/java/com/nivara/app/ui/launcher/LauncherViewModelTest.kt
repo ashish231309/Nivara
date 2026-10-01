@@ -14,6 +14,7 @@ import com.nivara.app.domain.credential.TimeProvider
 import com.nivara.app.domain.security.BiometricAuthenticationOutcome
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.security.SessionState
+import com.nivara.app.testing.TEST_SESSION_TIMEOUT_MILLIS
 import com.nivara.app.testing.testSessionManager
 import com.nivara.app.ui.applications.ApplicationSortOrder
 import kotlinx.coroutines.CompletableDeferred
