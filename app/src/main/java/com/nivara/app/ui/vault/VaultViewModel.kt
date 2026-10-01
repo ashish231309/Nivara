@@ -109,14 +109,25 @@ class VaultViewModel(
         val current = readyState() ?: return
         if (current.busy) return
 
-        if (!hasSession()) {
-            // Re-selecting a root changes which storage Nivara uses, so it is a configuration change
-            // like any other. The reference is kept so the user's pick is not lost while they unlock.
-            pendingLocation = VaultLocation(reference)
+        // A selection Nivara cannot use as a location is refused here, before anything is remembered:
+        // it is reported as a failed selection and the previous root is left exactly as it was.
+        val location = VaultLocation.create(reference)
+        if (location == null) {
+            unlockRequired = false
+            noticeRes = null
+            failure = vaultSelectionFailedMessage()
+            publish()
             return
         }
 
-        adopt(VaultLocation(reference))
+        if (!hasSession()) {
+            // Re-selecting a root changes which storage Nivara uses, so it is a configuration change
+            // like any other. The reference is kept so the user's pick is not lost while they unlock.
+            pendingLocation = location
+            return
+        }
+
+        adopt(location)
     }
 
     /** Creates a vault at the selected root. */

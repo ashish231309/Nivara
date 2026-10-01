@@ -70,9 +70,9 @@ sealed interface VaultState {
      * The root holds Nivara vault records, and none of them can be opened.
      *
      * Reported with the reason, because the three reasons have three different remedies and none of
-     * them is "the vault is empty". See [VaultUnreadable].
+     * them is "the vault is empty". See [VaultUnreadableReason].
      */
-    data class Unreadable(val reason: VaultUnreadable) : VaultState
+    data class Unreadable(val reason: VaultUnreadableReason) : VaultState
 
     /**
      * The root holds a Nivara vault written in a format this build does not know.
@@ -114,7 +114,7 @@ sealed interface VaultState {
  *   material is gone or unusable (removing the screen lock destroys such keys). The vault may still
  *   be recoverable through another wrapping in a later stage; it is not damaged.
  */
-enum class VaultUnreadable {
+enum class VaultUnreadableReason {
 
     /** A metadata record carries Nivara's marker and cannot be validated. */
     MetadataDamaged,

@@ -21,7 +21,7 @@ internal interface VaultRootStorage {
     /**
      * Creates the metadata area if it is not there, and reports nothing about a vault.
      *
-     * A separate step from [entriesByName] on purpose: reading must never create anything, so the
+     * A separate step from [metadataEntries] on purpose: reading must never create anything, so the
      * two are different calls and only the one that may write is used while initializing.
      */
     suspend fun ensureMetadataArea(): NivaraResult<Unit>

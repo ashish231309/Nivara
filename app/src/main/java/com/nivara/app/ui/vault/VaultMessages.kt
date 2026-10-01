@@ -3,7 +3,7 @@ package com.nivara.app.ui.vault
 import com.nivara.app.R
 import com.nivara.app.domain.vault.VaultFailure
 import com.nivara.app.domain.vault.VaultState
-import com.nivara.app.domain.vault.VaultUnreadable
+import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraMessage
 
 /**
@@ -44,9 +44,9 @@ internal fun VaultState.titleRes(): Int = when (this) {
     VaultState.Missing -> R.string.vault_state_missing_title
     is VaultState.Ready -> R.string.vault_state_ready_title
     is VaultState.Unreadable -> when (reason) {
-        VaultUnreadable.MetadataDamaged -> R.string.vault_state_unreadable_title
-        VaultUnreadable.StructureIncomplete -> R.string.vault_state_incomplete_title
-        VaultUnreadable.KeyUnavailable -> R.string.vault_state_unreadable_title
+        VaultUnreadableReason.MetadataDamaged -> R.string.vault_state_unreadable_title
+        VaultUnreadableReason.StructureIncomplete -> R.string.vault_state_incomplete_title
+        VaultUnreadableReason.KeyUnavailable -> R.string.vault_state_unreadable_title
     }
     is VaultState.UnsupportedVersion -> R.string.vault_state_unsupported_title
     VaultState.Unavailable -> R.string.vault_state_unavailable_title
@@ -60,9 +60,9 @@ internal fun VaultState.bodyRes(): Int = when (this) {
     VaultState.Missing -> R.string.vault_state_missing
     is VaultState.Ready -> R.string.vault_state_ready
     is VaultState.Unreadable -> when (reason) {
-        VaultUnreadable.MetadataDamaged -> R.string.vault_state_unreadable_metadata
-        VaultUnreadable.StructureIncomplete -> R.string.vault_state_unreadable_structure
-        VaultUnreadable.KeyUnavailable -> R.string.vault_state_unreadable_key
+        VaultUnreadableReason.MetadataDamaged -> R.string.vault_state_unreadable_metadata
+        VaultUnreadableReason.StructureIncomplete -> R.string.vault_state_unreadable_structure
+        VaultUnreadableReason.KeyUnavailable -> R.string.vault_state_unreadable_key
     }
     is VaultState.UnsupportedVersion -> R.string.vault_state_unsupported
     VaultState.Unavailable -> R.string.vault_state_unavailable

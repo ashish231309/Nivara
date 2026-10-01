@@ -15,7 +15,7 @@ import com.nivara.app.domain.vault.VaultLocationRead
 import com.nivara.app.domain.vault.VaultLocationStore
 import com.nivara.app.domain.vault.VaultRepository
 import com.nivara.app.domain.vault.VaultState
-import com.nivara.app.domain.vault.VaultUnreadable
+import com.nivara.app.domain.vault.VaultUnreadableReason
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -246,15 +246,15 @@ internal class NivaraVaultRepository(
                 )
                 // The metadata authenticates, so this *is* a Nivara vault, and a part of it is
                 // missing. That is neither an empty vault nor a valid one.
-                record != null -> VaultState.Unreadable(VaultUnreadable.StructureIncomplete)
+                record != null -> VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete)
                 survey.unreadableVersion != null ->
                     VaultState.UnsupportedVersion(survey.unreadableVersion)
-                survey.keyUnavailable -> VaultState.Unreadable(VaultUnreadable.KeyUnavailable)
-                survey.damaged -> VaultState.Unreadable(VaultUnreadable.MetadataDamaged)
+                survey.keyUnavailable -> VaultState.Unreadable(VaultUnreadableReason.KeyUnavailable)
+                survey.damaged -> VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged)
                 // Nivara's structure is there and holds no record: an initialization that did not
                 // finish, which is a fact about this folder and not an absent vault.
                 survey.metadataAreaPresent || survey.contentAreaPresent ->
-                    VaultState.Unreadable(VaultUnreadable.StructureIncomplete)
+                    VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete)
                 else -> VaultState.Missing
             }
         }
@@ -278,9 +278,9 @@ internal class NivaraVaultRepository(
                 } else {
                     VaultFailure.VaultUnreadable(
                         if (survey.keyUnavailable) {
-                            VaultUnreadable.KeyUnavailable
+                            VaultUnreadableReason.KeyUnavailable
                         } else {
-                            VaultUnreadable.MetadataDamaged
+                            VaultUnreadableReason.MetadataDamaged
                         },
                     )
                 }

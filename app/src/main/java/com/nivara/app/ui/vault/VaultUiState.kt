@@ -1,7 +1,7 @@
 package com.nivara.app.ui.vault
 
 import com.nivara.app.domain.vault.VaultState
-import com.nivara.app.domain.vault.VaultUnreadable
+import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraMessage
 
 /**
@@ -58,7 +58,7 @@ sealed interface VaultUiState {
         val vaultCanBeInitialized: Boolean
             get() = when (vault) {
                 VaultState.Missing -> true
-                is VaultState.Unreadable -> vault.reason == VaultUnreadable.StructureIncomplete
+                is VaultState.Unreadable -> vault.reason == VaultUnreadableReason.StructureIncomplete
                 else -> false
             }
 
@@ -70,7 +70,7 @@ sealed interface VaultUiState {
          * records are readable and merely unknown, and a later version can still open them.
          */
         val vaultHasUnreadableRecords: Boolean
-            get() = vault is VaultState.Unreadable && vault.reason != VaultUnreadable.StructureIncomplete
+            get() = vault is VaultState.Unreadable && vault.reason != VaultUnreadableReason.StructureIncomplete
 
         /**
          * Whether the screen should offer to create a vault right now.

@@ -28,7 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
 import com.nivara.app.domain.vault.VaultState
-import com.nivara.app.domain.vault.VaultUnreadable
+import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.components.NivaraMessageText
 import com.nivara.app.ui.theme.NivaraTheme
@@ -204,9 +204,12 @@ private fun VaultContent(
             }
         }
 
+        // Choosing the folder is the first half of a durable change, so it is offered exactly while a
+        // change is allowed: with the same gate and the same explanation as every other configuration
+        // screen, rather than opening a picker whose result could not be used.
         OutlinedButton(
             onClick = onChooseRoot,
-            enabled = !state.busy,
+            enabled = !state.busy && state.sessionAuthenticated,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
@@ -354,7 +357,7 @@ private fun VaultReadyPreview() {
 private fun VaultUnreadablePreview() {
     NivaraTheme {
         VaultScreen(
-            uiState = previewState(VaultState.Unreadable(VaultUnreadable.MetadataDamaged)),
+            uiState = previewState(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged)),
             onChooseRoot = {},
             onInitialize = {},
             onReplaceUnreadable = {},

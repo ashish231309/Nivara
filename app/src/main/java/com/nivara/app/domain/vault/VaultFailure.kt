@@ -67,7 +67,7 @@ sealed class VaultFailure(
      * Initialization refuses unless the caller has explicitly said that the unreadable records may be
      * replaced — see [VaultRepository.initialize].
      */
-    data class VaultUnreadable(val reason: VaultUnreadable) :
+    data class VaultUnreadable(val reason: VaultUnreadableReason) :
         VaultFailure("a vault exists at this root and cannot be opened")
 
     /**

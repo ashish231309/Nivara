@@ -26,14 +26,32 @@ data class VaultLocation(val reference: String) {
     override fun toString(): String = "VaultLocation(reference=REDACTED)"
 
     companion object {
+
         /**
          * The largest reference Nivara will store or accept.
          *
          * Platform URIs are bounded in practice, and a stored record larger than this is damaged
          * rather than legitimate, so accepting it would only mean carrying around whatever was
-         * written there.
+         * written there. The bound is on the encoded bytes, because that is what a record holds.
          */
         const val MAXIMUM_REFERENCE_LENGTH: Int = 4 * 1024
+
+        /**
+         * A location for a reference the platform produced, or `null` when it cannot be one.
+         *
+         * This is the door for input that comes from outside the domain: a selection the user made in
+         * a platform picker is checked here and refused as a value, so nothing has to catch an
+         * exception thrown by a screen's own input. A blank or absurd reference is not a location, and
+         * the caller reports it the same way it reports a selection that could not be adopted.
+         */
+        fun create(reference: String): VaultLocation? =
+            if (reference.isBlank() ||
+                reference.toByteArray(Charsets.UTF_8).size > MAXIMUM_REFERENCE_LENGTH
+            ) {
+                null
+            } else {
+                VaultLocation(reference)
+            }
     }
 }
 

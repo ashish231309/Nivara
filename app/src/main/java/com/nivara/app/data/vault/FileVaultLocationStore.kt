@@ -48,13 +48,12 @@ internal class FileVaultLocationStore(
 ) : VaultLocationStore {
 
     override suspend fun storedLocation(): VaultLocationRead = withContext(dispatcher) {
-        val bytes = try {
-            AtomicFiles.readOrNull(file)
-        } catch (error: Exception) {
+        val bytes = when (val read = nivaraRunCatching { AtomicFiles.readOrNull(file) }) {
             // The record is there and cannot be read: that is not "no vault is configured", and it is
             // not a reason to forget the selection.
-            return@withContext VaultLocationRead.Unreadable
-        } ?: return@withContext VaultLocationRead.None
+            is NivaraResult.Failure -> return@withContext VaultLocationRead.Unreadable
+            is NivaraResult.Success -> read.value ?: return@withContext VaultLocationRead.None
+        }
         VaultLocationCodec.decode(bytes)?.let { location -> VaultLocationRead.Present(location) }
             ?: VaultLocationRead.Unreadable
     }

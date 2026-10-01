@@ -8,7 +8,7 @@ import com.nivara.app.core.common.NivaraResult
 import com.nivara.app.core.common.nivaraRunCatching
 import com.nivara.app.domain.vault.VaultFailure
 import com.nivara.app.domain.vault.VaultLocation
-import com.nivara.app.domain.vault.VaultUnreadable
+import com.nivara.app.domain.vault.VaultUnreadableReason
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.FilterOutputStream
@@ -118,7 +118,7 @@ internal class SafVaultRootStorage(
                     }
                     if (read > VaultRecordCodec.MAXIMUM_RECORD_LENGTH) {
                         throw VaultRootException(
-                            VaultFailure.VaultUnreadable(VaultUnreadable.MetadataDamaged),
+                            VaultFailure.VaultUnreadable(VaultUnreadableReason.MetadataDamaged),
                         )
                     }
                     buffer.copyOf(read)
@@ -216,10 +216,6 @@ internal class SafVaultRootStorage(
     private fun childUri(directory: Uri, displayName: String): Uri? =
         childUriOrThrow(directory, displayName, missingIsNull = true)
 
-    private fun childUriOrThrow(directory: Uri, displayName: String): Uri =
-        childUriOrThrow(directory, displayName, missingIsNull = false)
-            ?: throw VaultRootException(VaultFailure.StorageUnavailable)
-
     private fun childUriOrThrow(directory: Uri, displayName: String, missingIsNull: Boolean): Uri? {
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(
             Uri.parse(location.reference),
@@ -256,7 +252,7 @@ internal class SafVaultRootStorage(
             // Something carries a name Nivara uses and is not a directory. That is a broken vault
             // structure, not a bad selection: the root is there, and what is inside it is wrong.
             throw VaultRootException(
-                VaultFailure.VaultUnreadable(VaultUnreadable.StructureIncomplete),
+                VaultFailure.VaultUnreadable(VaultUnreadableReason.StructureIncomplete),
             )
         }
         return uri
