@@ -298,16 +298,32 @@ class VaultViewerPresentationTest {
 
     @Test
     fun `an item in a state is described by facts and never by an address`() {
-        val fields = VaultViewerItem::class.java.declaredFields.map { field -> field.type }
+        // Whatever the toolchain adds to a compiled class as a static marker, the fields that carry an
+        // item are its own facts: an identifier, a name, a declared type, a size and an arrival time.
+        val carried = VaultViewerItem::class.java.declaredFields
+            .filter { field -> !java.lang.reflect.Modifier.isStatic(field.modifiers) }
 
-        assertTrue(fields.contains(VaultItemId::class.java))
-        assertTrue(fields.contains(String::class.java))
-        assertTrue(fields.contains(Long::class.javaPrimitiveType))
-        assertTrue(fields.contains(VaultContentKind::class.java))
         assertEquals(
-            "an item carries facts and a type, and nothing else",
-            6,
-            VaultViewerItem::class.java.declaredFields.size,
+            "an item carries its own facts and nothing else",
+            setOf("id", "name", "mimeType", "kind", "sizeBytes", "importedAtEpochMillis"),
+            carried.map { field -> field.name }.toSet(),
         )
+        val types = carried.map { field -> field.type }
+        assertTrue(types.contains(VaultItemId::class.java))
+        assertTrue(types.contains(String::class.java))
+        assertTrue(types.contains(Long::class.javaPrimitiveType))
+        assertTrue(types.contains(VaultContentKind::class.java))
+        // Never an address and never content: no Uri, no file, no stream and no decoded image.
+        for (forbidden in listOf(
+            android.net.Uri::class.java,
+            java.io.File::class.java,
+            java.io.InputStream::class.java,
+            android.graphics.Bitmap::class.java,
+        )) {
+            assertFalse(
+                "an item must not hold a ${forbidden.simpleName}",
+                types.contains(forbidden),
+            )
+        }
     }
 }

@@ -525,7 +525,7 @@ class VaultViewerViewModelTest {
         assertEquals(0, counting.establishes)
         assertEquals(0, counting.locks)
         // And the one lock in this test was the application's, which the viewer responded to above.
-        counting.delegate.lockNow()
+        counting.lockNow()
         assertEquals(1, counting.locks)
     }
 
