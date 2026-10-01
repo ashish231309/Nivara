@@ -111,7 +111,7 @@ class NivaraVaultRepositoryTest {
         createVault()
         storage.documents["notes.txt"] = "hello".toByteArray()
 
-        assertEquals("a person's own file in the area changes nothing", VaultState.Ready, inspect())
+        assertTrue("a person's own file in the area changes nothing", inspect() is VaultState.Ready)
     }
 
     @Test
