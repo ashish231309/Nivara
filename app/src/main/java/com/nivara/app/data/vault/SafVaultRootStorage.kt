@@ -3,6 +3,7 @@ package com.nivara.app.data.vault
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import com.nivara.app.core.common.NivaraResult
 import com.nivara.app.core.common.nivaraRunCatching
@@ -10,10 +11,7 @@ import com.nivara.app.domain.vault.VaultFailure
 import com.nivara.app.domain.vault.VaultLocation
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import java.io.FileNotFoundException
-import java.io.FileOutputStream
-import java.io.FilterOutputStream
 import java.io.IOException
-import java.io.OutputStream
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -150,9 +148,17 @@ internal class SafVaultRootStorage(
             // failing. That is not checked here, because checking it is what the caller's read-back
             // already does: the record is read again *by slot name* and validated, so a write that
             // landed anywhere else is reported as a failed write rather than as a created vault.
-            val stream = resolver.openOutputStream(created)
+            val descriptor = resolver.openFileDescriptor(created, "w")
                 ?: throw VaultRootException(VaultFailure.WriteFailed)
-            stream.use { output -> output.writeAndSync(bytes) }
+            // A descriptor-backed stream is the one that can be flushed *and* synced towards storage
+            // before it is closed; anything the platform hands back instead gets the flush it can
+            // honour. Neither is what makes the write count: the caller reads the document back and
+            // opens it again, so a provider that dropped the bytes is caught there.
+            ParcelFileDescriptor.AutoCloseOutputStream(descriptor).use { output ->
+                output.write(bytes)
+                output.flush()
+                output.fd.sync()
+            }
         }.mapVaultFailure(ioFailure = VaultFailure.WriteFailed)
     }
 
@@ -260,21 +266,6 @@ internal class SafVaultRootStorage(
 
     private fun directoryUriOrThrow(name: String): Uri =
         directoryUri(name) ?: throw VaultRootException(VaultFailure.StorageUnavailable)
-
-    /**
-     * Writes and forces [bytes] towards storage before the stream is closed.
-     *
-     * The providers Nivara meets hand out descriptor-backed streams, which are synced. A provider
-     * that hands out something else gets the flush it can honour, and the caller's read-back
-     * verification is what decides whether the write counts: Nivara never reports a vault as created
-     * because a call returned.
-     */
-    private fun OutputStream.writeAndSync(bytes: ByteArray) {
-        write(bytes)
-        flush()
-        (this as? FileOutputStream)?.fd?.sync()
-            ?: ((this as? FilterOutputStream)?.out as? FileOutputStream)?.fd?.sync()
-    }
 
     private companion object {
         const val OCTET_STREAM = "application/octet-stream"
