@@ -471,7 +471,11 @@ internal class NivaraVaultIndexRepository(
             digest = digesting.digest()
         }
         if (read !is NivaraResult.Success) {
-            return ObjectVerification.Failed(read.importFailureOf())
+            // The object this import just wrote cannot be read back at all — the provider accepted
+            // the write and does not have it. That is what "not verified" means, and it is reported
+            // as such rather than as a storage that is merely out of reach: the import must not
+            // describe a destination that lost the bytes as a destination that could not be asked.
+            return ObjectVerification.Failed(VaultImportFailure.VerificationFailed)
         }
         decryptionFailure?.let { failure ->
             return ObjectVerification.Failed(

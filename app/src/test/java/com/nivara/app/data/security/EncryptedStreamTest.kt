@@ -58,17 +58,17 @@ class EncryptedStreamTest {
     }
 
     @Test
-    fun `a stream of exactly one chunk comes back, and ends with an empty final record`() = runTest {
+    fun `a stream of exactly one chunk comes back, and its last record is the complete one`() = runTest {
         val plaintext = ByteArray(EncryptedStream.CHUNK_SIZE_BYTES) { index -> (index % 251).toByte() }
 
         val ciphertext = encrypt(plaintext)
 
-        // Two records: the chunk, then the record that marks the end. The final record is what makes
-        // "the source had exactly a chunk left" different from "the source was cut off".
-        assertEquals(
-            2,
-            countRecords(ciphertext, key = testKey),
-        )
+        // One record, and it carries the flag that says the stream ends here. The flag — not the
+        // presence of another record — is what makes "the source had exactly a chunk left" different
+        // from "the source was cut off": a stream whose last record is not marked complete is
+        // refused, so an object truncated at a record boundary is still a refusal rather than a
+        // shorter file.
+        assertEquals(1, countRecords(ciphertext, key = testKey))
         assertArrayEquals(plaintext, decrypt(ciphertext).first)
     }
 
@@ -395,6 +395,25 @@ class EncryptedStreamTest {
      * by hand, so what a failure proves is that the *reader* refuses an impossible order rather than
      * that the test wrote nonsense.
      */
+    /**
+     * The bytes of a test, offered the way a source offers them.
+     *
+     * The streaming primitive asks its source for pieces rather than reading a stream, so the test
+     * provides the same shape a real source has: one read at a time, `-1` when there is nothing left.
+     */
+    private class BytesSource(private val bytes: ByteArray) : StreamSource {
+
+        private var position = 0
+
+        override suspend fun read(buffer: ByteArray): Int {
+            if (position >= bytes.size) return -1
+            val count = minOf(buffer.size, bytes.size - position)
+            bytes.copyInto(buffer, 0, position, position + count)
+            position += count
+            return count
+        }
+    }
+
     private fun assemble(
         swapFirstTwoRecords: Boolean = false,
         duplicateFirstRecord: Boolean = false,

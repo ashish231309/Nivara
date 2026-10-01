@@ -266,10 +266,11 @@ class VaultIndexCodecTest {
                 body.write(mime)
             }
             repeat(8) { shift ->
-                body.write((item.sizeBytes ushr ((7 - shift) * 8)).toByte())
+                // One byte at a time, most significant first, written as the low byte of the shift.
+                body.write((item.sizeBytes ushr ((7 - shift) * 8)).toInt())
             }
             repeat(8) { shift ->
-                body.write((item.importedAtEpochMillis ushr ((7 - shift) * 8)).toByte())
+                body.write((item.importedAtEpochMillis ushr ((7 - shift) * 8)).toInt())
             }
             body.write(item.contentFormatVersion)
             body.write(hexToBytes(item.contentDigest.value))

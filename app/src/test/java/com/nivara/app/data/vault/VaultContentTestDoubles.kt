@@ -188,7 +188,7 @@ private class LimitedSink(
 
 /** Hands the pipeline a source it decides: bytes, declared metadata, and how reading fails. */
 internal class FakeVaultSourceOpener(
-    var source: VaultContentSource? = FakeVaultContentSource(bytes = "hello vault".toByteArray(), name = "notes.txt"),
+    var source: VaultContentSource? = FakeVaultContentSource(bytes = "hello vault".toByteArray(), displayName = "notes.txt"),
     var failure: VaultImportFailure? = null,
 ) : VaultSourceOpener {
 
