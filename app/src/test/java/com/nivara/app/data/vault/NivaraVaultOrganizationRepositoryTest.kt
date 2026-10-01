@@ -230,7 +230,7 @@ class NivaraVaultOrganizationRepositoryTest {
         repository.createAlbum(name = "First", authorize = ::authorize)
         repository.createAlbum(name = "Second", authorize = ::authorize)
 
-        val state = repository().read().valueOrFail()
+        val state = repository().read()
 
         assertEquals(listOf("First", "Second"), state.albums.map { album -> album.name })
         assertEquals("one record survives", 1, slotsHoldingRecords().size)
@@ -368,7 +368,7 @@ class NivaraVaultOrganizationRepositoryTest {
         repository.addItem(albumId = first.id, itemId = testItemId(7), authorize = ::authorize)
         repository.addItem(albumId = second.id, itemId = testItemId(7), authorize = ::authorize)
 
-        val state = repository().read().valueOrFail()
+        val state = repository().read()
         assertEquals(listOf(listOf(testItemId(7)), listOf(testItemId(7))), state.albums.map { album -> album.itemIds })
     }
 
@@ -379,7 +379,7 @@ class NivaraVaultOrganizationRepositoryTest {
 
         repository.addItem(albumId = created.id, itemId = testItemId(404), authorize = ::authorize)
 
-        val state = repository().read().valueOrFail()
+        val state = repository().read()
         assertEquals(
             "a reference is kept and shown as stale, never repaired away",
             listOf(testItemId(404)),
@@ -411,7 +411,7 @@ class NivaraVaultOrganizationRepositoryTest {
             .valueOrFail()
 
         assertTrue("the album is emptied", removed.itemIds.isEmpty())
-        val state = repository().read().valueOrFail()
+        val state = repository().read()
         assertEquals(
             "the other album still names it",
             listOf(testItemId(7)),
@@ -456,7 +456,7 @@ class NivaraVaultOrganizationRepositoryTest {
 
         repository.deleteAlbum(albumId = first.id, authorize = ::authorize).valueOrFail()
 
-        val state = repository().read().valueOrFail()
+        val state = repository().read()
         assertEquals(listOf("Second"), state.albums.map { album -> album.name })
         assertEquals(
             "the files the deleted album named are still named by the album that remains",
@@ -475,7 +475,7 @@ class NivaraVaultOrganizationRepositoryTest {
 
         repository.deleteAlbum(albumId = doomed.id, authorize = ::authorize)
 
-        val state = repository().read().valueOrFail()
+        val state = repository().read()
         assertEquals(listOf(kept.id), state.albums.map { album -> album.id })
         assertEquals(listOf(testItemId(7)), state.albums.single().itemIds)
     }
@@ -592,7 +592,7 @@ class NivaraVaultOrganizationRepositoryTest {
 
         assertEquals(VaultOrganizationFailure.WriteFailed, result.failure())
         assertEquals("the previous generation is still the record", before, slotsHoldingRecords().let { slots -> bytesOf(slots.single()) })
-        assertEquals(listOf("First"), repository().read().valueOrFail().albums.map { album -> album.name })
+        assertEquals(listOf("First"), repository().read().albums.map { album -> album.name })
     }
 
     @Test
@@ -608,7 +608,7 @@ class NivaraVaultOrganizationRepositoryTest {
         assertEquals(VaultOrganizationFailure.VerificationFailed, result.failure())
         assertEquals(listOf("albums.0.nva"), slotsHoldingRecords())
         assertEquals(before, bytesOf("albums.0.nva"))
-        assertEquals(listOf("First"), repository().read().valueOrFail().albums.map { album -> album.name })
+        assertEquals(listOf("First"), repository().read().albums.map { album -> album.name })
     }
 
     @Test
@@ -701,7 +701,7 @@ class NivaraVaultOrganizationRepositoryTest {
             metadata.writeGate = null
             assertEquals(
                 listOf("First", "Second"),
-                repository().read().valueOrFail().albums.map { album -> album.name },
+                repository().read().albums.map { album -> album.name },
             )
         }
 
@@ -712,7 +712,7 @@ class NivaraVaultOrganizationRepositoryTest {
         repository.addItem(albumId = first.id, itemId = testItemId(7), authorize = ::authorize)
         repository.renameAlbum(albumId = first.id, name = "First, renamed", authorize = ::authorize)
 
-        val state = repository().read().valueOrFail()
+        val state = repository().read()
         assertEquals(listOf("First, renamed"), state.albums.map { album -> album.name })
         assertEquals(listOf(testItemId(7)), state.albums.single().itemIds)
         assertEquals(1, slotsHoldingRecords().size)
@@ -768,7 +768,7 @@ class NivaraVaultOrganizationRepositoryTest {
         val created = repository.createAlbum(name = "Trip", authorize = ::authorize).valueOrFail()
         repository.addItem(albumId = created.id, itemId = testItemId(7), authorize = ::authorize)
 
-        val readBack = repository().read().valueOrFail()
+        val readBack = repository().read()
         val renamed = repository().renameAlbum(albumId = readBack.albums.single().id, name = "Winter", authorize = ::authorize)
             .valueOrFail()
 
