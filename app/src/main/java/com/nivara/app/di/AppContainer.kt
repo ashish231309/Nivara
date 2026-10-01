@@ -9,16 +9,22 @@ import com.nivara.app.data.biometric.AndroidBiometricAuthenticator
 import com.nivara.app.data.biometric.BiometricTokenStore
 import com.nivara.app.data.credential.SystemTimeProvider
 import com.nivara.app.data.app.AndroidApplicationRepository
+import com.nivara.app.data.applock.AndroidAppLockProtectionRunner
 import com.nivara.app.data.applock.AndroidForegroundApplicationDetector
 import com.nivara.app.data.applock.FileProtectedApplicationRepository
 import com.nivara.app.data.applock.NivaraAppLockMonitor
+import com.nivara.app.data.permissions.AndroidOverlayCapabilityRepository
 import com.nivara.app.data.permissions.AndroidUsageAccessRepository
 import com.nivara.app.data.session.InMemorySessionManager
 import com.nivara.app.domain.app.ApplicationRepository
 import com.nivara.app.domain.applock.AppLockMonitor
+import com.nivara.app.domain.applock.AppLockOverlayHost
+import com.nivara.app.domain.applock.AppLockOverlayPresenter
+import com.nivara.app.domain.applock.AppLockProtectionRunner
 import com.nivara.app.domain.applock.ForegroundApplicationDetector
 import com.nivara.app.domain.applock.ProtectedApplicationRepository
 import com.nivara.app.domain.applock.ProtectionDecisionEngine
+import com.nivara.app.domain.permissions.OverlayCapabilityRepository
 import com.nivara.app.domain.permissions.UsageAccessRepository
 import com.nivara.app.data.security.AndroidBiometricKeyStore
 import com.nivara.app.data.security.AndroidDeviceSecurityProvider
@@ -40,7 +46,12 @@ import com.nivara.app.domain.security.RecoveryKeyEnvelopeService
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.security.SessionTimeoutPolicy
 import com.nivara.app.domain.security.SecureRandomGenerator
+import com.nivara.app.ui.applock.overlay.AppLockSurfaceController
+import com.nivara.app.ui.applock.overlay.WindowManagerOverlaySurface
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /**
  * Application composition root.
@@ -129,6 +140,40 @@ interface AppContainer {
      * it, and stops it again.
      */
     val appLockMonitor: AppLockMonitor
+
+    /**
+     * Android's overlay capability for Nivara: whether the protection surface may be drawn above
+     * another application, and the settings screen where the user changes it.
+     *
+     * Detection and presentation are separate capabilities, and this is the second one. Nothing
+     * here draws anything or requests the grant; the component that owns the window does the first,
+     * and only the user does the second.
+     */
+    val overlayCapabilityRepository: OverlayCapabilityRepository
+
+    /**
+     * Decides whether the protection surface should be on screen, and routes authentication.
+     *
+     * Exposed so the composition root can wire the surface to it — and so nothing else grows a
+     * second answer to the same question.
+     */
+    val appLockOverlayPresenter: AppLockOverlayPresenter
+
+    /**
+     * The component that owns the protection window.
+     *
+     * Started and stopped by the same platform component that owns detection, and implemented by the
+     * presentation layer: the domain defines when a surface is needed, the UI knows how to draw one.
+     */
+    val appLockOverlayHost: AppLockOverlayHost
+
+    /**
+     * Turns protection on and off for the device.
+     *
+     * A screen asks for protection through this contract; how it keeps running while Nivara is not
+     * on screen is the implementation's business.
+     */
+    val appLockProtectionRunner: AppLockProtectionRunner
 }
 
 /**
@@ -227,6 +272,37 @@ class DefaultAppContainer(context: Context) : AppContainer {
             context = applicationContext,
             timeProvider = timeProvider,
         )
+    }
+
+    override val overlayCapabilityRepository: OverlayCapabilityRepository by lazy {
+        AndroidOverlayCapabilityRepository(applicationContext)
+    }
+
+    override val appLockOverlayPresenter: AppLockOverlayPresenter by lazy {
+        AppLockOverlayPresenter(
+            monitor = appLockMonitor,
+            sessionManager = sessionManager,
+            credentialManager = credentialManager,
+            biometrics = biometricAuthenticator,
+            overlayCapability = overlayCapabilityRepository,
+            // Its own scope, not the lifetime of a screen: the surface has to work while no screen
+            // of Nivara's is in front.
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        )
+    }
+
+    override val appLockOverlayHost: AppLockOverlayHost by lazy {
+        AppLockSurfaceController(
+            surface = WindowManagerOverlaySurface(applicationContext, appLockOverlayPresenter),
+            presenter = appLockOverlayPresenter,
+            // Window operations belong on the main thread, and so does the platform's callback that
+            // reports a window going away.
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+        )
+    }
+
+    override val appLockProtectionRunner: AppLockProtectionRunner by lazy {
+        AndroidAppLockProtectionRunner(applicationContext)
     }
 
     override val appLockMonitor: AppLockMonitor by lazy {

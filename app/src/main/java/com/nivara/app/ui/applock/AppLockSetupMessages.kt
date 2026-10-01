@@ -3,6 +3,7 @@ package com.nivara.app.ui.applock
 import androidx.annotation.StringRes
 import com.nivara.app.R
 import com.nivara.app.domain.permissions.AppLockPrerequisite
+import com.nivara.app.domain.permissions.OverlayCapability
 import com.nivara.app.domain.permissions.UsageAccessStatus
 import com.nivara.app.ui.components.NivaraMessage
 
@@ -21,11 +22,20 @@ internal fun usageAccessStatusRes(status: UsageAccessStatus): Int = when (status
     UsageAccessStatus.Unavailable -> R.string.applock_setup_usage_access_unavailable
 }
 
+/** Short status word for the current overlay-permission state. */
+@StringRes
+internal fun overlayStatusRes(capability: OverlayCapability): Int = when (capability) {
+    OverlayCapability.Granted -> R.string.applock_setup_overlay_granted
+    OverlayCapability.NotGranted -> R.string.applock_setup_overlay_not_granted
+    OverlayCapability.Unavailable -> R.string.applock_setup_overlay_unavailable
+}
+
 /** Name of a missing precondition, for the readiness summary. */
 @StringRes
 internal fun prerequisiteNameRes(prerequisite: AppLockPrerequisite): Int = when (prerequisite) {
     AppLockPrerequisite.ApplicationDiscovery -> R.string.applock_setup_prerequisite_discovery
     AppLockPrerequisite.UsageAccess -> R.string.applock_setup_prerequisite_usage_access
+    AppLockPrerequisite.Overlay -> R.string.applock_setup_prerequisite_overlay
 }
 
 /**
@@ -36,3 +46,13 @@ internal fun prerequisiteNameRes(prerequisite: AppLockPrerequisite): Int = when 
  */
 internal fun usageAccessSettingsUnavailableMessage(): NivaraMessage =
     NivaraMessage(textRes = R.string.applock_setup_settings_unavailable)
+
+/**
+ * The generic failure shown when the platform refused to start or stop protection.
+ *
+ * Deliberately plain: the platform's own message names a component or a restriction, and none of
+ * that belongs on the screen. What matters is the honest statement — the request did not take
+ * effect.
+ */
+internal fun protectionUnavailableMessage(): NivaraMessage =
+    NivaraMessage(textRes = R.string.applock_setup_protection_failed)

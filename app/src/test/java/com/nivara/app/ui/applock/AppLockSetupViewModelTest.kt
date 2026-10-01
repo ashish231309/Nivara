@@ -5,12 +5,23 @@ import com.nivara.app.core.common.NivaraResult
 import com.nivara.app.domain.app.ApplicationDiscoveryState
 import com.nivara.app.domain.app.ApplicationRepository
 import com.nivara.app.domain.app.InstalledApplication
+import com.nivara.app.domain.applock.AppLockMonitor
+import com.nivara.app.domain.applock.AppLockProtectionRunner
+import com.nivara.app.domain.applock.AppLockState
+import com.nivara.app.domain.applock.DetectionUnavailability
+import com.nivara.app.domain.applock.ProtectionDecision
+import com.nivara.app.domain.applock.ProtectionEvent
 import com.nivara.app.domain.permissions.AppLockPrerequisite
+import com.nivara.app.domain.permissions.OverlayCapability
+import com.nivara.app.domain.permissions.OverlayCapabilityRepository
 import com.nivara.app.domain.permissions.UsageAccessRepository
 import com.nivara.app.domain.permissions.UsageAccessStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -31,7 +42,9 @@ import org.junit.Test
  * permission or opens a settings screen, and none of them claims to. What is verified is the logic
  * the screen depends on — that both capabilities become one state, that a failed discovery is not
  * drawn as an empty device, that opening Android's settings is never treated as a grant, that a
- * return from those settings is noticed, and that nothing throws when a repository misbehaves.
+ * return from those settings is noticed, that nothing throws when a repository misbehaves, and that
+ * the protection switch only asks the component that owns protection — and then reports what that
+ * component says rather than what the tap assumed.
  *
  * Whether the platform actually reports a grant, returns the launcher list or opens the settings
  * screen is only knowable on a device, and the instrumented suite that checks it is compiled but
@@ -235,12 +248,181 @@ class AppLockSetupViewModelTest {
         gate.complete(Unit)
     }
 
+    // ------------------------------------------------------------------ overlay and protection
+
+    @Test
+    fun `the overlay capability is loaded into the ready state`() = runTest {
+        val model = viewModel(overlay = FakeOverlayCapabilityRepository(OverlayCapability.NotGranted))
+
+        val state = readyState(model)
+
+        assertEquals(OverlayCapability.NotGranted, state.setup.overlay)
+        assertEquals(listOf(AppLockPrerequisite.Overlay), state.setup.missingPrerequisites)
+    }
+
+    @Test
+    fun `an unreadable overlay capability is a missing prerequisite, never a grant`() = runTest {
+        val model = viewModel(overlay = FakeOverlayCapabilityRepository(OverlayCapability.Unavailable))
+
+        assertFalse(readyState(model).setup.isReady)
+    }
+
+    @Test
+    fun `opening the overlay settings is not a grant`() = runTest {
+        val overlay = FakeOverlayCapabilityRepository(OverlayCapability.NotGranted)
+        val model = viewModel(overlay = overlay)
+
+        model.openOverlaySettings()
+        model.onResumed()
+
+        assertEquals(1, overlay.openSettingsCalls)
+        assertEquals(OverlayCapability.NotGranted, readyState(model).setup.overlay)
+        assertNull("opening a screen is not a grant notice either", readyState(model).noticeRes)
+    }
+
+    @Test
+    fun `a returned overlay grant is confirmed once`() = runTest {
+        val overlay = FakeOverlayCapabilityRepository(OverlayCapability.NotGranted)
+        val model = viewModel(overlay = overlay)
+
+        model.openOverlaySettings()
+        overlay.capability = OverlayCapability.Granted
+        model.onResumed()
+
+        assertEquals(R.string.applock_setup_overlay_granted_notice, readyState(model).noticeRes)
+
+        model.onResumed()
+        assertNull("the confirmation is one-shot", readyState(model).noticeRes)
+    }
+
+    @Test
+    fun `a failed settings screen is reported, and nothing is claimed about the grant`() = runTest {
+        val overlay = FakeOverlayCapabilityRepository(
+            capability = OverlayCapability.NotGranted,
+            openSettingsResult = NivaraResult.Failure(),
+        )
+        val model = viewModel(overlay = overlay)
+
+        model.openOverlaySettings()
+
+        assertNotNull(readyState(model).failure)
+        assertEquals(OverlayCapability.NotGranted, readyState(model).setup.overlay)
+    }
+
+    @Test
+    fun `protection is off until it is asked for`() = runTest {
+        val runner = FakeProtectionRunner()
+        val model = viewModel(runner = runner)
+
+        assertEquals(ProtectionRunState.Stopped, readyState(model).protection)
+        assertEquals(0, runner.startCalls)
+    }
+
+    @Test
+    fun `turning protection on asks the runner exactly once`() = runTest {
+        val runner = FakeProtectionRunner()
+        val usage = FakeUsageAccessRepository(UsageAccessStatus.Granted)
+        val model = viewModel(runner = runner, usage = usage)
+
+        model.startProtection()
+
+        assertEquals(1, runner.startCalls)
+        assertEquals(0, runner.stopCalls)
+    }
+
+    @Test
+    fun `a start the device refuses is reported, and protection is not claimed`() = runTest {
+        val runner = FakeProtectionRunner(startResult = NivaraResult.Failure())
+        val model = viewModel(runner = runner, usage = FakeUsageAccessRepository(UsageAccessStatus.Granted))
+
+        model.startProtection()
+
+        assertEquals(1, runner.startCalls)
+        assertNotNull("a refusal must not be silent", readyState(model).failure)
+        assertEquals(
+            "and the switch still shows what the component reports",
+            ProtectionRunState.Stopped,
+            readyState(model).protection,
+        )
+    }
+
+    @Test
+    fun `a stop the device refuses is reported too`() = runTest {
+        val runner = FakeProtectionRunner(stopResult = NivaraResult.Failure())
+        val model = viewModel(runner = runner)
+
+        model.stopProtection()
+
+        assertEquals(1, runner.stopCalls)
+        assertNotNull(readyState(model).failure)
+    }
+
+    @Test
+    fun `protection cannot be turned on while a prerequisite is missing`() = runTest {
+        val runner = FakeProtectionRunner()
+        val model = viewModel(runner = runner, usage = FakeUsageAccessRepository(UsageAccessStatus.NotGranted))
+
+        model.startProtection()
+
+        assertEquals("an unprepared switch must not start anything", 0, runner.startCalls)
+    }
+
+    @Test
+    fun `the running state is read back from the component that owns protection`() = runTest {
+        val monitor = FakeMonitor()
+        val model = viewModel(monitor = monitor)
+        assertEquals(ProtectionRunState.Stopped, readyState(model).protection)
+
+        monitor.state.value = AppLockState.Monitoring(
+            foreground = null,
+            decision = ProtectionDecision.NoProtectionRequired,
+        )
+
+        assertEquals(ProtectionRunState.Running, readyState(model).protection)
+    }
+
+    @Test
+    fun `detection that cannot decide is reported as itself`() = runTest {
+        val monitor = FakeMonitor()
+        val model = viewModel(monitor = monitor)
+
+        monitor.state.value = AppLockState.Unavailable(
+            DetectionUnavailability.UsageAccessNotGranted,
+        )
+
+        assertEquals(ProtectionRunState.WithoutDecision, readyState(model).protection)
+    }
+
+    @Test
+    fun `turning protection off is always allowed`() = runTest {
+        val runner = FakeProtectionRunner()
+        val monitor = FakeMonitor()
+        val model = viewModel(
+            runner = runner,
+            monitor = monitor,
+            usage = FakeUsageAccessRepository(UsageAccessStatus.NotGranted),
+        )
+        monitor.state.value = AppLockState.Unavailable(
+            DetectionUnavailability.UsageAccessNotGranted,
+        )
+
+        model.stopProtection()
+
+        assertEquals(1, runner.stopCalls)
+    }
+
     private fun viewModel(
         repository: ApplicationRepository = FakeApplicationRepository(NivaraResult.Success(applications)),
         usage: UsageAccessRepository = FakeUsageAccessRepository(UsageAccessStatus.NotGranted),
+        overlay: OverlayCapabilityRepository = FakeOverlayCapabilityRepository(OverlayCapability.Granted),
+        runner: AppLockProtectionRunner = FakeProtectionRunner(),
+        monitor: AppLockMonitor = FakeMonitor(),
     ): AppLockSetupViewModel = AppLockSetupViewModel(
         applicationRepository = repository,
         usageAccessRepository = usage,
+        overlayCapabilityRepository = overlay,
+        protectionRunner = runner,
+        monitor = monitor,
     )
 
     private fun readyState(viewModel: AppLockSetupViewModel): AppLockSetupUiState.Ready {
@@ -261,6 +443,55 @@ class AppLockSetupViewModelTest {
             thrown?.let { error -> throw error }
             return result
         }
+    }
+
+    private class FakeOverlayCapabilityRepository(
+        var capability: OverlayCapability,
+        var openSettingsResult: NivaraResult<Unit> = NivaraResult.Success(Unit),
+    ) : OverlayCapabilityRepository {
+
+        var statusCalls = 0
+        var openSettingsCalls = 0
+
+        override suspend fun status(): OverlayCapability {
+            statusCalls++
+            return capability
+        }
+
+        override suspend fun openSettings(): NivaraResult<Unit> {
+            openSettingsCalls++
+            return openSettingsResult
+        }
+    }
+
+    private class FakeProtectionRunner(
+        var startResult: NivaraResult<Unit> = NivaraResult.Success(Unit),
+        var stopResult: NivaraResult<Unit> = NivaraResult.Success(Unit),
+    ) : AppLockProtectionRunner {
+
+        var startCalls = 0
+        var stopCalls = 0
+
+        override fun start(): NivaraResult<Unit> {
+            startCalls++
+            return startResult
+        }
+
+        override fun stop(): NivaraResult<Unit> {
+            stopCalls++
+            return stopResult
+        }
+    }
+
+    private class FakeMonitor : AppLockMonitor {
+
+        override val state = MutableStateFlow<AppLockState>(AppLockState.Stopped)
+
+        override val events: SharedFlow<ProtectionEvent> = MutableSharedFlow(extraBufferCapacity = 4)
+
+        override fun start() = Unit
+
+        override fun stop() = Unit
     }
 
     private class FakeUsageAccessRepository(

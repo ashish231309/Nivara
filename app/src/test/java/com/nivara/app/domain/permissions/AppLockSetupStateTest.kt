@@ -14,7 +14,8 @@ import org.junit.Test
  *
  * The aggregate is what a screen reads to decide what is missing, so the tests are about honest
  * answers: a failed query is not an empty device, an unreadable capability is not a refusal, and
- * the readiness claim is derived from the same two fields it summarises.
+ * the readiness claim is derived from the same fields it summarises — including the overlay
+ * permission, which shows protection rather than detecting it.
  */
 class AppLockSetupStateTest {
 
@@ -28,6 +29,7 @@ class AppLockSetupStateTest {
         val state = AppLockSetupState.of(
             discovery = NivaraResult.Success(applications),
             usageAccess = UsageAccessStatus.Granted,
+            overlay = OverlayCapability.Granted,
         )
 
         assertEquals(ApplicationDiscoveryState.Available(applications), state.discovery)
@@ -39,6 +41,7 @@ class AppLockSetupStateTest {
         val state = AppLockSetupState.of(
             discovery = NivaraResult.Failure(),
             usageAccess = UsageAccessStatus.Granted,
+            overlay = OverlayCapability.Granted,
         )
 
         assertEquals(ApplicationDiscoveryState.Unavailable, state.discovery)
@@ -51,6 +54,7 @@ class AppLockSetupStateTest {
         val state = AppLockSetupState.of(
             discovery = NivaraResult.Success(emptyList()),
             usageAccess = UsageAccessStatus.Granted,
+            overlay = OverlayCapability.Granted,
         )
 
         assertEquals(ApplicationDiscoveryState.Available(emptyList()), state.discovery)
@@ -62,6 +66,7 @@ class AppLockSetupStateTest {
         val state = AppLockSetupState.of(
             discovery = NivaraResult.Success(applications),
             usageAccess = UsageAccessStatus.Granted,
+            overlay = OverlayCapability.Granted,
         )
 
         assertTrue(state.isReady)
@@ -73,6 +78,7 @@ class AppLockSetupStateTest {
         val state = AppLockSetupState.of(
             discovery = NivaraResult.Success(applications),
             usageAccess = UsageAccessStatus.NotGranted,
+            overlay = OverlayCapability.Granted,
         )
 
         assertFalse(state.isReady)
@@ -84,6 +90,7 @@ class AppLockSetupStateTest {
         val state = AppLockSetupState.of(
             discovery = NivaraResult.Success(applications),
             usageAccess = UsageAccessStatus.Unavailable,
+            overlay = OverlayCapability.Granted,
         )
 
         assertFalse(state.isReady)
@@ -95,6 +102,7 @@ class AppLockSetupStateTest {
         val state = AppLockSetupState.of(
             discovery = NivaraResult.Failure(),
             usageAccess = UsageAccessStatus.NotGranted,
+            overlay = OverlayCapability.Granted,
         )
 
         assertEquals(
@@ -108,6 +116,7 @@ class AppLockSetupStateTest {
         val state = AppLockSetupState.of(
             discovery = NivaraResult.Failure(),
             usageAccess = UsageAccessStatus.Granted,
+            overlay = OverlayCapability.Granted,
         )
 
         assertEquals(
@@ -117,9 +126,59 @@ class AppLockSetupStateTest {
     }
 
     @Test
+    fun `a missing overlay grant is a missing prerequisite of its own`() {
+        val state = AppLockSetupState.of(
+            discovery = NivaraResult.Success(applications),
+            usageAccess = UsageAccessStatus.Granted,
+            overlay = OverlayCapability.NotGranted,
+        )
+
+        assertFalse("detection without a way to present it is not readiness", state.isReady)
+        assertEquals(listOf(AppLockPrerequisite.Overlay), state.missingPrerequisites)
+    }
+
+    @Test
+    fun `an unreadable overlay capability is missing, never treated as granted`() {
+        val state = AppLockSetupState.of(
+            discovery = NivaraResult.Success(applications),
+            usageAccess = UsageAccessStatus.Granted,
+            overlay = OverlayCapability.Unavailable,
+        )
+
+        assertFalse(state.isReady)
+        assertEquals(listOf(AppLockPrerequisite.Overlay), state.missingPrerequisites)
+    }
+
+    @Test
+    fun `every missing prerequisite is reported together, in a stable order`() {
+        val state = AppLockSetupState.of(
+            discovery = NivaraResult.Failure(),
+            usageAccess = UsageAccessStatus.Unavailable,
+            overlay = OverlayCapability.NotGranted,
+        )
+
+        assertEquals(
+            listOf(
+                AppLockPrerequisite.ApplicationDiscovery,
+                AppLockPrerequisite.UsageAccess,
+                AppLockPrerequisite.Overlay,
+            ),
+            state.missingPrerequisites,
+        )
+    }
+
+    @Test
     fun `the same answers build the same aggregate`() {
-        val first = AppLockSetupState.of(NivaraResult.Success(applications), UsageAccessStatus.Granted)
-        val second = AppLockSetupState.of(NivaraResult.Success(applications), UsageAccessStatus.Granted)
+        val first = AppLockSetupState.of(
+            NivaraResult.Success(applications),
+            UsageAccessStatus.Granted,
+            OverlayCapability.Granted,
+        )
+        val second = AppLockSetupState.of(
+            NivaraResult.Success(applications),
+            UsageAccessStatus.Granted,
+            OverlayCapability.Granted,
+        )
 
         assertEquals(first, second)
         assertEquals(first.hashCode(), second.hashCode())

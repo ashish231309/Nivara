@@ -231,6 +231,10 @@ justified_permissions = {
     "android.permission.PACKAGE_USAGE_STATS":
         "App Lock: makes Nivara visible in Android's Usage Access list and lets the detection stage "
         "read usage statistics; granted by the user in Android's settings, never requested at runtime",
+    "android.permission.SYSTEM_ALERT_WINDOW":
+        "App Lock: lets the protection surface be drawn above the protected application; Android "
+        "offers no other unprivileged way to do that, and the grant is given by the user in "
+        "Android's own overlay settings",
 }
 applock_docs_path = ROOT / "docs/applock/README.md"
 if not applock_docs_path.exists():
@@ -252,8 +256,6 @@ notes.append(f"manifest: {len(declared_permissions)} permission(s), all on the j
 for deferred_permission, reason in (
     ("android.permission.QUERY_ALL_PACKAGES",
      "the launcher-intent <queries> element is the narrow mechanism for launcher discovery"),
-    ("android.permission.SYSTEM_ALERT_WINDOW",
-     "nothing in the current feature set draws above another application"),
     ("android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
      "no battery exemption is justified by the current feature set"),
     ("android.permission.FOREGROUND_SERVICE",
@@ -541,10 +543,55 @@ if not setup_screen.exists():
     err("the App Lock preparation screen is missing")
 elif "SecureScreenEffect()" not in setup_screen.read_text():
     err("the App Lock preparation screen does not apply SecureScreenEffect()")
-flag_secure_files = [p for p in main_kt if "FLAG_SECURE" in p.read_text()]
-if len(flag_secure_files) != 1:
-    err(f"FLAG_SECURE appears in {len(flag_secure_files)} files; there must be exactly one "
-        f"implementation (SecureScreenEffect)")
+# Screenshot protection has exactly two sanctioned implementations, and no third: the composable
+# effect that flags the activity window, and the window configuration of the App Lock protection
+# surface, which is not an activity and therefore cannot use the effect.
+sanctioned_flag_secure = {
+    "app/src/main/java/com/nivara/app/ui/credential/SecureScreenEffect.kt",
+    "app/src/main/java/com/nivara/app/ui/applock/overlay/WindowManagerOverlaySurface.kt",
+}
+flag_secure_files = {str(p.relative_to(ROOT)) for p in main_kt if "FLAG_SECURE" in p.read_text()}
+for unexpected in sorted(flag_secure_files - sanctioned_flag_secure):
+    err(f"{unexpected}: FLAG_SECURE is set here; screenshot protection belongs to "
+        f"SecureScreenEffect or to the App Lock overlay window")
+for missing in sorted(sanctioned_flag_secure - flag_secure_files):
+    err(f"{missing}: the sanctioned screenshot protection is missing")
+
+# The App Lock protection surface must actually be an overlay window, and there must be exactly one
+# of them: a second implementation would be a second answer to "where is the surface drawn?".
+overlay_window_files = [p for p in main_kt if "TYPE_APPLICATION_OVERLAY" in p.read_text()]
+if len(overlay_window_files) != 1:
+    err(f"{len(overlay_window_files)} files create an application-overlay window; the protection "
+        f"surface must be the only one")
+elif "FLAG_SECURE" not in overlay_window_files[0].read_text():
+    err(f"{overlay_window_files[0].relative_to(ROOT)}: the protection window does not set FLAG_SECURE")
+
+# The App Lock surface is presentation, not a second security layer. It must not verify anything
+# itself: the credential layer verifies, the session gate decides, and the presentation layer only
+# routes. Cryptography appearing in these packages would mean a verifier has been written here.
+applock_presentation_dirs = [
+    ROOT / "app/src/main/java/com/nivara/app/domain/applock",
+    ROOT / "app/src/main/java/com/nivara/app/data/applock",
+    ROOT / "app/src/main/java/com/nivara/app/ui/applock",
+    ROOT / "app/src/main/java/com/nivara/app/data/permissions",
+]
+for directory in applock_presentation_dirs:
+    for path in sorted(directory.rglob("*.kt")):
+        rel = path.relative_to(ROOT)
+        text = strip_comments(path.read_text())
+        for forbidden, reason in (
+            ("java.security", "App Lock must not do its own cryptography"),
+            ("javax.crypto", "App Lock must not do its own cryptography"),
+            ("KeyDerivationService", "key derivation belongs to the credential layer"),
+            ("EncryptionService", "encryption belongs to the security layer"),
+            ("MessageDigest", "App Lock must not hash anything itself"),
+            ("Log.", "App Lock must not log: package names and credentials must never reach a log"),
+            ("println(", "App Lock must not print: package names and credentials must never be logged"),
+            ("HttpURLConnection", "App Lock transmits nothing"),
+            ("okhttp", "App Lock transmits nothing"),
+        ):
+            if forbidden in text:
+                err(f"{rel}: {forbidden} — {reason}")
 
 # Discovery is rebuilt on demand and kept in memory: no cache, no file and no database may appear
 # behind it.
@@ -576,7 +623,7 @@ applock_contracts = sorted(
     p.stem
     for package in ("domain/app", "domain/permissions", "domain/applock")
     for p in (ROOT / f"app/src/main/java/com/nivara/app/{package}").glob("*.kt")
-    if p.stem.endswith(("Repository", "Detector", "Monitor")))
+    if p.stem.endswith(("Repository", "Detector", "Monitor", "Runner")))
 for contract in applock_contracts:
     if contract not in container:
         err(f"AppContainer does not expose the '{contract}' contract")
@@ -584,6 +631,22 @@ for contract in applock_contracts:
                    if re.search(rf":\s*{contract}\b|,\s*{contract}\b", p.read_text())]
     if not implemented:
         err(f"no data-layer implementation found for '{contract}'")
+# The overlay host is a domain contract with a presentation-layer implementation: the domain says
+# when a surface is needed, the UI knows how Android draws one. Checking it here keeps the direction
+# of that dependency from being reversed later.
+overlay_host_contract = ROOT / "app/src/main/java/com/nivara/app/domain/applock/AppLockOverlayHost.kt"
+if not overlay_host_contract.exists():
+    err("the App Lock overlay host contract is missing")
+elif "AppLockOverlayHost" not in container:
+    err("AppContainer does not expose the 'AppLockOverlayHost' contract")
+else:
+    implementations = [
+        p for p in (ROOT / "app/src/main/java/com/nivara/app/ui").rglob("*.kt")
+        if re.search(r":\s*AppLockOverlayHost\b", p.read_text())
+    ]
+    if not implementations:
+        err("the App Lock overlay host has no presentation-layer implementation")
+
 notes.append(f"security review: {len(security_sources)} security sources, {len(contracts)} contracts wired")
 notes.append(f"app lock review: {len(applock_contracts)} contracts wired ({', '.join(applock_contracts)})")
 

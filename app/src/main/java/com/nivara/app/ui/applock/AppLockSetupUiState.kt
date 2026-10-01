@@ -4,6 +4,25 @@ import com.nivara.app.domain.permissions.AppLockSetupState
 import com.nivara.app.ui.components.NivaraMessage
 
 /**
+ * What protection itself is doing.
+ *
+ * Three values rather than a boolean, because "running but unable to decide anything" is a real and
+ * different situation: detection is on, and the platform will not answer. Presenting that as "off"
+ * would hide a working component, and presenting it as "on" would overstate what Nivara knows.
+ */
+enum class ProtectionRunState {
+
+    /** Detection is not running. */
+    Stopped,
+
+    /** Detection is running and looking at the device. */
+    Running,
+
+    /** Detection is running but cannot decide — a prerequisite is missing or the platform refuses. */
+    WithoutDecision,
+}
+
+/**
  * State of the App Lock preparation screen.
  *
  * The same three-case shape as every other Nivara screen: an explicit loading state, a ready state
@@ -26,6 +45,7 @@ sealed interface AppLockSetupUiState {
      */
     data class Ready(
         val setup: AppLockSetupState,
+        val protection: ProtectionRunState = ProtectionRunState.Stopped,
         val busy: Boolean = false,
         val failure: NivaraMessage? = null,
         val noticeRes: Int? = null,

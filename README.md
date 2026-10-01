@@ -11,7 +11,10 @@ frameworks, and no dependencies that are not justified by code that exists.
 ## Project status
 
 The repository contains the **foundation release**, the **cryptographic core**, **primary
-credential enrolment**, **biometric unlock as a secondary path** and the **session layer**.
+credential enrolment**, **biometric unlock as a secondary path**, the **session layer** and the
+**App Lock layer** — launcher discovery, the two Android capabilities it needs, foreground
+detection, and the protection surface that presents the requirement and routes authentication into
+the session.
 
 What works today:
 
@@ -24,20 +27,24 @@ What works today:
   invalidated key;
 - one in-memory authentication session, established by a primary-credential success or a
   biometric success, expiring on a fixed timeout and ended immediately by Quick Lock;
-- launcher-application discovery, the Usage Access capability and the preparation screen that
-  reports what App Lock needs;
+- launcher-application discovery, the Usage Access and overlay capabilities, and the preparation
+  screen that reports what App Lock needs and starts and stops protection;
 - App Lock detection: which application is in the foreground, whether the protected set requires
-  authentication for it, and a published requirement for the layer that will present the prompt;
+  authentication for it, and a published requirement for the layer that presents it;
+- the App Lock protection surface: one secure window above the protected application, its
+  authentication routed through the existing credential and biometric layers into the existing
+  session, with the requirement bound to the application it was raised for;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
 
 Biometric unlock never replaces the primary credential and never unlocks anything by itself, and
 the session is not one either: it is an authorization state held only while the process lives, and
-it holds no credential, no key and nothing on disk. Detection decides and publishes; it draws
-nothing, blocks nothing and authenticates nobody. There is still no authentication prompt over
-another application, no vault, no hidden apps and no recovery flow — those are the stages that
-follow, and they consume the layers
+it holds no credential, no key and nothing on disk. Detection decides and publishes; the surface
+that presents a requirement is separate from it, holds no credential of its own and can do exactly
+one thing with an authentication result — hand it to the session gate. There is still no App Lock
+settings screen, no app hiding, no vault and no recovery flow — those are the stages that follow,
+and they consume the layers
 described in [`docs/crypto/README.md`](docs/crypto/README.md),
 [`docs/credential/README.md`](docs/credential/README.md),
 [`docs/biometric/README.md`](docs/biometric/README.md),
@@ -81,14 +88,14 @@ app/src/main/java/com/nivara/app/
 ├── core/common/                Types shared across layers (NivaraResult)
 ├── domain/                     Contracts the app depends on (no Android types)
 │   ├── app/                    Installed-application model, ordering and search rule
-│   ├── permissions/            Usage Access state and the App Lock setup aggregate
-│   └── applock/                Protected set, foreground detection, decision rule
+│   ├── permissions/            Usage Access and overlay capabilities, setup aggregate
+│   └── applock/                Protected set, detection, decision rule, overlay contract
 ├── data/                       Platform-backed implementations of those contracts
 │   ├── app/                    Launcher-entry discovery through the package manager
 │   ├── applock/                Usage-event detector, protected set store, monitor, service
 │   ├── credential/             Credential record, counters and verifier
 │   ├── biometric/              Android's prompt, the NVBT record and its store
-│   ├── permissions/            Usage Access app-op check and its settings entry point
+│   ├── permissions/            Usage Access app-op check, overlay check, settings entry points
 │   ├── session/                The in-memory session manager
 │   └── security/               JCA, Android Keystore and device state
 └── ui/                         Compose UI
@@ -101,6 +108,7 @@ app/src/main/java/com/nivara/app/
     ├── credential/             Enrolment, verification and change screens
     ├── biometric/              Biometric settings, state and view model
     ├── applock/                App Lock preparation screen, state and view model
+    │   └── overlay/            The protection window, its lifecycle and its content
     └── session/                Session text shared by the screens that show it
 ```
 
@@ -180,6 +188,16 @@ that is never mistaken for "nothing to protect", a requirement raised once per e
 once per observation, and expiry and Quick Lock taking effect through the session gate alone. The
 detection policy's interval and window are asserted too, so changing them is a deliberate edit.
 
+The App Lock protection surface is covered the same way: which capability answers mean the
+requirement can be presented (and that a missing or unreadable grant is never "nothing to
+protect"), one occasion producing one request, a repeated requirement producing no second window,
+a window following a new request rather than being rebuilt, removal on every ending and cleanup
+that is safe to run twice, the routing of a primary and a biometric outcome into the session gate
+with nothing else touched, results for a superseded request opening nothing, and expiry and Quick
+Lock raising a fresh requirement. The window's platform half — `WindowManager`, Compose inside an
+overlay, the Back key and the home intent — is asserted by instrumented tests that are compiled but
+only run when a device is attached, and is declared unverified until then.
+
 Instrumented tests cover what only a device can prove: Android Keystore key generation,
 non-exportability, invalidation detection and use through a cipher, and that the biometric key
 refuses to produce output until Android has authorised a single operation. They are never simulated
@@ -189,17 +207,23 @@ on the JVM, and the flows that need a person to present a biometric remain manua
 
 Security behaviour is built into the project's defaults rather than added at the end:
 
-- **One permission, justified.** The manifest declares `PACKAGE_USAGE_STATS`, which makes Nivara
-  visible in Android's Usage Access list and lets App Lock read usage statistics; the user grants
-  it in Android's own settings and Nivara never requests it at runtime. Package visibility is
-  extended with a single `<queries>` launcher-intent signature rather than `QUERY_ALL_PACKAGES`.
-  Every permission has to be justified by a feature that exists; the reasons are recorded in
-  [`docs/applock/README.md`](docs/applock/README.md).
+- **Two permissions, each justified by a feature that exists.** `PACKAGE_USAGE_STATS` makes Nivara
+  visible in Android's Usage Access list and lets App Lock recognise the application in the
+  foreground; `SYSTEM_ALERT_WINDOW` lets the App Lock protection surface be drawn above the
+  application being protected, which is the only unprivileged way Android offers to do that. Both
+  are granted by the user in Android's own settings screens and neither is ever requested at
+  runtime. Package visibility is extended with a single `<queries>` launcher-intent signature rather
+  than `QUERY_ALL_PACKAGES`, and every permission has to be justified; the reasons are recorded in
+  [`docs/applock/README.md`](docs/applock/README.md) and checked by the repository verifier, which
+  refuses any permission added without them.
 - **Detection without privileges it does not need.** The App Lock service is a plain, unexported
-  started service: no foreground service, no notification, no accessibility service, and no overlay
-  or battery-exemption permission. Detection reads usage events and never aggregate usage history,
-  keeps no record of what was used, and reports an unavailable prerequisite as unavailable rather
-  than as "nothing needs protecting".
+  started service: no foreground service, no notification and no accessibility service, and no
+  battery-exemption request. Detector code holds no overlay window of its own — the very same
+  service also owns the single protection window, whose only capability is the justified overlay
+  grant. Detection reads usage events and never aggregate usage history and keeps no record of what
+  was used; the protection surface shows nothing sensitive, is `FLAG_SECURE`, never names the
+  protected application and never logs or transmits anything. An unavailable prerequisite is
+  reported as unavailable rather than as "nothing needs protecting".
 - **No cleartext traffic.** `android:usesCleartextTraffic="false"` is set on the application.
 - **No backup exposure.** `android:allowBackup="false"`, with
   `res/xml/data_extraction_rules.xml` excluding every storage domain from cloud backup and

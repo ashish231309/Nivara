@@ -25,6 +25,7 @@ import com.nivara.app.R
 import com.nivara.app.domain.app.ApplicationDiscoveryState
 import com.nivara.app.domain.app.InstalledApplication
 import com.nivara.app.domain.permissions.AppLockSetupState
+import com.nivara.app.domain.permissions.OverlayCapability
 import com.nivara.app.domain.permissions.UsageAccessStatus
 import com.nivara.app.ui.components.NivaraErrorState
 import com.nivara.app.ui.components.NivaraLoadingState
@@ -63,6 +64,9 @@ fun AppLockSetupRoute(
         uiState = uiState,
         onRetry = viewModel::refresh,
         onOpenUsageAccessSettings = viewModel::openUsageAccessSettings,
+        onOpenOverlaySettings = viewModel::openOverlaySettings,
+        onStartProtection = viewModel::startProtection,
+        onStopProtection = viewModel::stopProtection,
         modifier = modifier,
     )
 }
@@ -78,6 +82,9 @@ fun AppLockSetupScreen(
     uiState: AppLockSetupUiState,
     onRetry: () -> Unit,
     onOpenUsageAccessSettings: () -> Unit,
+    onOpenOverlaySettings: () -> Unit,
+    onStartProtection: () -> Unit,
+    onStopProtection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -87,6 +94,9 @@ fun AppLockSetupScreen(
             state = uiState,
             onRetry = onRetry,
             onOpenUsageAccessSettings = onOpenUsageAccessSettings,
+            onOpenOverlaySettings = onOpenOverlaySettings,
+            onStartProtection = onStartProtection,
+            onStopProtection = onStopProtection,
             modifier = modifier,
         )
     }
@@ -97,6 +107,9 @@ private fun AppLockSetupContent(
     state: AppLockSetupUiState.Ready,
     onRetry: () -> Unit,
     onOpenUsageAccessSettings: () -> Unit,
+    onOpenOverlaySettings: () -> Unit,
+    onStartProtection: () -> Unit,
+    onStopProtection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -120,6 +133,18 @@ private fun AppLockSetupContent(
             status = state.setup.usageAccess,
             busy = state.busy,
             onOpenSettings = onOpenUsageAccessSettings,
+        )
+
+        OverlayCard(
+            capability = state.setup.overlay,
+            busy = state.busy,
+            onOpenSettings = onOpenOverlaySettings,
+        )
+
+        ProtectionCard(
+            state = state,
+            onStart = onStartProtection,
+            onStop = onStopProtection,
         )
 
         state.noticeRes?.let { noticeRes ->
@@ -291,6 +316,109 @@ private fun UsageAccessCard(
     }
 }
 
+/**
+ * The overlay permission and the way to Android's screen for it.
+ *
+ * The wording is explicit that this capability is what *shows* protection, and that losing it never
+ * means an application is unprotected: the alternative — a surface that quietly stops appearing —
+ * would be the one failure this stage must not have.
+ */
+@Composable
+private fun OverlayCard(
+    capability: OverlayCapability,
+    busy: Boolean,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SetupCard(
+            title = stringResource(id = R.string.applock_setup_overlay_title),
+            body = stringResource(id = overlayStatusRes(capability)) + " — " +
+                stringResource(id = R.string.applock_setup_overlay_summary),
+        )
+        Text(
+            text = stringResource(id = R.string.applock_setup_overlay_explanation),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Button(
+            onClick = onOpenSettings,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(text = stringResource(id = R.string.applock_setup_overlay_action))
+        }
+        Text(
+            text = stringResource(id = R.string.applock_setup_overlay_settings_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * The protection switch.
+ *
+ * It starts and stops the component that owns detection — nothing else. "On" is therefore read back
+ * from that component rather than assumed, and the state where detection runs but cannot decide
+ * anything is reported as itself instead of as "off" or "on".
+ *
+ * The button is disabled while a prerequisite is missing, and the copy says why: turning protection
+ * on without them would start something that cannot protect anything, and would be a claim Nivara
+ * cannot back up.
+ */
+@Composable
+private fun ProtectionCard(
+    state: AppLockSetupUiState.Ready,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val running = state.protection != ProtectionRunState.Stopped
+    val body = when (state.protection) {
+        ProtectionRunState.Stopped -> stringResource(id = R.string.applock_setup_protection_stopped)
+        ProtectionRunState.Running -> stringResource(id = R.string.applock_setup_protection_running)
+        ProtectionRunState.WithoutDecision ->
+            stringResource(id = R.string.applock_setup_protection_unavailable)
+    }
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SetupCard(
+            title = stringResource(id = R.string.applock_setup_protection_title),
+            body = body,
+        )
+        if (!state.setup.isReady) {
+            Text(
+                text = stringResource(id = R.string.applock_setup_protection_blocked),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (running) {
+            Button(
+                onClick = onStop,
+                enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(text = stringResource(id = R.string.applock_setup_protection_stop_action))
+            }
+        } else {
+            Button(
+                onClick = onStart,
+                enabled = !state.busy && state.setup.isReady,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(text = stringResource(id = R.string.applock_setup_protection_start_action))
+            }
+        }
+        Text(
+            text = stringResource(id = R.string.applock_setup_protection_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 @Composable
 private fun SetupCard(
     title: String,
@@ -328,10 +456,15 @@ private fun AppLockSetupGrantedPreview() {
                         ),
                     ),
                     usageAccess = UsageAccessStatus.Granted,
+                    overlay = OverlayCapability.Granted,
                 ),
+                protection = ProtectionRunState.Running,
             ),
             onRetry = {},
             onOpenUsageAccessSettings = {},
+            onOpenOverlaySettings = {},
+            onStartProtection = {},
+            onStopProtection = {},
         )
     }
 }
@@ -345,10 +478,14 @@ private fun AppLockSetupIncompletePreview() {
                 setup = AppLockSetupState(
                     discovery = ApplicationDiscoveryState.Unavailable,
                     usageAccess = UsageAccessStatus.NotGranted,
+                    overlay = OverlayCapability.NotGranted,
                 ),
             ),
             onRetry = {},
             onOpenUsageAccessSettings = {},
+            onOpenOverlaySettings = {},
+            onStartProtection = {},
+            onStopProtection = {},
         )
     }
 }
@@ -361,6 +498,9 @@ private fun AppLockSetupLoadingPreview() {
             uiState = AppLockSetupUiState.Loading,
             onRetry = {},
             onOpenUsageAccessSettings = {},
+            onOpenOverlaySettings = {},
+            onStartProtection = {},
+            onStopProtection = {},
         )
     }
 }

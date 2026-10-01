@@ -6,14 +6,20 @@ import android.content.Intent
 import android.os.IBinder
 import com.nivara.app.NivaraApplication
 import com.nivara.app.domain.applock.AppLockMonitor
+import com.nivara.app.domain.applock.AppLockOverlayHost
 
 /**
  * The Android component that lets App Lock detection run away from Nivara's own screens.
  *
- * It is a thin owner: it starts and stops the application-scoped [AppLockMonitor] and does nothing
- * else. No detector, no decision and no state lives here, so there is exactly one monitoring loop
- * in the process no matter how often the service is started — and a service that goes away cannot
- * leave a phantom monitor behind, because [onDestroy] stops the one it started.
+ * It is a thin owner: it starts and stops the application-scoped [AppLockMonitor] and the
+ * application-scoped protection surface, and it does nothing else. No detector, no decision, no
+ * window and no state lives here, so there is exactly one monitoring loop and at most one surface in
+ * the process no matter how often the service is started — and a service that goes away cannot leave
+ * a phantom monitor or an orphaned window behind, because [onDestroy] stops both.
+ *
+ * Detection comes first and presentation second: the surface is started after the monitor so that a
+ * requirement raised by the monitor's very first turn is already published by the time the surface
+ * looks, and it is stopped first so that no window outlives the observations that justify it.
  *
  * ### Why not a foreground service
  *
@@ -50,14 +56,27 @@ class AppLockDetectionService : Service() {
     private val monitor: AppLockMonitor?
         get() = (application as? NivaraApplication)?.container?.appLockMonitor
 
+    /**
+     * The one protection surface in the process.
+     *
+     * The service owns its lifetime and nothing else about it: what is shown, when and with what
+     * result belongs to the presentation layer.
+     */
+    private val overlayHost: AppLockOverlayHost?
+        get() = (application as? NivaraApplication)?.container?.appLockOverlayHost
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         monitor?.start()
+        overlayHost?.start()
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         // However this service ended — a stop command, the platform reclaiming it, or the task
-        // being removed — detection ends with it.
+        // being removed — detection and the surface it drives both end with it. The order is the
+        // reverse of the one they were started in, so nothing is left waiting for an observation
+        // that will not arrive.
+        overlayHost?.stop()
         monitor?.stop()
         super.onDestroy()
     }

@@ -216,4 +216,40 @@
     <string name="applock_setup_settings_unavailable">Nivara could not open Android\'s settings screen on this device.</string>
 
     <string name="applock_setup_scope_note">App Lock itself — choosing applications and locking them — arrives in a later release. This screen only checks what it needs.</string>
+
+    <!-- App Lock protection surface (Stage 8) -->
+    <string name="applock_overlay_title">App Lock</string>
+    <string name="applock_overlay_summary">Nivara is protecting this application.</string>
+    <string name="applock_overlay_explanation">Enter your %1$s to continue.</string>
+    <string name="applock_overlay_checking">Checking your credential\u2026</string>
+    <string name="applock_overlay_biometric_action">Use biometric unlock</string>
+    <string name="applock_overlay_no_credential_title">No credential is set up</string>
+    <string name="applock_overlay_no_credential_summary">Nivara has no PIN, password or pattern yet, so this application cannot be unlocked. Open Nivara and set one up; the application stays protected until you do.</string>
+    <string name="applock_overlay_leave_action">Leave this application</string>
+    <string name="applock_overlay_leave_note">Leaving takes you to your home screen. Nothing is unlocked by leaving, and coming back asks again.</string>
+    <string name="applock_overlay_unpresentable_title">App Lock cannot be shown</string>
+    <string name="applock_overlay_unpresentable_not_granted">Android\'s overlay permission is missing, so Nivara cannot draw the App Lock surface. Open Nivara and work through the App Lock preparation screen.</string>
+    <string name="applock_overlay_unpresentable_unavailable">Nivara could not read Android\'s overlay permission, so it cannot claim the surface is available. Open Nivara and check the App Lock preparation screen.</string>
+    <string name="applock_overlay_unpresentable_failed">Android refused the App Lock surface. Nothing has been unlocked. Open Nivara and check the App Lock preparation screen.</string>
+
+    <!-- App Lock preparation: overlay prerequisite and the protection switch (Stage 8) -->
+    <string name="applock_setup_prerequisite_overlay">overlay permission</string>
+    <string name="applock_setup_overlay_title">Overlay permission</string>
+    <string name="applock_setup_overlay_granted">Granted</string>
+    <string name="applock_setup_overlay_not_granted">Not granted</string>
+    <string name="applock_setup_overlay_unavailable">Unavailable</string>
+    <string name="applock_setup_overlay_summary">App Lock shows its authentication surface above the protected application. Android allows that only with this permission, and it is granted in Android\'s own settings.</string>
+    <string name="applock_setup_overlay_explanation">Without it Nivara cannot show the App Lock surface. A protected application is never treated as unprotected because of that: Nivara reports the missing permission instead.</string>
+    <string name="applock_setup_overlay_action">Open overlay settings</string>
+    <string name="applock_setup_overlay_settings_note">That screen belongs to Android. Nivara only reads whether the grant exists, and checks again when you come back.</string>
+    <string name="applock_setup_overlay_granted_notice">Overlay permission is on.</string>
+    <string name="applock_setup_protection_title">Protection</string>
+    <string name="applock_setup_protection_running">Protection is on. Nivara watches for protected applications while it is running.</string>
+    <string name="applock_setup_protection_stopped">Protection is off. Nothing is being detected.</string>
+    <string name="applock_setup_protection_unavailable">Detection is on but cannot decide anything right now: a prerequisite is missing or Android will not answer. The statuses above say which.</string>
+    <string name="applock_setup_protection_blocked">Protection needs every prerequisite above. Fix what is missing first.</string>
+    <string name="applock_setup_protection_start_action">Turn on protection</string>
+    <string name="applock_setup_protection_stop_action">Turn off protection</string>
+    <string name="applock_setup_protection_failed">The device did not accept the change. Protection is not running.</string>
+    <string name="applock_setup_protection_note">Protection runs while Nivara is open and for as long as Android keeps its background service alive; Android stops background services on its own terms, and Nivara does not claim otherwise. Choosing which applications to protect comes next.</string>
 </resources>

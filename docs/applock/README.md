@@ -4,15 +4,19 @@ This document records the platform decisions behind App Lock: what Nivara asks t
 declares in the manifest, what it decides, and what it deliberately does not do yet. It is the
 durable reference for the stages that follow, not a description of the UI.
 
-It covers two stages, in order:
+It covers three stages, in order:
 
 * **[Stage 6: discovery, permission setup and preparation](#stage-6-discovery-permission-setup-and-preparation)** —
   which applications exist, whether Usage Access is granted, and where the user changes that.
 * **[Stage 7: detection and protection decisions](#stage-7-detection-and-protection-decisions)** —
   which application is in front, whether it needs authentication, and how that is published.
+* **[Stage 8: the protection surface and authentication flow](#stage-8-the-protection-surface-and-authentication-flow)** —
+  how a requirement is presented above another application, why that needs a declared permission,
+  and how the authentication it asks for reaches the existing session.
 
-Neither stage draws anything: the authentication prompt and the overlay belong to the stage that
-presents them.
+Stages 6 and 7 draw nothing. The surface that presents a requirement is this document's last
+chapter, and it is the only place Nivara asks Android for a way to appear above another
+application.
 
 # Stage 6: discovery, permission setup and preparation
 
@@ -137,17 +141,14 @@ The user changes the grant in Android's own screen, opened with
 * The state is re-read when the screen is resumed, which is how a return from Android's settings is
   noticed. There is no polling and no automation of the settings screen.
 
-## Overlay permission: deferred
+## Overlay permission: deferred here, decided in Stage 8
 
-`SYSTEM_ALERT_WINDOW` is **not** declared in this stage, and there is no overlay capability check.
+`SYSTEM_ALERT_WINDOW` was **not** declared in this stage, and no overlay capability was checked.
 
-The reason is that nothing in Stage 6 draws above another application, and the permission is only
-meaningful when something does. The stage that draws the authentication prompt over a locked
-application (Stage 8) is the first that can honestly justify it, and it must add, in the same
-change: the capability check, the settings entry point
-(`Settings.ACTION_MANAGE_OVERLAY_PERMISSION`), a clear explanation of what the user is granting,
-and the fact that the overlay permission itself locks nothing — it only allows a window to be
-drawn.
+The reason was that nothing in Stage 6 draws above another application, and the permission is only
+meaningful when something does. Stage 8 revisited the decision when it built the surface that
+presents an authentication requirement over a protected application, and declared the permission
+there, with the evidence and the reasoning recorded in that stage's section below.
 
 Keeping the two apart matters. Usage Access *observes* which application is in the foreground;
 overlay permission *draws* above another application. They are different capabilities, granted in
@@ -391,16 +392,17 @@ applications opened much later is not claimed, not verified, and not promised on
 The verifier refuses `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`, `POST_NOTIFICATIONS`
 and `BIND_ACCESSIBILITY_SERVICE` until a stage documents why it needs them.
 
-## Overlay decision
+## Overlay decision: carried forward to Stage 8
 
-Unchanged: `SYSTEM_ALERT_WINDOW` is **not** declared, and no overlay capability is checked.
-Detection produces an internal requirement and nothing draws above another application, so the
-permission would entitle Nivara to something it does not do. Stage 8 owns the capability check, the
-settings entry point, the explanation and the presentation — and must add all of them together,
-with the documentation and the allow-list entry to match. The distinction stays explicit: Usage
-Access *observes* which application is in front; overlay permission *draws* above another
-application. Neither substitutes for the other, and a granted overlay permission locks nothing by
-itself.
+`SYSTEM_ALERT_WINDOW` was still **not** declared at the end of this stage, and no overlay capability
+was checked. Detection produced an internal requirement and nothing drew above another application,
+so the permission would have entitled Nivara to something it did not do yet. Stage 8 owns the
+capability check, the settings entry point, the explanation and the presentation, and added all of
+them together with this documentation and the verifier's allow-list entry.
+
+The distinction stays explicit: Usage Access *observes* which application is in front; overlay
+permission *draws* above another application. Neither substitutes for the other, and a granted
+overlay permission locks nothing by itself.
 
 ## Battery and OEM behaviour
 
@@ -442,3 +444,215 @@ Stage 7 adds its own gaps to Stage 6's:
   stage can decide whether a wider window is worth its cost.
 * **The storage format is verified on the JVM**, with real files and real atomic writes, but not on
   a device's storage stack.
+
+# Stage 8: the protection surface and authentication flow
+
+Stage 7 detects that a protected application is in front and publishes an internal requirement. This
+stage is what turns that requirement into something the user sees, and what carries their answer back
+into the session layer that already exists. It adds no new authentication mechanism, no new session
+and no per-application unlock: it is the missing link between a decision and the credential chain
+built in earlier stages.
+
+## Scope of this stage
+
+* Deciding whether a surface above another application is genuinely required, and adding the
+  smallest capability that makes it possible if it is.
+* Reading, explaining and opening the permission for that capability, with every state
+  distinguished.
+* Drawing the surface: owned by Nivara, secure, private, at most one at a time.
+* Routing the user's authentication through `CredentialManager` and `BiometricAuthenticator` into
+  `SessionManager`, and doing nothing else with it.
+* Behaving correctly when an attempt is cancelled, refused, blocked, timed out, or when the session
+  is locked while the surface is up.
+
+Explicitly out of scope: App Lock's settings, search and sorting; hiding applications; a custom
+launcher; camouflage; a vault; scheduled locking; battery or OEM workarounds; and visual design,
+which a later stage owns. Everything on that list that touches the protected set will use the
+repository introduced in Stage 7.
+
+## Why a surface is required at all
+
+Android offers an application no unprivileged way to put something in front of another application's
+UI. The options were examined and each was rejected on its own merits:
+
+| Option | Why it is not used |
+| --- | --- |
+| A background activity start | Refused by the platform from API 29 onwards for a process the user is not interacting with, unless the same overlay grant exists. Adding it would raise a warning the user cannot resolve, and on modern versions it would simply fail. |
+| A foreground service with a notification | A persistent notification is a *notification*, not a blocking surface. It cannot stop the protected application's UI from being used, so it protects nothing; it would also require `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` and `POST_NOTIFICATIONS`, none of which the feature needs. |
+| An accessibility service | An accessibility service reads the content of every screen on the device. That is a vastly broader capability than drawing one window, it is not needed to draw one window, and it would mean asking the user to grant surveillance to obtain a lock screen. |
+| Doing nothing and reporting success | The one genuinely unacceptable option: a missing capability must never be presented as "nothing needs protecting". |
+
+The remaining mechanism is a window of type `TYPE_APPLICATION_OVERLAY`, which is exactly the
+capability `SYSTEM_ALERT_WINDOW` grants and nothing more. It is the smallest Android-supported way
+to appear above the protected application, and the permission itself locks nothing: a granted
+overlay permission without the surface would be an empty entitlement.
+
+## Permission: `android.permission.SYSTEM_ALERT_WINDOW`
+
+| Question | Answer |
+| --- | --- |
+| Why does it exist? | The protection surface must be drawn above the protected application. Android offers no other unprivileged mechanism that can place a blocking surface there. |
+| Which feature requires it? | App Lock's protection surface. Detection alone does not need it, and no other feature of this project draws over another application. |
+| How is it granted? | By the user, in Android's own "Display over other apps" screen, reached with `Settings.ACTION_MANAGE_OVERLAY_PERMISSION` and Nivara's own package URI. It is never a runtime permission and `requestPermissions` is never called for it. |
+| Does it need to be declared? | Yes — without the declaration the app-op can never be granted and Nivara cannot appear in the overlay settings list. |
+| Is it needed on Android 9+? | Yes, on every supported version; `TYPE_APPLICATION_OVERLAY` exists from API 26 and `Settings.canDrawOverlays` has existed since API 23. |
+| Does it expose user data by itself? | No. It permits a window to be drawn above other applications; it grants no access to their content, and nothing is read from the application underneath. |
+
+The declaration carries `tools:ignore="ProtectedPermissions"` for the same reason Usage Access does:
+the permission is protected on purpose, and only the user may grant it.
+
+The capability is read with `Settings.canDrawOverlays`, which reports the app-op as a boolean and
+throws on platforms where the operation cannot be resolved. A `null` or throwing answer becomes
+`OverlayCapability.Unavailable`, never `NotGranted`: an unreadable check is not a refusal the user
+can fix, and it must not be presented as a normal "off" state. `Granted` is shown as *Granted*,
+`NotGranted` as *Not granted*, and `Unavailable` as *Unsupported* — three separate sentences,
+because the remedy differs and because collapsing them would tell the user something Nivara does not
+know.
+
+`Settings.ACTION_MANAGE_OVERLAY_PERMISSION` is opened with Nivara's own package URI so the list is
+filtered to Nivara. On devices where that deep link cannot be resolved the intent is retried without
+the URI, and a failure to open either screen becomes a generic message — opening the screen is never
+treated as a grant. The state is re-read when the preparation screen is resumed, exactly as Usage
+Access is.
+
+The verifier keeps the permission on an explicit allow-list and requires this document to justify
+it. The remaining permissions this project deliberately does not hold — `FOREGROUND_SERVICE`,
+`FOREGROUND_SERVICE_SPECIAL_USE`, `POST_NOTIFICATIONS`, `BIND_ACCESSIBILITY_SERVICE`,
+`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` and `QUERY_ALL_PACKAGES` — stay refused until a stage
+documents a demonstrated need.
+
+## The surface
+
+The surface is a window owned by Nivara and nothing else:
+
+* It is added with the application context through `WindowManager`, as `TYPE_APPLICATION_OVERLAY`
+  with `FLAG_SECURE` and an opaque pixel format. `FLAG_SECURE` means the content of the protection
+  surface itself cannot be captured in a screenshot, a screen recording or a mirror of the display —
+  the same rule the credential screens already follow.
+* It is not exported and launches nothing of its own: it is not an activity, it has no task and no
+  navigation, and it exists only while a requirement does.
+* It shows no sensitive information. It never names the protected application, never shows its icon
+  or its label and never mentions a package name. The user already knows which application they
+  opened; what the surface adds is that authentication is required.
+* It logs nothing. The App Lock packages contain no logging calls, no cryptography (they neither
+  store nor derive credentials) and no network access at all; the verifier enforces all three.
+* The input the user types goes straight to the existing credential entry component and is handed to
+  `CredentialManager` on submit, which owns and clears it. The surface keeps no copy.
+
+### One surface at a time
+
+There is exactly one window, owned by one component, and its state is an explicit state machine —
+`Idle`, `Showing(request)`, `Dismissing(request)` — rather than a set of flags:
+
+* A repeat of the same requirement while it is already `Showing` changes nothing and creates no
+  second window.
+* A different protected application coming forward while a surface is up reuses the same window and
+  updates its request; the window is never rebuilt for a new occasion.
+* Every ending — authentication succeeded, the user left the application, detection stopped, the
+  service stopped, the preparation screen switched protection off — goes through the same dismissal,
+  which is idempotent. A second call to stop an already-stopped host is a no-op.
+* If Android removes the window itself (for example the user revoked the permission), the surface
+  reports the requirement as one that could not be presented and the presenter publishes
+  `Unpresentable` with `OverlayUnavailability.Failed`. It does not re-attach in a loop: the
+  requirement stays visible as a failure and the next occasion tries again.
+* Leaving the surface — the explicit "leave this application" action or the Back gesture — sends the
+  user to the device's home screen with `ACTION_MAIN`/`CATEGORY_HOME`. The protected application is
+  not opened or bypassed by the surface, and no application-launching intent is used. The surface is
+  deliberately **not** hidden at the moment the leave action fires: it stays up until detection sees
+  the launcher, so that a home intent the platform refuses can never leave the protected application
+  uncovered. The cost is that the surface may remain over the launcher for one detection interval,
+  which is the honest side of that trade.
+* When detection is running but cannot decide anything (`AppLockState.Unavailable`), a surface that
+  is already up stays up. Removing it would turn "Nivara cannot see" into "everything is fine",
+  which is the one reading this stage must never produce; and no surface is created, because Nivara
+  cannot name an application it cannot see.
+
+The window-owning component is behind a small seam (`OverlaySurface`) so the lifecycle rules above
+can be tested on the JVM with a fake, and so the platform calls stay in one file. The platform half —
+`WindowManager.addView`/`removeView`, `ComposeView` inside an overlay window, Back interception and
+the home intent — cannot be exercised on the JVM and is declared as compiled, not verified, below.
+
+## Authentication routing
+
+The surface asks for authentication; it does not implement it. The primary credential is discovered
+at the moment the surface is shown by asking `CredentialManager.status()` what is configured — never
+hard-coded, never read from a preference and never guessed. The answer is shown through the existing
+`CredentialEntry` component, which renders whatever type the credential layer reports.
+
+* **Primary**: `CredentialManager.verify(input)` produces an `AuthenticationOutcome`, which is handed
+  to `SessionManager.establish(outcome)`. Every outcome is possible — succeeded, failed with a block
+  window, temporarily blocked with a retry delay, not configured, invalid configuration — and every
+  one is shown as the credential layer's own message. There is no second password, PIN, pattern or
+  verification path.
+* **Biometric**: offered only when the existing `BiometricAuthenticator` reports it enabled, through
+  the same authenticator and system prompt the credential screens use.
+  `BiometricAuthenticationOutcome` reaches the same `SessionManager.establish` overload. Cancelled,
+  failed, system-blocked and invalidated outcomes leave the session untouched and keep the primary
+  credential available.
+* **The platform prompt's host.** Android's biometric prompt must be hosted by one of Nivara's own
+  activities. While a protected application is in front, Nivara's activity is stopped, so the
+  existing authenticator is asked while it may have no live host — in which case it reports the
+  secondary path as unavailable, that outcome is shown, and the primary credential stays available.
+  Nothing is fabricated to work around this, and the limitation is recorded rather than hidden.
+* **The session**: the one `SessionManager` gate. App Lock adds no unlocked flag, no per-application
+  authentication state, no unlocked-package list, no session timer of its own and no authentication
+  counter. The only thing it can do to the session is what every other screen does: hand it an
+  outcome, and read `currentState()`.
+* **Quick Lock and expiry**: `lockNow()` and session expiry are observed through the session's own
+  state stream. When the gate says the session is gone while a protected application is still in
+  front, the requirement is published again by the same reconciliation that handles every other
+  wake-up.
+
+### Request identity and staleness
+
+A requirement is identified by a monotonically increasing in-memory id together with the package
+name it was raised for. Every authentication result is used only if it belongs to the request that is
+still current:
+
+* An attempt that finishes after the user has moved to another protected application is dropped, so a
+  success obtained for one application cannot open the gate for a different situation.
+* A→B races cannot unlock B: B's request has a different identity, and A's late result no longer
+  matches.
+* Only one attempt can run per request at a time, so a second tap cannot start two verifications.
+
+The identity lives in memory only, is never persisted and is never written anywhere.
+
+## The preparation screen's protection switch
+
+The App Lock preparation screen gains a switch that starts and stops protection, and a card for the
+overlay capability alongside the ones Stage 6 introduced. The switch only calls the component that
+owns detection; the state it displays is read back from that component's own state, never assumed
+from the tap. A platform refusal — a restricted background start, a component an OEM build has
+disabled — is reported as a failure and the switch keeps showing that protection is not running,
+because claiming otherwise would be claiming something this layer cannot know. Returning from
+Android's overlay screen with the grant in place is confirmed once, and returning without one is not
+an error. Its three values — stopped, running, running-without-a-decision — are distinct, because
+"detection is on but the platform will not answer" is neither off nor working. Starting is disabled
+until every prerequisite is satisfied, and stopping is always available, because turning something
+off never needs a permission. A missing prerequisite is never presented as an empty device or as
+"nothing to protect".
+
+## What is not verified here (Stage 8)
+
+Every platform claim in this chapter is a claim about Android, verified by reading the platform
+documentation and by compiling against it — not by running it:
+
+* **No device or emulator was available.** Nothing in this stage was executed on Android hardware.
+  The instrumented tests that can only run on a device are compiled in CI, which is not the same as
+  running them.
+* **`Settings.canDrawOverlays` was not executed**, and no grant, revocation or Settings round-trip
+  was observed on a device.
+* **The window was never attached.** `WindowManager.addView`/`removeView` with
+  `TYPE_APPLICATION_OVERLAY`, `FLAG_SECURE`, the insets handling and the display-cutout mode are
+  compiled and asserted by an instrumented test that has not run.
+* **Compose inside an overlay window was not exercised.** The `ComposeView` lifecycle owners, the
+  recomposition of the surface state, the Back interception and the home-screen intent are
+  compiled-only.
+* **Authentication through the overlay was not performed.** The JVM tests prove routing, request
+  identity, staleness, de-duplication, session outcomes and overlay state transitions with fakes; no
+  fingerprint, PIN or system prompt was shown by this code on a device, and Stage 4's own device gaps
+  are unchanged.
+* **The behaviour of the surface while the process is killed, and across OEM power management, is
+  not verified and not claimed.** The service that owns the surface remains stop-and-forget
+  (`START_NOT_STICKY`); if the process is gone, nothing is drawing, and no mechanism available to
+  Nivara changes that.
