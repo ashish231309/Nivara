@@ -393,4 +393,55 @@
     <string name="camouflage_unlock_action">Unlock Nivara</string>
     <string name="camouflage_notice_changed">Identity changed. Android\'s launcher may take a moment to show the new entry.</string>
     <string name="camouflage_error_not_changed">Nivara could not change its launcher identity. Nothing was changed, and the identity shown above is the one in use.</string>
+
+    <!--
+      The vault: where it lives, what is at it, and what each state means. The copy states plainly
+      that a vault Nivara cannot read has not been deleted, because "the vault is empty" is the one
+      reading this screen must never invite.
+    -->
+    <string name="home_vault_title">Vault storage</string>
+    <string name="home_vault_summary">Choose the folder Nivara keeps its encrypted vault in. Nivara only touches the folder you pick.</string>
+    <string name="home_vault_action">Set up vault storage</string>
+    <string name="vault_title">Vault storage</string>
+    <string name="vault_state_not_configured_title">No vault folder chosen</string>
+    <string name="vault_state_not_configured">Nivara does not have a vault yet, and does not create one on its own. Choose the folder that should hold it, then create the vault there.</string>
+    <string name="vault_state_location_unknown_title">The vault folder is unknown</string>
+    <string name="vault_state_location_unknown">Nivara\'s record of which folder holds the vault cannot be read, so it cannot say where the vault is. Nothing has been deleted, and no other folder has been used. Choose the folder again to reconnect to it.</string>
+    <string name="vault_state_missing_title">No vault in this folder</string>
+    <string name="vault_state_missing">This folder does not hold a Nivara vault yet. You can create one here; nothing else in the folder is touched.</string>
+    <string name="vault_state_ready_title">Vault ready</string>
+    <string name="vault_state_ready">The vault in this folder is intact and can be opened. Its contents are encrypted with a key that never leaves the device, and nothing else is stored here.</string>
+    <string name="vault_state_unreadable_title">Vault cannot be opened</string>
+    <string name="vault_state_unreadable_metadata">There is a Nivara vault in this folder, and its metadata cannot be read: the record may be damaged, or the device key that protects it may no longer be the one it was written with. Nothing has been changed, deleted or replaced, and the vault has not been treated as empty.</string>
+    <string name="vault_state_incomplete_title">Vault setup is incomplete</string>
+    <string name="vault_state_unreadable_structure">Nivara\'s structure is in this folder without a complete vault record, which usually means an earlier setup did not finish. Nothing has been deleted. If you expected an existing vault here, stop and check the folder before creating one.</string>
+    <string name="vault_state_unreadable_key">The vault in this folder is intact, and the device key that protects its key material is no longer available — this happens when the screen lock is removed. Nothing has been changed or deleted.</string>
+    <string name="vault_state_unsupported_title">Vault from a newer Nivara</string>
+    <string name="vault_state_unsupported">This folder holds a vault written by a newer version of Nivara. This build refuses to touch it rather than risk your data. Update Nivara to open it.</string>
+    <string name="vault_state_unavailable_title">Vault storage unavailable</string>
+    <string name="vault_state_unavailable">The folder that holds the vault cannot be reached right now — the storage may be removed, or the folder may no longer exist. Nothing has been changed or deleted.</string>
+    <string name="vault_state_access_denied_title">Vault storage not permitted</string>
+    <string name="vault_state_access_denied">Nivara no longer has permission to use this folder. Choose it again to grant access; nothing has been changed or deleted.</string>
+    <string name="vault_choose_root_action">Choose vault folder</string>
+    <string name="vault_change_root_action">Choose a different folder</string>
+    <string name="vault_initialize_action">Create vault here</string>
+    <string name="vault_replace_action">Replace the unreadable vault</string>
+    <string name="vault_replace_warning">This deletes the unreadable records in this folder and starts a new vault. Anything the old vault held cannot be recovered.</string>
+    <string name="vault_locked">Unlock Nivara to change vault storage. You can look at this screen without unlocking.</string>
+    <string name="vault_unlock_action">Unlock Nivara</string>
+    <string name="vault_notice_root_selected">Vault folder saved.</string>
+    <string name="vault_notice_initialized">Vault created in the selected folder.</string>
+    <string name="vault_error_selection_failed">Nivara could not use that folder. Nothing was changed.</string>
+    <string name="vault_error_invalid_location">That folder cannot hold a Nivara vault. Nothing was changed.</string>
+    <string name="vault_error_location_unreadable">Nivara cannot read where the vault is, so it will not replace it. Nothing was changed.</string>
+    <string name="vault_error_access_denied">Nivara does not have permission for that folder. Nothing was changed.</string>
+    <string name="vault_error_storage_unavailable">That storage cannot be reached right now. Nothing was changed.</string>
+    <string name="vault_error_already_exists">A vault already exists in that folder. Nothing was replaced.</string>
+    <string name="vault_error_not_replaced">Nivara will not replace that vault. Nothing was changed.</string>
+    <string name="vault_error_write_failed">Nivara could not write to that folder. Nothing was created.</string>
+    <string name="vault_error_not_verified">The vault record could not be verified after writing, so no vault was created. Nothing was left behind.</string>
+    <string name="vault_error_key_unavailable">The device key that protects the vault is not available, so no vault was created.</string>
+    <string name="vault_error_cryptography">Nivara\'s encryption layer refused the operation, so no vault was created.</string>
+    <string name="vault_explanation_title">Where the vault lives</string>
+    <string name="vault_explanation">The vault is one folder on storage you choose, and Nivara only ever touches that folder. Inside it, Nivara keeps an authenticated record of the vault and an encrypted content area; nothing is written anywhere else and nothing is uploaded. The folder can be on a memory card or in a synced location, which is also how it moves between devices — and why the storage is not a secret: what protects it is the encryption, not where it sits.</string>
 </resources>

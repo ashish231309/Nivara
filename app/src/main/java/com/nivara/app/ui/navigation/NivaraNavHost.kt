@@ -16,6 +16,7 @@ import com.nivara.app.ui.credential.CredentialChangeRoute
 import com.nivara.app.ui.credential.CredentialSetupRoute
 import com.nivara.app.ui.credential.CredentialVerifyRoute
 import com.nivara.app.ui.home.HomeRoute
+import com.nivara.app.ui.vault.VaultRoute
 
 /**
  * Navigation graph of the application.
@@ -60,6 +61,7 @@ fun NivaraNavHost(
                 onOpenAppLock = { navController.navigateTo(NivaraDestination.AppLock) },
                 onOpenHiddenApps = { navController.navigateTo(NivaraDestination.HiddenApps) },
                 onOpenCamouflage = { navController.navigateTo(NivaraDestination.Camouflage) },
+                onOpenVault = { navController.navigateTo(NivaraDestination.Vault) },
             )
         }
         composable(route = NivaraDestination.About.route) {
@@ -96,6 +98,14 @@ fun NivaraNavHost(
                 // The credential screen is the one place a session is opened. Changing the
                 // application's own identity does not reimplement it, and does not keep a session of
                 // its own.
+                onUnlock = { navController.navigateTo(NivaraDestination.CredentialVerify) },
+            )
+        }
+        composable(route = NivaraDestination.Vault.route) {
+            VaultRoute(
+                // The credential screen is the one place a session is opened. Creating a vault needs
+                // one, and the vault screen does not reimplement authentication to get it: it sends
+                // the user to the same screen every other configuration change uses.
                 onUnlock = { navController.navigateTo(NivaraDestination.CredentialVerify) },
             )
         }

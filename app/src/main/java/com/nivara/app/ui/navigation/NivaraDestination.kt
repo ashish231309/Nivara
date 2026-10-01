@@ -102,6 +102,18 @@ sealed interface NivaraDestination {
     }
 
     /**
+     * Vault storage: which folder holds the vault, and whether one is there yet.
+     *
+     * The one entry into the vault. Reaching it is ordinary navigation from the home screen under
+     * whatever identity Nivara currently presents, because storage has nothing to do with the name
+     * and icon on the launcher and nothing about the vault is a secret route.
+     */
+    data object Vault : NivaraDestination {
+        override val route: String = "vault"
+        override val titleRes: Int = R.string.vault_title
+    }
+
+    /**
      * Nivara as the device's Home application: the launcher surface and its app drawer.
      *
      * A destination like any other, so that reaching Nivara's settings from the launcher is ordinary
@@ -132,6 +144,7 @@ sealed interface NivaraDestination {
                 AppLock,
                 HiddenApps,
                 Camouflage,
+                Vault,
             )
 
         /** Resolves a navigation route back to its destination, or `null` when unknown. */

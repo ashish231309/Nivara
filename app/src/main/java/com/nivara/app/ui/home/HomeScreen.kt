@@ -48,6 +48,7 @@ fun HomeRoute(
     onOpenAppLock: () -> Unit,
     onOpenHiddenApps: () -> Unit,
     onOpenCamouflage: () -> Unit,
+    onOpenVault: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
@@ -65,6 +66,7 @@ fun HomeRoute(
         onOpenAppLock = onOpenAppLock,
         onOpenHiddenApps = onOpenHiddenApps,
         onOpenCamouflage = onOpenCamouflage,
+        onOpenVault = onOpenVault,
         modifier = modifier,
     )
 }
@@ -85,6 +87,7 @@ fun HomeScreen(
     onOpenAppLock: () -> Unit,
     onOpenHiddenApps: () -> Unit,
     onOpenCamouflage: () -> Unit,
+    onOpenVault: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -105,6 +108,7 @@ fun HomeScreen(
             onOpenAppLock = onOpenAppLock,
             onOpenHiddenApps = onOpenHiddenApps,
             onOpenCamouflage = onOpenCamouflage,
+            onOpenVault = onOpenVault,
             modifier = modifier,
         )
     }
@@ -126,6 +130,7 @@ private fun HomeContent(
     onOpenAppLock: () -> Unit,
     onOpenHiddenApps: () -> Unit,
     onOpenCamouflage: () -> Unit,
+    onOpenVault: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -182,6 +187,8 @@ private fun HomeContent(
         )
 
         CamouflageCard(onOpenCamouflage = onOpenCamouflage)
+
+        VaultCard(onOpenVault = onOpenVault)
 
         Button(onClick = onOpenAbout) {
             Text(text = stringResource(id = R.string.home_about_action))
@@ -380,6 +387,29 @@ private fun CamouflageCard(
 }
 
 /**
+ * The way into vault storage.
+ *
+ * The only entry into the vault, and it says the two things a person needs before choosing a folder:
+ * the folder is theirs to pick, and Nivara never picks one on its own and never falls back to another.
+ * It does not claim that files can be imported yet — that is a later stage.
+ */
+@Composable
+private fun VaultCard(
+    onOpenVault: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        InfoCard(
+            title = stringResource(id = R.string.home_vault_title),
+            body = stringResource(id = R.string.home_vault_summary),
+        )
+        OutlinedButton(onClick = onOpenVault, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(id = R.string.home_vault_action))
+        }
+    }
+}
+
+/**
  * The way into App Lock.
  *
  * The card states what the feature does, and it leads to the screen where the protected
@@ -447,6 +477,7 @@ private fun HomeScreenReadyPreview() {
             onOpenAppLock = {},
             onOpenHiddenApps = {},
             onOpenCamouflage = {},
+            onOpenVault = {},
         )
     }
 }
@@ -476,6 +507,7 @@ private fun HomeScreenConfiguredPreview() {
             onOpenAppLock = {},
             onOpenHiddenApps = {},
             onOpenCamouflage = {},
+            onOpenVault = {},
         )
     }
 }
@@ -496,6 +528,7 @@ private fun HomeScreenErrorPreview() {
             onOpenAppLock = {},
             onOpenHiddenApps = {},
             onOpenCamouflage = {},
+            onOpenVault = {},
         )
     }
 }
