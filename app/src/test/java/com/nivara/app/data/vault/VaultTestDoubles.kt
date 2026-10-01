@@ -55,6 +55,14 @@ internal class FakeVaultRootStorage : VaultRootStorage {
     /** Held open to keep a write in flight while a test inspects the root. */
     var writeGate: CompletableDeferred<Unit>? = null
 
+    /**
+     * Called inside a write, with the entry being written, before [writeGate] is waited on.
+     *
+     * It is how a test observes a change *at the moment it is being written* without racing a thread:
+     * the hook runs synchronously inside the write, so what it records is a fact about that instant.
+     */
+    var onWriteStarted: (suspend (entryName: String) -> Unit)? = null
+
     // Written from whichever thread a test runs the repository on, so a test that waits on one of
     // them observes the write rather than a value the compiler was free to cache.
     @Volatile
@@ -92,6 +100,7 @@ internal class FakeVaultRootStorage : VaultRootStorage {
 
     override suspend fun writeMetadata(entryName: String, bytes: ByteArray): NivaraResult<Unit> {
         writeCalls += 1
+        onWriteStarted?.invoke(entryName)
         writeGate?.await()
         writeFailure?.let { failure ->
             writeFailureAfterBytes?.let { count ->

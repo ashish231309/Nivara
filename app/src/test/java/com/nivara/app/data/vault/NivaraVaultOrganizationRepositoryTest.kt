@@ -18,15 +18,9 @@ import com.nivara.app.testing.testAlbumId
 import com.nivara.app.testing.testItemId
 import com.nivara.app.testing.valueOrFail
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -46,7 +40,6 @@ import org.junit.Test
  * encryption is real, because the property under test is that only bytes sealed for this purpose can
  * be read back at all.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 class NivaraVaultOrganizationRepositoryTest {
 
     private val random = SecureRandomGenerator()
@@ -90,13 +83,6 @@ class NivaraVaultOrganizationRepositoryTest {
 
     private fun bytesOf(name: String): List<Int> =
         metadata.documents.getValue(name).map { byte -> byte.toInt() and 0xFF }
-
-    /** Waits until the storage double has recorded a write past [before], or fails the test. */
-    private suspend fun awaitWriteAfterMoreThan(before: Int) {
-        withTimeout(10_000) {
-            while (metadata.writeCalls <= before) delay(5)
-        }
-    }
 
     /** Puts a record into a slot without going through the repository, as a previous generation would. */
     private suspend fun putRecord(
@@ -704,27 +690,54 @@ class NivaraVaultOrganizationRepositoryTest {
     // ------------------------------------------------------------------ while a change is in flight
 
     @Test
-    fun `a read while a change is being written still sees the record that is committed`() = runBlocking {
+    fun `a reader is answered with the committed record while the next one is being written`() = runTest {
         val repository = repository()
         val first = repository.createAlbum(name = "First", authorize = ::authorize).valueOrFail()
-        val gate = CompletableDeferred<Unit>()
-        metadata.writeGate = gate
+        val committedSlot = slotsHoldingRecords().single()
+        val committed = bytesOf(committedSlot)
+        var entryWritten: String? = null
+        var authoritativeDuringTheWrite: List<Int>? = null
+        var whatAReaderSaw: VaultOrganizationState? = null
+        metadata.onWriteStarted = { entryName ->
+            entryWritten = entryName
+            // Everything below is true at the instant the new generation is being written: the slot
+            // that holds the record has not been touched, and a reader asking now is answered from it.
+            authoritativeDuringTheWrite = bytesOf(committedSlot)
+            whatAReaderSaw = repository.read()
+        }
 
-        val writing = async(Dispatchers.Default) { repository.createAlbum(name = "Second", authorize = ::authorize) }
-        // The double counts the write before it waits, so waiting for the count is waiting for the
-        // commit to be held inside the write — no assumption about which thread got there first.
-        awaitWriteAfterMoreThan(metadata.writeCalls)
-        val duringWrite = repository.read()
-        metadata.writeGate = null
-        gate.complete(Unit)
-        val committed = writing.await().valueOrFail()
+        val second = repository.createAlbum(name = "Second", authorize = ::authorize).valueOrFail()
 
-        assertEquals("the record that is committed is the one a reader sees", VaultOrganizationState.Ready(listOf(first)), duringWrite)
-        assertEquals("Second", committed.name)
+        assertEquals(
+            "a change is written into the slot that is not authoritative",
+            VaultStructure.ORGANIZATION_SLOT_NAMES.first { name -> name != committedSlot },
+            entryWritten,
+        )
+        assertEquals("the committed record is byte for byte what it was", committed, authoritativeDuringTheWrite)
+        assertEquals(
+            "so a reader is answered with it, not with something half-written",
+            VaultOrganizationState.Ready(listOf(first)),
+            whatAReaderSaw,
+        )
+        assertEquals("Second", second.name)
         assertEquals(
             listOf("First", "Second"),
             repository().read().readable().map { album -> album.name },
         )
+    }
+
+    @Test
+    fun `a half-written record in the other slot never becomes the record`() = runTest {
+        val repository = repository()
+        val first = repository.createAlbum(name = "First", authorize = ::authorize).valueOrFail()
+        val other = VaultStructure.ORGANIZATION_SLOT_NAMES.first { name -> name != slotsHoldingRecords().single() }
+        // What a crash between the write and the read-back leaves behind: bytes, not a record.
+        metadata.documents[other] = ByteArray(24) { index -> (index * 3).toByte() }
+
+        val read = repository.read()
+
+        assertEquals("the committed generation is still the record", VaultOrganizationState.Ready(listOf(first)), read)
+        assertTrue("and the leftover is left exactly as it was found", metadata.documents.containsKey(other))
     }
 
     @Test
@@ -761,25 +774,21 @@ class NivaraVaultOrganizationRepositoryTest {
     }
 
     @Test
-    fun `a cancelled change is not retried behind the caller's back`() = runBlocking {
+    fun `a change cancelled while it is being written commits nothing and is not retried`() = runTest {
         val repository = repository()
-        val gate = CompletableDeferred<Unit>()
-        metadata.writeGate = gate
+        metadata.writeGate = CompletableDeferred()
         val writesBefore = metadata.writeCalls
+        lateinit var change: Job
+        // Cancelled from inside the write itself: the interruption lands where it is hardest — after
+        // the bytes were handed to the storage and before anything was verified.
+        metadata.onWriteStarted = { change.cancel() }
 
-        val job = launch(Dispatchers.Default) { repository.createAlbum(name = "Trip", authorize = ::authorize) }
-        // Held inside the write, which is where a cancellation has something to interrupt.
-        awaitWriteAfterMoreThan(writesBefore)
-        job.cancelAndJoin()
-        metadata.writeGate = null
-        gate.complete(Unit)
+        change = launch { repository.createAlbum(name = "Trip", authorize = ::authorize) }
+        change.join()
 
-        assertEquals("the change was attempted once", writesBefore + 1, metadata.writeCalls)
-        assertEquals(
-            "and nothing was committed",
-            VaultOrganizationState.Missing,
-            repository().read(),
-        )
+        assertTrue("the change was interrupted, not retried", change.isCancelled)
+        assertEquals("it was attempted exactly once", writesBefore + 1, metadata.writeCalls)
+        assertEquals("and nothing was committed", VaultOrganizationState.Missing, repository().read())
     }
 
     @Test
