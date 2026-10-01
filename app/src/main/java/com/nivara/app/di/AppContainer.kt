@@ -8,6 +8,7 @@ import com.nivara.app.data.credential.PersistedAttemptTracker
 import com.nivara.app.data.biometric.AndroidBiometricAuthenticator
 import com.nivara.app.data.biometric.BiometricTokenStore
 import com.nivara.app.data.app.AndroidApplicationIconLoader
+import com.nivara.app.data.app.AndroidApplicationLauncher
 import com.nivara.app.data.app.AndroidApplicationRepository
 import com.nivara.app.data.credential.SystemTimeProvider
 import com.nivara.app.data.applock.AndroidAppLockProtectionRunner
@@ -18,6 +19,7 @@ import com.nivara.app.data.applock.NivaraAppLockMonitor
 import com.nivara.app.data.permissions.AndroidOverlayCapabilityRepository
 import com.nivara.app.data.permissions.AndroidUsageAccessRepository
 import com.nivara.app.data.session.InMemorySessionManager
+import com.nivara.app.domain.app.ApplicationLauncher
 import com.nivara.app.domain.app.ApplicationRepository
 import com.nivara.app.domain.applock.AppLockMonitor
 import com.nivara.app.domain.applock.AppLockOverlayHost
@@ -128,6 +130,15 @@ interface AppContainer {
      * Configuration only: it says what to protect, never whether Nivara is unlocked.
      */
     val protectedApplicationRepository: ProtectedApplicationRepository
+
+    /**
+     * Opens an application by its package name.
+     *
+     * Used by Nivara's own launcher, which starts what the user tapped rather than composing an
+     * intent of its own. It is a domain contract with a platform implementation, like discovery, so
+     * the launcher's screens stay free of `PackageManager` and `Intent`.
+     */
+    val applicationLauncher: ApplicationLauncher
 
     /**
      * Which applications the user asked Nivara to keep out of sight.
@@ -335,6 +346,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val applicationIconLoader: ApplicationIconLoader by lazy {
         AndroidApplicationIconLoader(applicationContext)
+    }
+
+    override val applicationLauncher: ApplicationLauncher by lazy {
+        AndroidApplicationLauncher(applicationContext)
     }
 
     override val appLockMonitor: AppLockMonitor by lazy {
