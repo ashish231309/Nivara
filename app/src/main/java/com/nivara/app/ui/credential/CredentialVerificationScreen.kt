@@ -19,6 +19,8 @@ import com.nivara.app.R
 import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.components.NivaraMessageText
+import com.nivara.app.ui.session.sessionStatusRes
+import com.nivara.app.ui.session.sessionSummaryRes
 
 /**
  * Verifies the primary credential.
@@ -55,6 +57,7 @@ private fun CredentialVerificationRoute(
     CredentialVerificationScreen(
         uiState = uiState,
         onSubmit = viewModel::submit,
+        onLockNow = viewModel::lockNow,
         onChangeCredential = onChangeCredential,
         modifier = modifier,
     )
@@ -65,6 +68,7 @@ private fun CredentialVerificationRoute(
 fun CredentialVerificationScreen(
     uiState: CredentialVerificationUiState,
     onSubmit: (CredentialInput) -> Unit,
+    onLockNow: () -> Unit,
     onChangeCredential: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -90,6 +94,9 @@ fun CredentialVerificationScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // Shown when a session ended while this screen was open, so the return to the
+                // entry field is explained rather than surprising.
+                uiState.notice?.let { notice -> NivaraMessageText(message = notice) }
                 if (type == null) {
                     Text(
                         text = stringResource(id = R.string.credential_error_invalid_configuration),
@@ -121,8 +128,19 @@ fun CredentialVerificationScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // What is actually open, as the session gate sees it. This step lasts only while
+                // the session does: the timeout and Quick Lock both send the screen back to the
+                // entry field above.
+                Text(
+                    text = "${stringResource(id = sessionStatusRes(uiState.session))} — " +
+                        stringResource(id = sessionSummaryRes(uiState.session)),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
                 Button(onClick = onChangeCredential, modifier = Modifier.fillMaxWidth()) {
                     Text(text = stringResource(id = R.string.credential_action_change))
+                }
+                OutlinedButton(onClick = onLockNow, modifier = Modifier.fillMaxWidth()) {
+                    Text(text = stringResource(id = R.string.session_action_lock))
                 }
             }
 

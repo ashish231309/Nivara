@@ -24,11 +24,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
 import com.nivara.app.domain.credential.PrimaryCredentialType
+import com.nivara.app.domain.security.AuthenticationSource
 import com.nivara.app.domain.security.BiometricStatus
+import com.nivara.app.domain.security.SessionState
 import com.nivara.app.ui.biometric.biometricStatusRes
 import com.nivara.app.ui.components.NivaraErrorState
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.credential.credentialTypeNameRes
+import com.nivara.app.ui.session.sessionStatusRes
+import com.nivara.app.ui.session.sessionSummaryRes
 import com.nivara.app.ui.theme.NivaraTheme
 
 /**
@@ -49,6 +53,7 @@ fun HomeRoute(
     HomeScreen(
         uiState = uiState,
         onRetry = viewModel::refresh,
+        onLockNow = viewModel::lockNow,
         onOpenAbout = onOpenAbout,
         onOpenCredentialSetup = onOpenCredentialSetup,
         onOpenCredentialVerify = onOpenCredentialVerify,
@@ -65,6 +70,7 @@ fun HomeRoute(
 fun HomeScreen(
     uiState: HomeUiState,
     onRetry: () -> Unit,
+    onLockNow: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenCredentialSetup: () -> Unit,
     onOpenCredentialVerify: () -> Unit,
@@ -79,6 +85,9 @@ fun HomeScreen(
             deviceLockConfigured = uiState.deviceLockConfigured,
             credentialType = uiState.credentialType,
             biometricStatus = uiState.biometricStatus,
+            session = uiState.session,
+            sessionNoticeRes = uiState.sessionNoticeRes,
+            onLockNow = onLockNow,
             onOpenAbout = onOpenAbout,
             onOpenCredentialSetup = onOpenCredentialSetup,
             onOpenCredentialVerify = onOpenCredentialVerify,
@@ -94,6 +103,9 @@ private fun HomeContent(
     deviceLockConfigured: Boolean,
     credentialType: PrimaryCredentialType?,
     biometricStatus: BiometricStatus,
+    session: SessionState,
+    sessionNoticeRes: Int?,
+    onLockNow: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenCredentialSetup: () -> Unit,
     onOpenCredentialVerify: () -> Unit,
@@ -120,6 +132,12 @@ private fun HomeContent(
         )
 
         DeviceSecurityCard(deviceLockConfigured = deviceLockConfigured)
+
+        SessionCard(
+            session = session,
+            noticeRes = sessionNoticeRes,
+            onLockNow = onLockNow,
+        )
 
         CredentialCard(
             credentialType = credentialType,
@@ -243,6 +261,51 @@ private fun BiometricCard(
     }
 }
 
+/**
+ * The session's state, and Quick Lock.
+ *
+ * This is the only place the in-memory session is surfaced, and it is surfaced plainly: whether
+ * Nivara is currently unlocked, how it got that way, and the one action that ends it immediately.
+ * The card never shows a countdown — the exact remaining time is a detail the session manager owns,
+ * and a screen that tracked it would be a second source of truth.
+ */
+@Composable
+private fun SessionCard(
+    session: SessionState,
+    noticeRes: Int?,
+    onLockNow: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        InfoCard(
+            title = stringResource(id = R.string.session_title),
+            body = "${stringResource(id = sessionStatusRes(session))} — " +
+                stringResource(id = sessionSummaryRes(session)),
+        )
+
+        noticeRes?.let { notice ->
+            Text(
+                text = stringResource(id = notice),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        // Locking is offered only while there is something to lock.
+        if (session.isAuthenticated) {
+            Button(onClick = onLockNow, modifier = Modifier.fillMaxWidth()) {
+                Text(text = stringResource(id = R.string.session_action_lock))
+            }
+        }
+
+        Text(
+            text = stringResource(id = R.string.session_locked_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 @Composable
 private fun InfoCard(
     title: String,
@@ -275,8 +338,10 @@ private fun HomeScreenReadyPreview() {
                 deviceLockConfigured = true,
                 credentialType = null,
                 biometricStatus = BiometricStatus.Disabled,
+                session = SessionState.Unauthenticated,
             ),
             onRetry = {},
+            onLockNow = {},
             onOpenAbout = {},
             onOpenCredentialSetup = {},
             onOpenCredentialVerify = {},
@@ -295,8 +360,14 @@ private fun HomeScreenConfiguredPreview() {
                 deviceLockConfigured = false,
                 credentialType = PrimaryCredentialType.Pattern,
                 biometricStatus = BiometricStatus.Enabled,
+                session = SessionState.Authenticated(
+                    source = AuthenticationSource.Biometric,
+                    startedAtMillis = 0L,
+                    expiresAtMillis = 300_000L,
+                ),
             ),
             onRetry = {},
+            onLockNow = {},
             onOpenAbout = {},
             onOpenCredentialSetup = {},
             onOpenCredentialVerify = {},
@@ -313,6 +384,7 @@ private fun HomeScreenErrorPreview() {
         HomeScreen(
             uiState = HomeUiState.Error,
             onRetry = {},
+            onLockNow = {},
             onOpenAbout = {},
             onOpenCredentialSetup = {},
             onOpenCredentialVerify = {},

@@ -15,6 +15,7 @@ import com.nivara.app.domain.credential.CredentialStatus
 import com.nivara.app.domain.security.BiometricAuthenticationOutcome
 import com.nivara.app.domain.security.BiometricAuthenticator
 import com.nivara.app.domain.security.BiometricFailure
+import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.ui.components.NivaraMessage
 import com.nivara.app.ui.components.secondsFromMillis
 import com.nivara.app.ui.credential.toFailureMessage
@@ -49,6 +50,7 @@ import kotlinx.coroutines.withContext
 class BiometricViewModel(
     private val authenticator: BiometricAuthenticator,
     private val credentialManager: CredentialManager,
+    private val sessionManager: SessionManager,
     private val clockMillis: () -> Long = { System.currentTimeMillis() },
     private val backgroundDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
@@ -89,6 +91,10 @@ class BiometricViewModel(
 
         start {
             val outcome = withContext(backgroundDispatcher) { authenticator.authenticate() }
+            // A biometric success is a valid factor for the session, and the only thing that turns
+            // it into one: the authenticator reports what happened, the gate decides what it opens.
+            // Every other outcome leaves the session exactly as it was.
+            sessionManager.establish(outcome)
             // The state read after the attempt is authoritative: it carries the failure count and
             // whatever delay Nivara now applies, which is not something the outcome has to restate.
             mutableUiState.value = readState().copy(
@@ -136,6 +142,10 @@ class BiometricViewModel(
                 mutableUiState.value = current.copy(busy = false, failure = rejection)
                 return@start
             }
+
+            // The primary credential was verified here, so this is a primary authentication like
+            // any other: it opens a session before the pending change is carried out.
+            sessionManager.establish(outcome)
 
             val result = withContext(backgroundDispatcher) { apply(pending) }
             val failure = result.toMessage()
@@ -207,6 +217,7 @@ class BiometricViewModel(
                 BiometricViewModel(
                     authenticator = container.biometricAuthenticator,
                     credentialManager = container.credentialManager,
+                    sessionManager = container.sessionManager,
                 )
             }
         }

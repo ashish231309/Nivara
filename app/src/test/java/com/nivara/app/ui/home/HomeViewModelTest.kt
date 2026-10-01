@@ -1,6 +1,8 @@
 package com.nivara.app.ui.home
 
+import com.nivara.app.R
 import com.nivara.app.core.common.NivaraResult
+import com.nivara.app.data.session.InMemorySessionManager
 import com.nivara.app.domain.credential.AuthenticationOutcome
 import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.domain.credential.CredentialManager
@@ -13,13 +15,25 @@ import com.nivara.app.domain.security.BiometricState
 import com.nivara.app.domain.security.BiometricStatus
 import com.nivara.app.domain.security.BiometricUnavailability
 import com.nivara.app.domain.security.DeviceSecurityProvider
+import com.nivara.app.domain.security.SessionState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import com.nivara.app.domain.security.AuthenticationSource
+import com.nivara.app.domain.security.SessionManager
+import com.nivara.app.testing.MutableTimeProvider
+import com.nivara.app.testing.TEST_SESSION_TIMEOUT_MILLIS
+import com.nivara.app.testing.testSessionManager
+import com.nivara.app.testing.testSessionPolicy
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -38,6 +52,8 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
 
+    private val time = MutableTimeProvider()
+
     @Before
     fun setUp() {
         // viewModelScope runs on Dispatchers.Main, which only exists on Android.
@@ -55,6 +71,7 @@ class HomeViewModelTest {
             deviceSecurityProvider = FakeDeviceSecurityProvider(NivaraResult.Success(true)),
             credentialManager = FakeCredentialManager(NivaraResult.Success(CredentialStatus.NotConfigured)),
             biometricAuthenticator = FakeBiometricAuthenticator(BiometricStatus.Disabled),
+            sessionManager = sessionManager(),
         )
 
         assertEquals(
@@ -62,6 +79,7 @@ class HomeViewModelTest {
                 deviceLockConfigured = true,
                 credentialType = null,
                 biometricStatus = BiometricStatus.Disabled,
+                session = SessionState.Unauthenticated,
             ),
             viewModel.uiState.value,
         )
@@ -75,6 +93,7 @@ class HomeViewModelTest {
                 NivaraResult.Success(CredentialStatus.Configured(PrimaryCredentialType.Pin)),
             ),
             biometricAuthenticator = FakeBiometricAuthenticator(BiometricStatus.Enabled),
+            sessionManager = sessionManager(),
         )
 
         assertEquals(
@@ -82,6 +101,7 @@ class HomeViewModelTest {
                 deviceLockConfigured = false,
                 credentialType = PrimaryCredentialType.Pin,
                 biometricStatus = BiometricStatus.Enabled,
+                session = SessionState.Unauthenticated,
             ),
             viewModel.uiState.value,
         )
@@ -95,6 +115,7 @@ class HomeViewModelTest {
             biometricAuthenticator = FakeBiometricAuthenticator(
                 BiometricStatus.Unavailable(BiometricUnavailability.NotEnrolled),
             ),
+            sessionManager = sessionManager(),
         )
 
         assertEquals(
@@ -102,6 +123,7 @@ class HomeViewModelTest {
                 deviceLockConfigured = true,
                 credentialType = null,
                 biometricStatus = BiometricStatus.Unavailable(BiometricUnavailability.NotEnrolled),
+                session = SessionState.Unauthenticated,
             ),
             viewModel.uiState.value,
         )
@@ -115,6 +137,7 @@ class HomeViewModelTest {
             ),
             credentialManager = FakeCredentialManager(NivaraResult.Success(CredentialStatus.NotConfigured)),
             biometricAuthenticator = FakeBiometricAuthenticator(BiometricStatus.Disabled),
+            sessionManager = sessionManager(),
         )
 
         assertEquals(HomeUiState.Error, viewModel.uiState.value)
@@ -128,6 +151,7 @@ class HomeViewModelTest {
                 NivaraResult.Failure(IllegalStateException("unreadable")),
             ),
             biometricAuthenticator = FakeBiometricAuthenticator(BiometricStatus.Disabled),
+            sessionManager = sessionManager(),
         )
 
         assertEquals(HomeUiState.Error, viewModel.uiState.value)
@@ -138,7 +162,7 @@ class HomeViewModelTest {
         val provider = FakeDeviceSecurityProvider(NivaraResult.Failure(IllegalStateException("unavailable")))
         val credentials = FakeCredentialManager(NivaraResult.Success(CredentialStatus.NotConfigured))
         val biometrics = FakeBiometricAuthenticator(BiometricStatus.Disabled)
-        val viewModel = HomeViewModel(provider, credentials, biometrics)
+        val viewModel = HomeViewModel(provider, credentials, biometrics, sessionManager())
 
         assertEquals(HomeUiState.Error, viewModel.uiState.value)
         // The failed first load stops at the device check, so neither of the other two is asked.
@@ -153,6 +177,7 @@ class HomeViewModelTest {
                 deviceLockConfigured = true,
                 credentialType = null,
                 biometricStatus = BiometricStatus.Disabled,
+                session = SessionState.Unauthenticated,
             ),
             viewModel.uiState.value,
         )
@@ -160,6 +185,70 @@ class HomeViewModelTest {
         assertEquals(1, credentials.callCount)
         assertEquals(1, biometrics.callCount)
     }
+
+    @Test
+    fun `an open session is reported on the home screen`() {
+        val manager = sessionManager()
+        manager.establish(AuthenticationOutcome.Succeeded)
+
+        val viewModel = HomeViewModel(
+            deviceSecurityProvider = FakeDeviceSecurityProvider(NivaraResult.Success(true)),
+            credentialManager = FakeCredentialManager(NivaraResult.Success(CredentialStatus.NotConfigured)),
+            biometricAuthenticator = FakeBiometricAuthenticator(BiometricStatus.Disabled),
+            sessionManager = manager,
+        )
+
+        val state = viewModel.uiState.value as HomeUiState.Ready
+        assertTrue(state.session.isAuthenticated)
+        assertEquals(AuthenticationSource.Primary, (state.session as SessionState.Authenticated).source)
+    }
+
+    @Test
+    fun `quick lock closes the session and says so`() {
+        val manager = sessionManager()
+        manager.establish(AuthenticationOutcome.Succeeded)
+        val viewModel = HomeViewModel(
+            deviceSecurityProvider = FakeDeviceSecurityProvider(NivaraResult.Success(true)),
+            credentialManager = FakeCredentialManager(NivaraResult.Success(CredentialStatus.NotConfigured)),
+            biometricAuthenticator = FakeBiometricAuthenticator(BiometricStatus.Disabled),
+            sessionManager = manager,
+        )
+
+        viewModel.lockNow()
+
+        val state = viewModel.uiState.value as HomeUiState.Ready
+        assertFalse(state.session.isAuthenticated)
+        assertFalse(manager.isAuthenticated())
+        assertEquals(R.string.session_notice_locked, state.sessionNoticeRes)
+    }
+
+    @Test
+    fun `a session that expires updates the card without being asked`() {
+        val scheduler = TestCoroutineScheduler()
+        val manager = InMemorySessionManager(
+            timeProvider = time,
+            policy = testSessionPolicy(),
+            scope = CoroutineScope(UnconfinedTestDispatcher(scheduler) + SupervisorJob()),
+        )
+        manager.establish(AuthenticationOutcome.Succeeded)
+        val viewModel = HomeViewModel(
+            deviceSecurityProvider = FakeDeviceSecurityProvider(NivaraResult.Success(true)),
+            credentialManager = FakeCredentialManager(NivaraResult.Success(CredentialStatus.NotConfigured)),
+            biometricAuthenticator = FakeBiometricAuthenticator(BiometricStatus.Disabled),
+            sessionManager = manager,
+        )
+        assertTrue((viewModel.uiState.value as HomeUiState.Ready).session.isAuthenticated)
+
+        // The clock and the timer both move, as they would while the screen is open.
+        time.advanceBy(TEST_SESSION_TIMEOUT_MILLIS)
+        scheduler.advanceTimeBy(TEST_SESSION_TIMEOUT_MILLIS)
+        scheduler.runCurrent()
+
+        assertFalse((viewModel.uiState.value as HomeUiState.Ready).session.isAuthenticated)
+    }
+
+    /** The real session manager, on a clock the tests move and a timer that stays quiet. */
+    private fun sessionManager(): SessionManager = testSessionManager(time)
 
     private class FakeDeviceSecurityProvider(
         var nextResult: NivaraResult<Boolean>,

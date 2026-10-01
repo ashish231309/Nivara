@@ -15,6 +15,10 @@ import com.nivara.app.domain.security.BiometricPromptHost
 import com.nivara.app.domain.security.BiometricState
 import com.nivara.app.domain.security.BiometricStatus
 import com.nivara.app.domain.security.BiometricUnavailability
+import com.nivara.app.domain.security.SessionManager
+import com.nivara.app.domain.security.SessionState
+import com.nivara.app.testing.MutableTimeProvider
+import com.nivara.app.testing.testSessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -23,8 +27,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -264,6 +270,71 @@ class BiometricViewModelTest {
     }
 
     @Test
+    fun `an accepted biometric opens a session`() = runTest {
+        val sessionManager = testSessionManager(MutableTimeProvider())
+        val authenticator = FakeBiometricAuthenticator(
+            currentState = BiometricState(status = BiometricStatus.Enabled),
+            authenticateOutcome = BiometricAuthenticationOutcome.Succeeded,
+        )
+
+        val viewModel = viewModel(authenticator, sessionManager = sessionManager)
+        viewModel.authenticate()
+
+        val session = sessionManager.currentState()
+        assertTrue(session is SessionState.Authenticated)
+        assertEquals(AuthenticationSource.Biometric, (session as SessionState.Authenticated).source)
+    }
+
+    @Test
+    fun `a rejected biometric opens nothing`() = runTest {
+        val sessionManager = testSessionManager(MutableTimeProvider())
+        val authenticator = FakeBiometricAuthenticator(
+            currentState = BiometricState(status = BiometricStatus.Enabled),
+            authenticateOutcome = BiometricAuthenticationOutcome.Failed(
+                attemptsRemaining = 4,
+                blockedForMillis = 0L,
+            ),
+        )
+
+        val viewModel = viewModel(authenticator, sessionManager = sessionManager)
+        viewModel.authenticate()
+
+        assertFalse(sessionManager.currentState().isAuthenticated)
+        assertEquals(R.string.biometric_error_failed, readyState(viewModel).failure?.textRes)
+    }
+
+    @Test
+    fun `Android's lockout opens nothing either`() = runTest {
+        val sessionManager = testSessionManager(MutableTimeProvider())
+        val authenticator = FakeBiometricAuthenticator(
+            currentState = BiometricState(status = BiometricStatus.Enabled),
+            authenticateOutcome = BiometricAuthenticationOutcome.SystemBlocked(permanent = false),
+        )
+
+        val viewModel = viewModel(authenticator, sessionManager = sessionManager)
+        viewModel.authenticate()
+
+        assertFalse(sessionManager.currentState().isAuthenticated)
+        assertEquals(R.string.biometric_error_system_locked, readyState(viewModel).failure?.textRes)
+    }
+
+    @Test
+    fun `proving the primary credential for a change opens a primary session`() = runTest {
+        val sessionManager = testSessionManager(MutableTimeProvider())
+        val authenticator = FakeBiometricAuthenticator(
+            currentState = BiometricState(status = BiometricStatus.Disabled),
+        )
+
+        val viewModel = viewModel(authenticator, sessionManager = sessionManager)
+        viewModel.requestChange(BiometricPendingChange.TurnOn)
+        viewModel.submitPrimary(pin())
+
+        val session = sessionManager.currentState()
+        assertTrue(session is SessionState.Authenticated)
+        assertEquals(AuthenticationSource.Primary, (session as SessionState.Authenticated).source)
+    }
+
+    @Test
     fun `backing out of a pending change touches nothing`() = runTest {
         val authenticator = FakeBiometricAuthenticator(
             currentState = BiometricState(status = BiometricStatus.Disabled),
@@ -284,9 +355,11 @@ class BiometricViewModelTest {
     private fun viewModel(
         authenticator: FakeBiometricAuthenticator,
         credentials: FakeCredentialManager = FakeCredentialManager(),
+        sessionManager: SessionManager = testSessionManager(MutableTimeProvider()),
     ): BiometricViewModel = BiometricViewModel(
         authenticator = authenticator,
         credentialManager = credentials,
+        sessionManager = sessionManager,
         clockMillis = { NOW_MILLIS },
         backgroundDispatcher = UnconfinedTestDispatcher(),
     )

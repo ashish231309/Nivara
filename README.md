@@ -11,7 +11,7 @@ frameworks, and no dependencies that are not justified by code that exists.
 ## Project status
 
 The repository contains the **foundation release**, the **cryptographic core**, **primary
-credential enrolment** and **biometric unlock as a secondary path**.
+credential enrolment**, **biometric unlock as a secondary path** and the **session layer**.
 
 What works today:
 
@@ -22,16 +22,20 @@ What works today:
 - biometric unlock through Android's own `BiometricPrompt`, gated by a Keystore key that requires
   a strong biometric for every use, with its own failure policy and explicit handling of an
   invalidated key;
+- one in-memory authentication session, established by a primary-credential success or a
+  biometric success, expiring on a fixed timeout and ended immediately by Quick Lock;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
 
-Biometric unlock never replaces the primary credential and never unlocks anything by itself. There
-is still no session, no timeout, no app locking, no vault and no recovery flow — those are the
-stages that follow, and they consume the layers described in
-[`docs/crypto/README.md`](docs/crypto/README.md),
-[`docs/credential/README.md`](docs/credential/README.md) and
-[`docs/biometric/README.md`](docs/biometric/README.md).
+Biometric unlock never replaces the primary credential and never unlocks anything by itself, and
+the session is not one either: it is an authorization state held only while the process lives, and
+it holds no credential, no key and nothing on disk. There is still no app locking, no vault, no
+hidden apps and no recovery flow — those are the stages that follow, and they consume the layers
+described in [`docs/crypto/README.md`](docs/crypto/README.md),
+[`docs/credential/README.md`](docs/credential/README.md),
+[`docs/biometric/README.md`](docs/biometric/README.md) and
+[`docs/session/README.md`](docs/session/README.md).
 
 ## Planned capabilities
 
@@ -72,6 +76,7 @@ app/src/main/java/com/nivara/app/
 ├── data/                       Platform-backed implementations of those contracts
 │   ├── credential/             Credential record, counters and verifier
 │   ├── biometric/              Android's prompt, the NVBT record and its store
+│   ├── session/                The in-memory session manager
 │   └── security/               JCA, Android Keystore and device state
 └── ui/                         Compose UI
     ├── NivaraApp.kt            Root composable: app bar + navigation host
@@ -81,7 +86,8 @@ app/src/main/java/com/nivara/app/
     ├── home/                   Home screen, state and view model
     ├── about/                  About screen
     ├── credential/             Enrolment, verification and change screens
-    └── biometric/              Biometric settings, state and view model
+    ├── biometric/              Biometric settings, state and view model
+    └── session/                Session text shared by the screens that show it
 ```
 
 The layering is deliberately small: `ui` depends on `domain` contracts, `domain` has no
@@ -139,6 +145,10 @@ throttling and scans proving that no credential or derived key is ever written. 
 is covered the same way: the status rule, the failure policy, the record format, the translations
 of Android's own result codes, the rule that decides when removal needs another authentication, and
 the screen's state machine — including the separation between Nivara's delay and Android's lockout.
+
+The session layer is covered the same way: establishment from a success and from nothing else,
+validity either side of the expiry boundary, the timer closing the gate on its own, Quick Lock's
+immediacy and idempotency, and the separation between the session and both throttling counters.
 
 Instrumented tests cover what only a device can prove: Android Keystore key generation,
 non-exportability, invalidation detection and use through a cipher, and that the biometric key
@@ -226,6 +236,23 @@ handling of an enrolment change — is in [`docs/biometric/README.md`](docs/biom
 | Failure policy | Five free failures, then one attempt per 30 seconds; reset by success or by a successful primary-credential authentication |
 | Android's lockout | Reported as the platform's, never bypassed, never shortened, never claimed as clearable |
 | Failures vs credential | Separate counters, separate files, separate types — a biometric failure never counts as a credential failure |
+
+## Sessions
+
+Nivara keeps exactly one authentication session, in memory, behind a `SessionManager`. A primary
+credential success and a biometric success both arrive at the same gate; nothing else opens it. The
+session holds the factor that opened it and when it ends — no credential, no key, no token — and it
+is never written anywhere, so a recreated process is unauthenticated. The rules, the boundary and
+Quick Lock are documented in [`docs/session/README.md`](docs/session/README.md).
+
+| Concern | Behaviour |
+| --- | --- |
+| Established by | A successful primary-credential or biometric authentication, and nothing else |
+| Timeout | Five minutes, by default, as a configurable value; valid strictly before expiry |
+| Extended by | Nothing — a new authentication starts a new session with a new deadline |
+| Quick Lock | `sessionManager.lockNow()`: immediate, idempotent, and reusable by later features |
+| Persistence | None. No preferences, files or database; ending the process ends the session |
+| Failure counters | Never read, advanced or reset by the session; credential and biometric policies are untouched |
 
 ## Repository checks
 

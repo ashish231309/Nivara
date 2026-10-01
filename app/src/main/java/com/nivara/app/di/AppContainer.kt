@@ -8,6 +8,7 @@ import com.nivara.app.data.credential.PersistedAttemptTracker
 import com.nivara.app.data.biometric.AndroidBiometricAuthenticator
 import com.nivara.app.data.biometric.BiometricTokenStore
 import com.nivara.app.data.credential.SystemTimeProvider
+import com.nivara.app.data.session.InMemorySessionManager
 import com.nivara.app.data.security.AndroidBiometricKeyStore
 import com.nivara.app.data.security.AndroidDeviceSecurityProvider
 import com.nivara.app.data.security.AndroidKeystoreDeviceKeyStore
@@ -25,6 +26,8 @@ import com.nivara.app.domain.security.DeviceSecurityProvider
 import com.nivara.app.domain.security.EncryptionService
 import com.nivara.app.domain.security.KeyDerivationService
 import com.nivara.app.domain.security.RecoveryKeyEnvelopeService
+import com.nivara.app.domain.security.SessionManager
+import com.nivara.app.domain.security.SessionTimeoutPolicy
 import com.nivara.app.domain.security.SecureRandomGenerator
 import java.io.File
 
@@ -67,6 +70,15 @@ interface AppContainer {
      * replace one.
      */
     val biometricAuthenticator: BiometricAuthenticator
+
+    /**
+     * The single authentication session gate, shared by the whole process.
+     *
+     * One instance per process on purpose: a session is an authorization state, and two of them
+     * would be two answers to the same question. It holds nothing on disk, so ending the process
+     * ends the session.
+     */
+    val sessionManager: SessionManager
 }
 
 /**
@@ -136,6 +148,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
             ),
             random = secureRandomGenerator,
             timeProvider = timeProvider,
+        )
+    }
+
+    override val sessionManager: SessionManager by lazy {
+        // Held in memory for the life of the process, and built on the same clock as every other
+        // timed rule in the application. Nothing here reaches storage.
+        InMemorySessionManager(
+            timeProvider = timeProvider,
+            policy = SessionTimeoutPolicy.Default,
         )
     }
 

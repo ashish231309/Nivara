@@ -156,6 +156,12 @@ for path in kt_files:
     for m2 in re.finditer(r"^(?:internal |private |public )*(?:inline )?(?:val|var)\s+"
                           r"[\w.<>?,*\[\] ]+\.\s*([A-Za-z_]\w*)", text, re.MULTILINE):
         declared_symbols.add(m2.group(1))
+    # Top-level properties and constants, which are imported by name like anything else. Only
+    # column-zero declarations are collected, so a class member (indented) is never mistaken for a
+    # package-level symbol that an import could legitimately resolve to.
+    for m2 in re.finditer(r"^(?:internal |private |public )?(?:const |inline )?(?:val|var)\s+"
+                          r"([A-Za-z_]\w*)\s*[:=]", text, re.MULTILINE):
+        declared_symbols.add(m2.group(1))
 
 for path in kt_files:
     rel = path.relative_to(ROOT)
@@ -294,7 +300,8 @@ for path in main_kt:
 # ---------------------------------------------------------------- cryptographic hygiene
 security_sources = sorted((ROOT / "app/src/main/java/com/nivara/app/domain/security").glob("*.kt")) + \
     sorted((ROOT / "app/src/main/java/com/nivara/app/data/security").glob("*.kt")) + \
-    sorted((ROOT / "app/src/main/java/com/nivara/app/data/biometric").glob("*.kt"))
+    sorted((ROOT / "app/src/main/java/com/nivara/app/data/biometric").glob("*.kt")) + \
+    sorted((ROOT / "app/src/main/java/com/nivara/app/data/session").glob("*.kt"))
 main_all_kt = sorted((ROOT / "app/src/main").rglob("*.kt"))
 
 for path in security_sources:
@@ -373,7 +380,7 @@ for path in sorted((ROOT / "app/src/main/java/com/nivara/app/domain/security").g
 # on the platform prompt (data/biometric) rather than on the key store alone (data/security).
 container = (ROOT / "app/src/main/java/com/nivara/app/di/AppContainer.kt").read_text()
 contracts = sorted(p.stem for p in (ROOT / "app/src/main/java/com/nivara/app/domain/security").glob("*.kt")
-                   if p.stem.endswith(("Service", "Provider", "Store", "Wrapper", "Authenticator")))
+                   if p.stem.endswith(("Service", "Provider", "Store", "Wrapper", "Authenticator", "Manager")))
 for contract in contracts:
     if contract not in container:
         err(f"AppContainer does not expose the '{contract}' contract")

@@ -168,4 +168,16 @@
     <string name="biometric_prompt_disable_title">Confirm it is you</string>
     <string name="biometric_prompt_disable_subtitle">Authenticate to turn off biometric unlock.</string>
     <string name="biometric_prompt_negative">Cancel</string>
+
+    <!-- Session: the in-memory authorization state, its timeout and Quick Lock. -->
+    <string name="session_title">Nivara session</string>
+    <string name="session_status_authenticated">Unlocked — session active</string>
+    <string name="session_status_locked">Locked — authentication required</string>
+    <string name="session_summary_locked">Nivara locks itself after a period of inactivity, and whenever you lock it. Nothing is kept on disk, so closing the app ends the session too.</string>
+    <string name="session_source_primary">Opened with your primary credential. Biometrics stay a shortcut, and the credential still works on its own.</string>
+    <string name="session_source_biometric">Opened with Android biometrics. Your primary credential is unchanged and still works on its own.</string>
+    <string name="session_action_lock">Lock now</string>
+    <string name="session_notice_locked">Nivara is locked. Authenticate again to continue.</string>
+    <string name="session_notice_ended">The session ended. Authenticate again to continue.</string>
+    <string name="session_locked_note">This is Nivara's own session, not the device's screen lock: locking it does not touch your credential, your biometric enrolment or any stored file.</string>
 </resources>
