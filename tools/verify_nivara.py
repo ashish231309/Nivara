@@ -1267,7 +1267,8 @@ for name in declared_destinations:
 
 # documentation that the code refers to must exist
 for doc in ("docs/crypto/envelope-format.md", "docs/crypto/README.md", "docs/apphide/README.md",
-            "docs/launcher/README.md", "docs/camouflage/README.md", "tools/crypto_reference.py"):
+            "docs/launcher/README.md", "docs/camouflage/README.md", "docs/vault/README.md",
+            "tools/crypto_reference.py"):
     if not (ROOT / doc).exists():
         err(f"documentation or tooling referenced by the code is missing: {doc}")
 
@@ -1281,6 +1282,294 @@ for path in sorted(ROOT.rglob("*.kt")):
     for match in re.finditer(pattern, path.read_text()):
         warn(f"{path.relative_to(ROOT)}: integer literal compared with a byte expression "
              f"({match.group(0).strip()}) - box the literal with .toByte()")
+
+# ---------------------------------------------------------------- external encrypted vault
+# The vault is a storage foundation: where it lives, whether one exists there, and creating one. These
+# rules pin the boundaries the stage is built on — a domain that knows nothing about Android, all
+# platform storage behind one data-layer seam, no second cryptography, no session or credential inside
+# storage, no way to select a root automatically — and, above all, no state that can be read as "the
+# vault is empty" when what actually happened is damage, a lost key or an unreachable folder.
+vault_domain_dir = ROOT / "app/src/main/java/com/nivara/app/domain/vault"
+vault_data_dir = ROOT / "app/src/main/java/com/nivara/app/data/vault"
+vault_ui_dir = ROOT / "app/src/main/java/com/nivara/app/ui/vault"
+for directory, names in (
+    (vault_domain_dir, ["VaultState.kt", "VaultRepository.kt", "VaultLocationStore.kt", "VaultFailure.kt"]),
+    (vault_data_dir, ["VaultRecordCodec.kt", "VaultRootStorage.kt", "SafVaultRootStorage.kt",
+                      "FileVaultLocationStore.kt", "VaultLocationCodec.kt", "NivaraVaultRepository.kt"]),
+    (vault_ui_dir, ["VaultUiState.kt", "VaultViewModel.kt", "VaultMessages.kt", "VaultScreen.kt"]),
+):
+    if not directory.is_dir():
+        err(f"the vault layer is missing: {directory.relative_to(ROOT)}")
+        continue
+    for name in names:
+        if not (directory / name).exists():
+            err(f"the vault layer is missing {directory.relative_to(ROOT)}/{name}")
+
+vault_domain_sources = sorted(vault_domain_dir.glob("*.kt")) if vault_domain_dir.is_dir() else []
+vault_data_sources = sorted(vault_data_dir.glob("*.kt")) if vault_data_dir.is_dir() else []
+vault_ui_sources = sorted(vault_ui_dir.glob("*.kt")) if vault_ui_dir.is_dir() else []
+if not vault_domain_sources or not vault_data_sources or not vault_ui_sources:
+    err("no vault sources were found")
+
+# The domain is what the rest of the application reasons about, so it must not know what a platform
+# is. Word boundaries are used so an identifier such as `EncryptionContext` is not mistaken for a
+# context, and the check runs on code with comments removed, so documentation may discuss all of this.
+for path in vault_domain_sources:
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bandroid\.", "an Android type"),
+        (r"\bjava\.io\b", "a platform file type"),
+        (r"\bjava\.net\b", "a platform network type"),
+        (r"\bUri\b", "a platform URI"),
+        (r"\bDocumentFile\b", "a document handle"),
+        (r"\bContext\b", "an Android context"),
+        (r"\bContentResolver\b", "a platform content resolver"),
+        (r"\bEncryptionKey\b", "key material"),
+        (r"\bSensitiveBytes\b", "raw secret bytes"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the vault domain must not mention {why}")
+
+# Platform storage is one seam. Document handles are handled in two named owners and nowhere else: the
+# Storage Access Framework implementation, and the store that takes the durable grant on the user's
+# selection. Everything above them speaks of named children, bytes and typed failures.
+saf_owner = vault_data_dir / "SafVaultRootStorage.kt"
+location_owner = vault_data_dir / "FileVaultLocationStore.kt"
+for owner in (saf_owner, location_owner):
+    if owner.exists():
+        owner_code = strip_comments(owner.read_text())
+        if "DocumentsContract" not in owner_code:
+            err(f"{owner.relative_to(ROOT)} must be where document access happens")
+for path in vault_data_sources:
+    if path.name in ("SafVaultRootStorage.kt", "FileVaultLocationStore.kt"):
+        continue
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bDocumentsContract\b", "document access"),
+        (r"\bContentResolver\b", "a content resolver"),
+        (r"\bUri\b", "a platform URI"),
+        (r"\bandroid\.content\.", "an Android content type"),
+        (r"\bandroid\.net\.", "an Android network type"),
+        (r"\bandroid\.provider\.", "an Android provider type"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: {why} belongs to the storage seam, not to the vault's logic")
+
+# There is one cryptographic implementation in the project, and the vault uses it. No vault source may
+# reach for a primitive of its own: the ciphers, key generators, digests and randomness all live in the
+# security layer, and a second copy here would be a second set of rules for the same vault.
+for path in vault_domain_sources + vault_data_sources:
+    code = strip_comments(path.read_text())
+    for pattern in (r"\bjavax\.crypto\b", r"\bjava\.security\b", r"\bCipher\b", r"\bSecretKeySpec\b",
+                    r"\bKeyGenerator\b", r"\bMessageDigest\b", r"\bMac\b", r"\bSecureRandom\b"):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the vault must use the existing cryptographic services, not "
+                f"'{pattern}'")
+
+# The repository is where the vault's key hierarchy is assembled, and it is assembled from the Stage 2
+# contracts only. It also must not touch a credential, a session or a biometric: creating a vault needs
+# the session gate, and the gate belongs to the screen, not to storage.
+vault_repository_source = vault_data_dir / "NivaraVaultRepository.kt"
+if vault_repository_source.exists():
+    repository_code = strip_comments(vault_repository_source.read_text())
+    for contract in ("ContentKeyWrapper", "EncryptionService", "DeviceKeyStore", "SecureRandomGenerator",
+                     "EncryptionContext"):
+        if contract not in repository_code:
+            err(f"the vault repository must use the existing {contract} service")
+    for pattern, why in (
+        (r"\bKeyDerivationService\b", "credential-based key derivation"),
+        (r"\bCredentialManager\b", "the credential layer"),
+        (r"\bSessionManager\b", "the session gate"),
+        (r"\bBiometricAuthenticator\b", "biometrics"),
+        (r"\bDeviceSecurityProvider\b", "the device security posture"),
+    ):
+        if re.search(pattern, repository_code):
+            err(f"the vault repository must not use {why}")
+    # A written record is only committed after it has been read back and opened again, and the clear
+    # header's generation must agree with the sealed payload: that pair of checks is what stops an
+    # edited header from promoting an older record and what stops a dropped write from looking like a
+    # created vault.
+    if "VerificationFailed" not in repository_code:
+        err("the vault repository must verify a written record by reading it back")
+    if "generation != header.generation" not in repository_code:
+        err("the vault repository must check the sealed generation against the clear header")
+
+# The screen state carries no key material and no platform handle: what is drawn is the vault's state
+# and its words, and nothing that could open the vault ever reaches a Compose state.
+for path in vault_ui_sources:
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bByteArray\b", "raw bytes"),
+        (r"\bEncryptionKey\b", "key material"),
+        (r"\bSensitiveBytes\b", "raw secret bytes"),
+        (r"\bAtomicFiles\b", "the atomic-write mechanism"),
+        (r"\bjava\.io\b", "a platform file type"),
+        (r"\bContentResolver\b", "a content resolver"),
+        (r"\bDocumentsContract\b", "document access"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the vault's presentation layer must not carry {why}")
+
+# A session is asked for, never kept: the vault screen reads the existing gate and hands the user to the
+# existing credential screen. It must not establish a session, end one, count an attempt or derive a key
+# from anything the user types — there is no second vault password in this project.
+vault_view_model_source = vault_ui_dir / "VaultViewModel.kt"
+if vault_view_model_source.exists():
+    view_model_code = strip_comments(vault_view_model_source.read_text())
+    if "SessionManager" not in view_model_code:
+        err("the vault screen must ask the existing session gate whether a change is authorized")
+    for pattern, why in (
+        (r"\bestablish\s*\(", "establish a session"),
+        (r"\blockNow\s*\(", "end a session"),
+        (r"\bCredentialManager\b", "the credential layer"),
+        (r"\bKeyDerivationService\b", "key derivation"),
+        (r"\bBiometricAuthenticator\b", "biometrics"),
+    ):
+        if re.search(pattern, view_model_code):
+            err(f"the vault screen must not {why}: that is the existing gate's business")
+
+# Independence: the vault has nothing to do with the name and icon Nivara presents, with the hidden set,
+# with the protected set or with App Lock. Camouflage is presentation, hiding is configuration, and the
+# vault is storage; a reference either way would be the beginning of a secret route.
+for path in vault_domain_sources + vault_data_sources + vault_ui_sources:
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"[Cc]amouflage", "the application's identity"),
+        (r"[Hh]iddenApplication", "the hidden-application set"),
+        (r"\bAppLock\b", "App Lock"),
+        (r"[Pp]rotectedApplication", "the protected-application set"),
+        (r"\bOverlayCapability", "the overlay capability"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the vault must be independent of {why}")
+
+# Nothing about storage is printed, logged or reported: a URI, a document name, a path and a vault
+# identifier are all things the product never needs in output, and the vault's own rule is that they
+# never reach one.
+for path in vault_domain_sources + vault_data_sources + vault_ui_sources:
+    code = strip_comments(path.read_text())
+    for pattern in (r"\bLog\.[vdiew]\b", r"\bprintln\s*\(", r"\bSystem\.out\b"):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the vault must not write to output ('{pattern}')")
+
+# An exception is never swallowed. Storage trouble is reported as a typed failure, and a failed read is
+# never an empty result: the difference between "I could not look" and "there is nothing there" is what
+# the whole stage is built to keep.
+for path in vault_domain_sources + vault_data_sources + vault_ui_sources:
+    for match in re.finditer(r"catch\s*\([^)]*\)\s*\{\s*\}", strip_comments(path.read_text())):
+        err(f"{path.relative_to(ROOT)}: a caught exception is ignored ({match.group(0).strip()})")
+
+# The vault uses the Storage Access Framework, so it needs no storage permission at all. Broad storage
+# permissions are not part of this application, and neither is a root chosen by Nivara itself: not a
+# public directory, not the application's own private storage, and no silent migration between them.
+for permission in ("MANAGE_EXTERNAL_STORAGE", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE",
+                   "READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_MEDIA_AUDIO"):
+    if permission in manifest:
+        err(f"the vault must not require {permission}: it uses the Storage Access Framework")
+for path in vault_domain_sources + vault_data_sources:
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"getExternalStorageDirectory", "the root of external storage"),
+        (r"getExternalFilesDir", "a directory the application picks by itself"),
+        (r"/storage/emulated", "a hard-coded storage path"),
+        (r"Environment\.DIRECTORY_", "one of Android's public directories"),
+        (r"\bDownloads?\b", "the Download folder"),
+        (r"\bDCIM\b", "the camera folder"),
+        (r"\bPictures\b", "the pictures folder"),
+        (r"[Ff]allback", "a fallback location"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: a vault root is the user's choice, never {why}")
+
+# The metadata is versioned and the version is checked. A record this build does not understand is
+# reported as such; it is never reinterpreted as a record it does, and it is never written over.
+vault_record_codec_source = vault_data_dir / "VaultRecordCodec.kt"
+if vault_record_codec_source.exists():
+    codec_code = strip_comments(vault_record_codec_source.read_text())
+    if "VERSION" not in codec_code:
+        err("the vault metadata record must carry a format version")
+    if "UnsupportedVersion" not in (vault_domain_dir / "VaultState.kt").read_text():
+        err("the vault must report a record it cannot read because it is newer")
+    if "fileVersion" not in (vault_domain_dir / "VaultState.kt").read_text():
+        err("an unsupported record must carry the version that was read")
+vault_location_store_source = location_owner
+if vault_location_store_source.exists():
+    if "AtomicFiles" not in strip_comments(vault_location_store_source.read_text()):
+        err("the stored vault location must be written through the project's atomic writer")
+
+# The structure created is exactly what is documented: two areas and two record slots, and nothing that
+# a later stage has not asked for yet.
+vault_structure_source = vault_data_dir / "VaultRootStorage.kt"
+if vault_structure_source.exists():
+    structure_code = strip_comments(vault_structure_source.read_text())
+    if "nivara.meta" not in structure_code or "nivara.content" not in structure_code:
+        err("the vault must create the metadata and content areas it documents")
+    if len(re.findall(r"const val \w*DIRECTORY\w*\s*[:=]", structure_code)) != 2:
+        err("the vault creates exactly two directories, and this stage documents them")
+
+# One owner per fact: the vault repository, the location store and the platform storage implementation
+# are constructed in the composition root and nowhere else in the application.
+for needle, defining_source, what in (
+    ("NivaraVaultRepository(", "NivaraVaultRepository.kt", "the vault repository"),
+    ("FileVaultLocationStore(", "FileVaultLocationStore.kt", "the vault location store"),
+    ("SafVaultRootStorage(", "SafVaultRootStorage.kt", "the platform vault storage"),
+):
+    # The class declaring the name is not an owner of it; everything else that mentions the
+    # constructor is, and there must be exactly one: the composition root.
+    owners = [p for p in main_kt
+              if needle in strip_comments(p.read_text()) and p.name != defining_source]
+    if len(owners) != 1 or owners[0].name != "AppContainer.kt":
+        err(f"{what} must be created only in the composition root (found in "
+            f"{[p.name for p in owners] or 'nothing'})")
+
+# Every state and every reason the domain declares has wording in the screen: a state with no message
+# would be drawn as whatever the reader guessed, which is how "cannot be read" becomes "no vault".
+vault_messages_source = vault_ui_dir / "VaultMessages.kt"
+vault_state_source = vault_domain_dir / "VaultState.kt"
+if vault_messages_source.exists() and vault_state_source.exists():
+    messages_code = strip_comments(vault_messages_source.read_text())
+    state_code = strip_comments(vault_state_source.read_text())
+    for state in re.findall(r"data (?:object|class) (\w+)\s*:\s*VaultState", state_code):
+        if f"VaultState.{state}" not in messages_code:
+            err(f"the vault screen has no wording for the state '{state}'")
+    reasons_block = re.search(r"enum class VaultUnreadable\s*\{(.*?)\}", state_code, re.S)
+    for reason in re.findall(r"^\s+(\w+),$", reasons_block.group(1) if reasons_block else "", re.M):
+        if f"VaultUnreadable.{reason}" not in messages_code:
+            err(f"the vault screen has no wording for the reason '{reason}'")
+
+# The vault is reached from the home screen like every other settings screen: under whatever identity
+# Nivara presents, through the ordinary surface, with no hidden route of its own.
+home_screen_source = (ROOT / "app/src/main/java/com/nivara/app/ui/home/HomeScreen.kt").read_text()
+if "onOpenVault" not in home_screen_source:
+    err("the home screen must offer the way into vault storage")
+
+# The vault's own local suites: the state model, the identifier, the two record codecs, the repository
+# with injectable storage failures, the screen's state machine and its wording.
+for suite in (
+    "app/src/test/java/com/nivara/app/domain/vault/VaultStateTest.kt",
+    "app/src/test/java/com/nivara/app/domain/vault/VaultIdentityTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/VaultRecordCodecTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/VaultLocationCodecTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/NivaraVaultRepositoryTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/VaultViewModelTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/VaultPresentationTest.kt",
+    "app/src/androidTest/java/com/nivara/app/ui/vault/VaultScreenTest.kt",
+):
+    if not (ROOT / suite).exists():
+        err(f"the vault's test suite is missing: {suite}")
+
+vault_tests = sum(len(re.findall(r"@Test\b", (ROOT / suite).read_text()))
+                  for suite in (
+                      "app/src/test/java/com/nivara/app/domain/vault/VaultStateTest.kt",
+                      "app/src/test/java/com/nivara/app/domain/vault/VaultIdentityTest.kt",
+                      "app/src/test/java/com/nivara/app/data/vault/VaultRecordCodecTest.kt",
+                      "app/src/test/java/com/nivara/app/data/vault/VaultLocationCodecTest.kt",
+                      "app/src/test/java/com/nivara/app/data/vault/NivaraVaultRepositoryTest.kt",
+                      "app/src/test/java/com/nivara/app/ui/vault/VaultViewModelTest.kt",
+                      "app/src/test/java/com/nivara/app/ui/vault/VaultPresentationTest.kt",
+                  ) if (ROOT / suite).exists())
+notes.append(f"vault review: {len(vault_domain_sources)} domain, {len(vault_data_sources)} data and "
+             f"{len(vault_ui_sources)} presentation sources; {vault_tests} local vault tests")
 
 # ---------------------------------------------------------------- wrapper / hygiene
 wrapper_props = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()

@@ -17,9 +17,10 @@ detection, the protection surface that presents the requirement and routes authe
 session, and the settings screen that chooses which applications are protected — the
 **hidden-app layer**: the record of which applications Nivara keeps out of sight, the screen that
 manages it, the **launcher**: Nivara as the device's Home application, with an app drawer that
-leaves hidden applications out and can show them again for as long as Nivara is unlocked — and the
+leaves hidden applications out and can show them again for as long as Nivara is unlocked — the
 **application identity**: the name and icon Nivara's launcher entry presents, and the ordinary route
-back to Nivara's own.
+back to Nivara's own — and the **vault storage foundation**: the folder the user chooses, the
+authenticated record that says a vault is there, and creating one.
 
 What works today:
 
@@ -59,6 +60,16 @@ What works today:
   still list Nivara, and the screen that offers it says so. What protects Nivara is unchanged too:
   the credential, biometric unlock, App Lock and the session timeout, none of which camouflage
   bypasses and none of which it weakens;
+- vault storage: the user chooses one folder through Android's own folder picker, and Nivara keeps a
+  durable reference to it and nothing else. Inside that folder it creates exactly two areas — an
+  authenticated, versioned metadata record and a place for encrypted content — and it never chooses a
+  location by itself, never falls back to another one, and never replaces a vault it can open. The
+  vault's key is generated on the device and stored only wrapped under a key that never leaves
+  Android's Keystore. What is at the folder is reported as one of a fixed set of states, so a record that
+  cannot be opened is never drawn as an empty vault: damaged metadata, a lost platform key, an
+  unfinished setup, a newer format, unreachable storage and a revoked grant are each their own
+  answer, and none of them deletes or repairs anything. Importing files, media, albums, search and
+  trash are later stages, and the screen says nothing it does not do;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
@@ -67,8 +78,8 @@ Biometric unlock never replaces the primary credential and never unlocks anythin
 the session is not one either: it is an authorization state held only while the process lives, and
 it holds no credential, no key and nothing on disk. Detection decides and publishes; the surface
 that presents a requirement is separate from it, holds no credential of its own and can do exactly
-one thing with an authentication result — hand it to the session gate. There is still no vault — that is
-the stage that follows, and it consumes the layers described in
+one thing with an authentication result — hand it to the session gate. The vault is storage and a state model, not a way
+to store a file yet — that is the stage that follows, and it consumes the layers described in
 [`docs/crypto/README.md`](docs/crypto/README.md),
 [`docs/credential/README.md`](docs/credential/README.md),
 [`docs/biometric/README.md`](docs/biometric/README.md),
@@ -76,10 +87,13 @@ the stage that follows, and it consumes the layers described in
 [`docs/applock/README.md`](docs/applock/README.md),
 [`docs/apphide/README.md`](docs/apphide/README.md),
 [`docs/launcher/README.md`](docs/launcher/README.md) and
-[`docs/camouflage/README.md`](docs/camouflage/README.md). Hiding an application means Nivara's own
+[`docs/camouflage/README.md`](docs/camouflage/README.md) and
+[`docs/vault/README.md`](docs/vault/README.md). Hiding an application means Nivara's own
 drawer leaves it out; Android's launcher still shows every application, and both the screens and the
 documentation say so. Camouflage means Nivara's own launcher entry shows a different name and icon;
-Android still lists Nivara by its package, and the screen that offers it says that too.
+Android still lists Nivara by its package, and the screen that offers it says that too. Vault storage
+means the vault lives in a folder the user picked, protected by encryption rather than by its
+location — the folder itself is not a secret, and the screen that configures it says so.
 
 ## Planned capabilities
 
@@ -129,7 +143,8 @@ app/src/main/java/com/nivara/app/
 │   ├── applock/                Protected set, detection, decision rule, overlay contract
 │   ├── apphide/                Hidden set, its repository contract and its failure cases
 │   ├── launcher/               What a launcher may draw, and the fail-closed rule for it
-│   └── camouflage/             What an identity is, and which one the device is presenting
+│   ├── camouflage/             What an identity is, and which one the device is presenting
+│   └── vault/                  What is at the vault root, its states and its failures
 ├── data/                       Platform-backed implementations of those contracts
 │   ├── app/                    Launcher-entry discovery through the package manager
 │   ├── applock/                Usage-event detector, protected set store, monitor, service
@@ -138,6 +153,7 @@ app/src/main/java/com/nivara/app/
 │   ├── biometric/              Android's prompt, the NVBT record and its store
 │   ├── permissions/            Usage Access app-op check, overlay check, settings entry points
 │   ├── session/                The in-memory session manager
+│   ├── vault/                  The storage seam, the two record codecs and the repository
 │   └── security/               JCA, Android Keystore and device state
 └── ui/                         Compose UI
     ├── NivaraApp.kt            Root composable: app bar + navigation host
@@ -155,6 +171,7 @@ app/src/main/java/com/nivara/app/
     ├── apphide/                Choosing which applications Nivara keeps out of sight
     ├── launcher/               The Home activity, the home surface and the app drawer
     ├── camouflage/             Choosing the name and icon Nivara presents under
+    ├── vault/                  Choosing the vault folder, and what is at it
     └── session/                Session text shared by the screens that show it
 ```
 
@@ -467,6 +484,27 @@ reached from the home screen and protected by the same session every other confi
 | What it is not | A security boundary, a way to hide the application, or a way to hide anything from Android |
 
 The full contract is in [`docs/camouflage/README.md`](docs/camouflage/README.md).
+
+## Vault storage
+
+The vault lives in **one folder the user chooses** through Android's own folder picker, and Nivara
+keeps a durable reference to that folder and nothing else. No storage permission is involved, and the
+folder can be on a memory card or in a synced location — which is also how the vault moves between
+devices.
+
+| Concern | Behaviour |
+| --- | --- |
+| Where the vault lives | The folder the user selected; Nivara never picks one, never falls back to another, and never moves a vault |
+| What is created | Exactly two areas inside that folder: an authenticated metadata record and a place for encrypted content |
+| The record | Versioned and authenticated; a vault's identity and wrapped key, sealed by the existing cryptographic layer, with nothing secret in the clear |
+| The key | Generated on the device, stored only wrapped under a key that never leaves Android's Keystore |
+| Creating a vault | Explicit, session-gated, and reported as done only after the record has been read back and opened |
+| Opening a vault | A read; nothing is created, repaired, deleted or replaced while looking |
+| What is at the folder | States from "no folder chosen" to "a newer Nivara wrote this" — damage, a lost key and unreachable storage are never drawn as an empty vault |
+| What it is not | A way to import or store a file yet, a second password, or a hidden route: the vault is reached from the home screen like any other settings screen |
+
+The full contract — the structure, the metadata format, the key hierarchy, the failure states and the
+verification status — is in [`docs/vault/README.md`](docs/vault/README.md).
 
 ## Repository checks
 
