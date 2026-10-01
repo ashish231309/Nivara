@@ -230,7 +230,11 @@ class AppLockManagementViewModelTest {
 
         model.protect(camera)
 
-        assertEquals("nothing is written to a configuration that cannot be read", 0, protected.protectCalls)
+        assertEquals(
+            "nothing is written to a configuration that cannot be read",
+            0,
+            protected.protectCalls.size,
+        )
         assertEquals(R.string.applock_manage_error_protected_set, failureRes(readyState(model)))
     }
 
@@ -300,8 +304,8 @@ class AppLockManagementViewModelTest {
         model.onQueryChange("")
 
         assertEquals("filtering is not a repository operation", readsBefore, repository.calls)
-        assertEquals(0, protected.protectCalls)
-        assertEquals(0, protected.unprotectCalls)
+        assertEquals(0, protected.protectCalls.size)
+        assertEquals(0, protected.unprotectCalls.size)
     }
 
     @Test
@@ -369,8 +373,8 @@ class AppLockManagementViewModelTest {
         model.onSortChange(ApplicationSortOrder.NameAscending)
 
         assertEquals(setOf("com.example.camera"), protected.stored)
-        assertEquals(0, protected.protectCalls)
-        assertEquals(0, protected.unprotectCalls)
+        assertEquals(0, protected.protectCalls.size)
+        assertEquals(0, protected.unprotectCalls.size)
         assertEquals(
             "and the rows still say what the stored set says",
             ApplicationProtectionState.Protected,

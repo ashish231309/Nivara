@@ -336,7 +336,7 @@ class AppLockManagementViewModel(
             busy = busy,
             failure = failure,
             noticeRes = noticeRes,
-            emptiness = emptinessOf(data, ordered),
+            emptiness = emptinessOf(data, visible, matching),
         )
     }
 
@@ -349,6 +349,7 @@ class AppLockManagementViewModel(
      */
     private fun emptinessOf(
         data: Loaded,
+        visible: List<InstalledApplication>,
         rows: List<InstalledApplication>,
     ): AppLockListEmptiness? = when {
         rows.isNotEmpty() -> null
@@ -357,7 +358,10 @@ class AppLockManagementViewModel(
 
         data.catalogue.isEmpty() -> AppLockListEmptiness.DeviceHasNoApplications
 
-        section == ApplicationSection.Protected -> AppLockListEmptiness.NothingProtected
+        // The section had something to show and the query is what emptied it: that is a search
+        // result. Saying "nothing is protected yet" here would be a different, and false, statement.
+        section == ApplicationSection.Protected && visible.isEmpty() ->
+            AppLockListEmptiness.NothingProtected
 
         else -> AppLockListEmptiness.NoSearchResults
     }
