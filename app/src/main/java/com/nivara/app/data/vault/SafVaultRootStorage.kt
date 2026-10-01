@@ -166,10 +166,10 @@ internal class SafVaultRootStorage(
         withContext(dispatcher) {
             nivaraRunCatching {
                 val directory = directoryUriOrThrow(VaultStructure.METADATA_DIRECTORY)
-                childUri(directory, entryName)?.let { existing ->
-                    if (!DocumentsContract.deleteDocument(resolver, existing)) {
-                        throw VaultRootException(VaultFailure.WriteFailed)
-                    }
+                val existing = childUri(directory, entryName)
+                // A document that is not there has already been deleted; nothing to do is success.
+                if (existing != null && !DocumentsContract.deleteDocument(resolver, existing)) {
+                    throw VaultRootException(VaultFailure.WriteFailed)
                 }
             }.mapVaultFailure(ioFailure = VaultFailure.WriteFailed)
         }
