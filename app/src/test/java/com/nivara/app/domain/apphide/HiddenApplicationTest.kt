@@ -61,8 +61,13 @@ class HiddenApplicationTest {
     }
 
     @Test
-    fun `a name that is not dotted is refused`() {
-        assertThrows(IllegalArgumentException::class.java) { HiddenApplication("camera") }
+    fun `a single-segment name is accepted, because the shared rule is deliberately loose`() {
+        // PackageNames refuses what could not be a package name at all — blanks, whitespace, path
+        // separators, illegal characters, unbounded length — and does not require a dot. The rule is
+        // shared with App Lock's protected set, so it is asserted here as it is rather than as it
+        // might be: a name that reaches this feature always comes from the platform's own catalogue,
+        // and tightening the shared rule is a change to both features at once.
+        assertEquals("camera", HiddenApplication("camera").packageName)
     }
 
     @Test

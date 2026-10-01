@@ -169,10 +169,10 @@ class HiddenApplicationCodecTest {
 
     @Test
     fun `a name that is not a package name is rejected even when the checksum fits`() {
-        // A single segment with no dot is not an application identity. The file is written the way a
-        // damaged one could be, with a correct checksum over the wrong content, so only the name rule
-        // can reject it.
-        val name = "camera".toByteArray(Charsets.UTF_8)
+        // A name containing a character an Android package name cannot contain. The file is written
+        // the way a damaged one could be, with a correct checksum over the wrong content, so only the
+        // name rule can reject it.
+        val name = "camera-lite".toByteArray(Charsets.UTF_8)
         val bytes = ByteArray(firstEntryIndex + 1 + name.size + 4)
         bytes[0] = 'N'.code.toByte()
         bytes[1] = 'V'.code.toByte()
