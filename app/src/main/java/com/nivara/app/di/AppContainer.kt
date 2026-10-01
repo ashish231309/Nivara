@@ -26,6 +26,12 @@ import com.nivara.app.data.vault.NivaraVaultRepository
 import com.nivara.app.data.vault.SafDocumentSourceOpener
 import com.nivara.app.data.vault.SafVaultContentStorage
 import com.nivara.app.data.vault.SafVaultRootStorage
+import com.nivara.app.data.vault.viewer.NivaraDocumentEngineFactory
+import com.nivara.app.data.vault.viewer.NivaraMediaEngineFactory
+import com.nivara.app.data.vault.viewer.NivaraVaultImageEngine
+import com.nivara.app.data.vault.viewer.VaultDocumentEngineFactory
+import com.nivara.app.data.vault.viewer.VaultImageEngine
+import com.nivara.app.data.vault.viewer.VaultMediaEngineFactory
 import com.nivara.app.domain.app.ApplicationLauncher
 import com.nivara.app.domain.app.ApplicationRepository
 import com.nivara.app.domain.applock.AppLockMonitor
@@ -258,6 +264,20 @@ interface AppContainer {
      * document picker and the vault's key stay behind it. See docs/vault/README.md.
      */
     val vaultIndexRepository: VaultIndexRepository
+
+    /**
+     * The engine that decodes an imported image, inside the viewer's memory bound.
+     *
+     * Shared, because a decode is a call rather than a session: it borrows the vault's key, reads the
+     * image within that borrow, and keeps nothing but the decoded bitmap the viewer releases.
+     */
+    val vaultImageEngine: VaultImageEngine
+
+    /** Creates the media engine for one viewer. */
+    val vaultMediaEngines: VaultMediaEngineFactory
+
+    /** Creates the document engine for one viewer. */
+    val vaultDocumentEngines: VaultDocumentEngineFactory
 }
 
 /**
@@ -493,8 +513,13 @@ class DefaultAppContainer(context: Context) : AppContainer {
      * key, the existing encryption service, and two platform adapters that are the only classes in the
      * vault that know what a document is: one for the metadata area, one for the file that was picked.
      * Nothing is cached between imports, and no reference to a picked file outlives the import.
+     *
+     * The concrete type is kept here because this one object serves two contracts: the screen's
+     * [VaultIndexRepository] and the viewer's content reader. Both are the same instance on purpose —
+     * the locking, the index slot survey and the one place a file is decrypted belong together, and a
+     * second reader would be a second set of rules for the same encrypted objects.
      */
-    override val vaultIndexRepository: VaultIndexRepository by lazy {
+    private val nivaraVaultIndex: NivaraVaultIndexRepository by lazy {
         NivaraVaultIndexRepository(
             vaultRepository = nivaraVaultStorage,
             keyAccess = nivaraVaultStorage,
@@ -508,6 +533,32 @@ class DefaultAppContainer(context: Context) : AppContainer {
             encryptionService = encryptionService,
             random = secureRandomGenerator,
         )
+    }
+
+    override val vaultIndexRepository: VaultIndexRepository get() = nivaraVaultIndex
+
+    /**
+     * The engines that show an imported file.
+     *
+     * Each is built from the vault's index repository — the one object that holds the key borrow and
+     * reads the encrypted objects — so a viewer reads through the single decryption path the project
+     * has. No engine holds a key of its own, touches storage directly or knows a cipher.
+     *
+     * The image engine is shared because a decode is a call: it opens a borrow, reads inside it, and
+     * keeps only the decoded bitmap the viewer releases. The other two are factories because an
+     * engine *holds* a borrow for as long as a viewer is open: one is created per viewer, and that
+     * viewer releases it.
+     */
+    override val vaultImageEngine: VaultImageEngine by lazy {
+        NivaraVaultImageEngine(reader = nivaraVaultIndex)
+    }
+
+    override val vaultMediaEngines: VaultMediaEngineFactory by lazy {
+        NivaraMediaEngineFactory(reader = nivaraVaultIndex)
+    }
+
+    override val vaultDocumentEngines: VaultDocumentEngineFactory by lazy {
+        NivaraDocumentEngineFactory(context = applicationContext, reader = nivaraVaultIndex)
     }
 
     /** One wall clock for every throttling rule in the application. */

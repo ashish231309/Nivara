@@ -4,7 +4,7 @@ This document records what Nivara's vault storage is, where it lives, what is wr
 the user chooses, which key protects it, how a vault is created and reopened, and what every failure
 state means. It is the durable reference for the storage foundation, not a walkthrough of the screen.
 
-It covers two stages:
+It covers three stages:
 
 * **[Stage 13: external encrypted vault storage](#stage-13-external-encrypted-vault-storage)** — the
   vault root, its structure, its authenticated metadata record, and creating a vault at a root the
@@ -12,10 +12,14 @@ It covers two stages:
 * **[Stage 14: file import, content encryption and the vault index](#stage-14-file-import-content-encryption-and-the-vault-index)** —
   choosing one document, encrypting it into the vault as a bounded-memory stream, and recording it in
   an authenticated index that is only ever replaced once its replacement has been read back.
+* **[Stage 15: viewing a stored file](#stage-15-viewing-a-stored-file)** — opening one listed file
+  again: what Nivara can draw, play and read, how the content is decrypted without a plaintext copy
+  anywhere, and what happens when a file is unsupported, missing, unreadable, damaged, or opened while
+  the session ends.
 
-Still **not** covered here, because it does not exist yet: presenting a stored file, media and
-document rendering, albums, search and sorting, trash and restore, recovery, and the vault's visual
-polish. This document describes what is implemented, and nothing else.
+Still **not** covered here, because it does not exist yet: albums, search and sorting, tags and
+favourites, trash and restore, permanent deletion, recovery after reinstalling, sharing or exporting —
+and the vault's visual polish. This document describes what is implemented, and nothing else.
 
 # Stage 13: external encrypted vault storage
 
@@ -546,3 +550,269 @@ emulator is attached. Nothing here claims that a particular provider returns a d
 that a provider honours a rename, that a large file encrypts at a particular speed, or what a device
 does when the process is killed mid-import — those are platform behaviours that require a device to
 observe, and the code is written to fail safely when they do not hold.
+
+
+# Stage 15: viewing a stored file
+
+## Purpose
+
+An imported file is only worth keeping if it can be opened again, and it is only worth trusting if
+opening it does not undo what the vault is for. This stage delivers the smallest honest version of
+that:
+
+* **one classifier** that decides what a file is from the type the index authenticated, never from its
+  name;
+* **one content reader** that every viewer reads through — the streaming decryption Stage 14 already
+  wrote, served in bounded pieces, with the session asked before each piece;
+* **one viewer per kind** that this build can genuinely show: a picture, the platform's media stack for
+  video and audio, bounded text, and PDF pages rendered through a proxy file descriptor;
+* **one description** for everything else, with the file's facts and no guessing;
+* **one ending**: when the session ends — by itself or through Quick Lock — the reader stops, the
+  player and every decoder are released, and the screen says the vault is locked.
+
+Nothing here creates a second vault key, a second root, a second index, a second authentication
+prompt or a second encrypted format. A viewer is a *reader* of what Stage 13 and Stage 14 already
+write.
+
+## What a stored file is, and which viewer it gets
+
+The classification lives in the domain, is free of Android types, and is the same one the list uses —
+so the label on a row and the viewer that opens from it can never disagree. It works from the declared
+type stored in the authenticated index:
+
+* the type is normalised first (lower case, parameters such as `; charset=utf-8` removed);
+* the **family** comes from the type itself: `image/`, `video/`, `audio/`, `text/`;
+* a type that is missing, blank, over-long or malformed is treated as no type at all, and the file is
+  `Other` — a generic file with its facts, never a guess from its extension;
+* a document Nivara recognises but cannot render is still a **document**: the screen says plainly that
+  this build has no viewer for it rather than pretending the file is something else.
+
+Nothing about the classifier is stored. The index keeps what the provider declared and the bytes; the
+classification is presentation, so a later stage can classify something differently without a single
+file being rewritten.
+
+## Formats: what is shown, played or read, and what is only described
+
+The set is bounded on purpose. "Whatever the platform happens to accept" is not a policy — it would
+make what Nivara shows depend on the device and the codec pack of the moment — so these are the sets
+Nivara attempts, and everything outside them is a generic file with metadata.
+
+| Kind | Types Nivara attempts to show | How |
+| --- | --- | --- |
+| Image | `image/jpeg`, `image/png`, `image/webp`, `image/gif`, `image/bmp`, `image/heic`, `image/heif` | The platform's image decoder, sampled to a bound |
+| Video | `video/mp4`, `video/webm`, `video/3gpp`, `video/mpeg`, `video/x-matroska` | The platform's `MediaPlayer`, over a media data source fed by the vault's decryption |
+| Audio | `audio/mpeg`, `audio/mp4`, `audio/aac`, `audio/wav`, `audio/x-wav`, `audio/ogg`, `audio/flac`, `audio/x-flac`, `audio/opus` | The same player, with no drawing surface |
+| Text | `text/plain`, `text/csv`, `text/markdown`, `text/xml`, `application/json`, `application/xml` | Read into a bounded preview through the content handle |
+| Document | `application/pdf` | `PdfRenderer` over a proxy file descriptor served from the decrypted stream |
+| Described only | `application/msword`, `application/vnd.ms-excel`, `application/vnd.ms-powerpoint`, `application/rtf`, `text/rtf`, `application/zip`, `application/x-tar`, `application/gzip`, and every `application/vnd.openxmlformats-officedocument.*` | No viewer: the file's name, type, size and arrival time, and a sentence saying this build cannot show it |
+| Everything else | Anything whose declared type is missing, malformed or unfamiliar | The same description, with no claim about what is inside |
+
+Two honest qualifications belong here rather than in a later correction:
+
+* **Attempting is not guaranteeing.** Whether a particular device decodes a particular HEIC photograph,
+  a particular Matroska video or a particular Opus stream is the platform's answer, not Nivara's. A
+  file the platform refuses becomes "this device could not display the file" — never an empty vault,
+  never a claim of damage.
+* **Office documents and archives are represented, not rendered.** Nivara recognises them as documents,
+  lists them with their facts, and explains that there is no viewer. It does not extract their
+  contents, does not hand them to another application, and never claims otherwise.
+
+## Reading content: one decryption path, in bounded pieces
+
+Everything a viewer reads comes through one content reader, which is the streaming decryption of
+Stage 14 running as a producer into **one bounded pipe** (128 KiB):
+
+```
+storage ──ciphertext──▶ existing decryptStream ──▶ one bounded pipe ──read()──▶ decoder
+                                                    producer coroutine
+```
+
+* The decryption is not re-implemented, wrapped or shortened: a viewer that needed its own cipher
+  would be a second set of rules for the same format. The verifier refuses a cipher, a digest, a MAC,
+  a random source, a key type, a key store, the encryption service or the vault's key borrow anywhere
+  in the viewing layer.
+* Nothing is buffered whole. An item is never read into a `ByteArray`, never converted to base64, and
+  never written to the application's private storage to be rendered from. The only memory a read
+  costs is the pipe, the service's own chunk buffers, and whatever a decoder allocates.
+* **The handle is sequential, and stays sequential.** Every record of the object authenticates in
+  order, so a reader that could ask for an arbitrary offset would be trusting bytes it had not
+  checked. `restart()` begins the item again from its first record — that is what an image decoder
+  scanning a file twice, or a player seeking backwards, does instead of keeping a copy. Seeking
+  *forwards* decrypts and discards the bytes in between: bounded memory, not constant time, and the
+  viewer's own documentation says so.
+* **The session is asked before every piece**, and the answer decides whether the next piece is
+  served. A session that ends mid-read stops the read at the next read, whatever the screen is doing,
+  so no plaintext is produced after the gate has closed — even if a screen never noticed.
+* A failed authentication is a failure, never a shorter file: a corrupt record ends the read with a
+  typed failure rather than being reported as the end of the item. A part of a file is not the file.
+
+## The picture
+
+The image engine decodes within an explicit bound, because a bitmap is the one place where a viewer's
+memory is inherently proportional to the content:
+
+* the decoder is asked for the dimensions first, and a declared size beyond 32 768 pixels on a side is
+  refused rather than sampled;
+* sampling is then computed from those dimensions — a power of two, so the decoded image stays within
+  2 048 pixels on its longest side **and** within 4 000 000 pixels in total;
+* the item is restarted and decoded with that sampling, so a 50-megapixel photograph costs what a
+  screen can show rather than what the file holds;
+* the previous decode is recycled before a new one replaces it, and the picture is released when the
+  viewer closes;
+* the screen fits the picture to the width, offers a double-tap zoom to twice that, and says when a
+  picture was reduced — a softer image should not be a mystery.
+
+## Video and audio
+
+Both are the same engine over the platform's `MediaPlayer`, and they differ only in whether there is a
+drawing surface:
+
+* the player never receives the vault's key. It receives a **media data source**: the platform's own
+  abstraction for "give me the bytes at this offset and tell me how long you are", backed by the
+  content handle. The size the source reports is the size the authenticated index recorded;
+* playback controls are play, pause, a seek bar, the position and the duration where the platform
+  reports one, and a stop that is the release. A file whose length the player cannot report shows a
+  position with no total rather than inventing one;
+* the video surface belongs to the composable that draws it: it is handed to the engine when it exists
+  and withdrawn when it is destroyed, and the engine never holds it beyond that;
+* nothing plays in the background. Leaving the screen pauses playback; leaving the viewer releases the
+  player, the source, the content and the key borrow;
+* there is no plaintext video anywhere: no cache file, no whole-file buffer, no decoded copy on disk.
+
+## Documents
+
+* **Plain text** is read through the content handle into a preview bounded at 256 KiB, in 64 KiB
+  pieces. The whole object is still decrypted — that is what makes a damaged file fail instead of
+  showing a prefix — while only the bounded part is kept, and the screen says that it is showing the
+  beginning and how many characters that is.
+* **PDF** is the one platform API that genuinely needs seekable access: `PdfRenderer` cannot read a
+  stream. Nivara hands it a **proxy file descriptor** — the platform's mechanism for a descriptor
+  whose contents the application produces on demand — over the same content handle. There is no
+  plaintext file to leak: the descriptor is a kernel object that exists for the length of the viewer,
+  is served from the decrypted stream in bounded pieces, and disappears when the session is released.
+  This is the stage's whole answer to "a platform API requires seekable access": the safe mechanism
+  the platform provides, rather than a temporary decrypted copy of the file.
+* Pages are rendered one at a time into a bitmap bounded by the same maximum dimension the image
+  viewer uses, and released as the reader moves on.
+* **What that leaves unverified is stated plainly:** the render path needs a device with a PDF
+  renderer, so the JVM suites verify the engine's seams and the failure vocabulary, and the
+  instrumentation compiles the screen's half. Rendering a real PDF is verified only when the
+  instrumented suite runs on a device with content that a person imported.
+
+## Unsupported, missing, unreadable, damaged and locked
+
+Five sentences, kept apart, because collapsing them would be the mistake the whole vault exists to
+avoid:
+
+| State | What it means | What the screen offers |
+| --- | --- | --- |
+| Unsupported | The file is in the vault, its content is intact, and this build has no viewer for its type | The file's facts and an explanation; no controls, no retry |
+| Missing | The index names the file and its encrypted object is not in the vault | The entry, the explanation that nothing was deleted or forgotten, no retry |
+| Unreadable | The vault's storage could not be reached or refused the read | The explanation, and try again |
+| Damaged | The bytes did not authenticate; none of the file was shown | The explanation that not even the beginning is displayed, no retry |
+| Could not be displayed | The bytes authenticated and this device's decoder refused them | The explanation that the file is unaffected, and try again |
+| Locked | The session is not open | The existing unlock action, which leads to the credential screen that already exists |
+
+Missing, unlisted and unfinished content is first class, exactly as Stage 14 made it: a missing object
+never empties the vault, never removes the entry and never triggers a "repair", a viewer that cannot
+render a file never mutates the index, and one bad item never takes the list down with it. A viewer
+reads; it never imports, deletes, renames, creates, commits an index or deletes a temporary object.
+
+## The session, and Quick Lock
+
+The viewer has no session of its own. It asks the existing `SessionManager` whether the gate is open,
+watches the same gate while it is open, and never calls `establish` or `lockNow`, never refreshes a
+session because media is playing and never extends a timeout. Both halves are enforced: the verifier
+refuses those calls in the viewing layer, and a JVM suite drives the viewer through a recording
+wrapper around the production session manager and asserts that the viewer only ever *reads* it.
+
+**Quick Lock** is therefore already covered by the design rather than special-cased: locking the
+application from anywhere ends the session, the viewer's watcher releases the player, the decoders and
+the content, the state becomes locked, and the reader independently refuses the next piece because the
+plausible answer to "may I serve this byte?" is now no. Reopening goes through the existing
+authentication path — the credential screen the whole application already uses — and then the same
+item can be opened again. A fake-session test proves the viewer responds to invalidation.
+
+## Lifecycle
+
+The viewer is part of the vault screen rather than a destination of its own: it is one file from the
+list, so leaving it leaves nothing behind, and the view model that owns its content is cleared with
+the screen. There is no saved instance state for the viewer — a restorable viewer would be a viewer
+that claims to still hold content it has released.
+
+* **Entering** asks the gate; a closed gate shows the locked state and reads nothing.
+* **Leaving** (the back key, the explicit close action, or the screen going away) releases the player,
+  the media source, the document session, the renderer, the decoders, the pipe and the key borrow.
+  `onCleared` releases them too, so no borrow outlives the viewer.
+* **The screen leaving the foreground** pauses playback; coming back asks the gate again.
+* **Repeated closes are safe**, controls with nothing open are ignored, and a second tap cannot open a
+  second item over one that is still opening.
+
+## The list, and thumbnails
+
+The list is Stage 14's with one addition: each row shows the file's name, its type (as a word, from
+the one classifier), its size and when it arrived, and a tap opens it. Nothing else was added — no
+sorting controls, no search, no albums, no tags, no trash.
+
+There are **no thumbnails**: no thumbnail is generated, stored, cached or decoded ahead of time, and
+the list draws an icon for the file's *kind* rather than a picture of its contents. That is a
+deliberate limit, not an omission: a thumbnail is decrypted content, and a stored one would be a
+plaintext picture of the vault's contents sitting outside the encryption the vault exists to provide.
+
+## Permissions and platform boundaries
+
+No permission is added by this stage — no `READ_MEDIA_*`, no `MANAGE_EXTERNAL_STORAGE`, no broad
+storage access, no notification and no foreground service. The vault root's persisted Storage Access
+Framework grant is still the only way anything is reached, and a viewer reads only what the vault's
+own index names.
+
+Everything platform-shaped stays in the data layer: `MediaPlayer`, `BitmapFactory`, `PdfRenderer`,
+`SurfaceView` and the surface's lifecycle live in adapters behind `VaultMediaEngine`,
+`VaultImageEngine` and `VaultDocumentEngine`; the domain contracts and the viewer's state carry no
+Android type, no bitmap, no stream, no player and no key. No new dependency was added: the platform's
+own media stack, image decoder and PDF renderer are used, and nothing else was brought in.
+
+## Security and privacy boundaries
+
+* No key, content key, key-store object, cipher, nonce, wrapped blob or storage handle ever reaches a
+  screen: the viewer's state carries facts, counts and positions, and a JVM test asserts by reflection
+  that no state type could carry bytes, a stream, a decoder or a key.
+* No filename, plaintext, URI, path, identifier or nonce is logged, printed or reported anywhere; the
+  failures are fixed, non-secret sentences.
+* No plaintext temporary file, no plaintext cache and no persistent plaintext thumbnail exists — the
+  PDF path uses a proxy file descriptor instead of a file, which is the only place a platform API
+  asked for one.
+* No sharing, exporting, copying to Downloads, "open with" or `ACTION_SEND` exists anywhere in the
+  application; decrypted content leaves through a screen and nowhere else.
+* The original imported file is never touched, no vault object is deleted or modified because a viewer
+  could not render it, and a missing or unlisted object is reported rather than repaired.
+* No network, analytics, telemetry or usage history is involved: viewing is entirely local.
+
+## Scope
+
+Delivered: the content classifier, the content reader and its handle, the bounded pipe, the media data
+source, the image, media and document engines, the viewer's state machine and messages, the viewer
+inside the vault screen (open, controls, close, back, lifecycle), the list's type and open action, the
+verifier rules and the test suites.
+
+Deliberately **not** in this stage: albums, tags, favourites, search, sorting and any other way of
+organising the list; trash, restore and permanent deletion; recovery after reinstalling, backup and
+cloud sync; sharing, exporting or opening a file in another application; thumbnails and picture
+caching; zoom beyond a double tap, panning, or advanced gestures; a background playback service, a
+notification or a media session; and the vault's visual polish (Stage 16 onward).
+
+## Runtime verification status
+
+The classifier, the content reader, the handle's failure vocabulary and bounds, the engines' seams, the
+viewer's state machine, its session behaviour and its wording are verified by local JVM suites — 87
+tests across five suites — together with the static checks, which run on every change. The verifier's
+Stage 15 rules are themselves negative-tested: each one is broken on purpose and seen to fail, and the
+repository is restored byte for byte afterwards.
+
+What is **not** verified by those suites, and is therefore not claimed anywhere: the real image
+decoder, the platform's media playback (including whether a device seeks through a decrypted stream as
+expected), `PdfRenderer` on a real document, Storage Access Framework reads of real files, rendering of
+large files, and TalkBack traversal of the viewer. The instrumented suite covers the viewer screen's
+composition — each state, its words and its controls — and is **compiled but not executed** in
+continuous integration, because no device or emulator is attached. Claims about decoding, playback and
+rendering remain claims about code that compiles until a device runs it.

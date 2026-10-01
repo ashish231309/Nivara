@@ -7,6 +7,7 @@ import com.nivara.app.domain.credential.AuthenticationOutcome
 import com.nivara.app.domain.credential.TimeProvider
 import com.nivara.app.domain.security.SecureRandomGenerator
 import com.nivara.app.domain.security.SessionManager
+import com.nivara.app.domain.vault.VaultContentKind
 import com.nivara.app.domain.vault.VaultContentDigest
 import com.nivara.app.domain.vault.VaultImportFailure
 import com.nivara.app.domain.vault.VaultImportProgress
@@ -250,7 +251,18 @@ class VaultImportTest {
         assertTrue(
             ready(
                 vault = vaultReady,
-                index = VaultIndexUiState.Indexed(items = listOf(VaultItemUi("a.txt", 1L, 1L, "text/plain"))),
+                index = VaultIndexUiState.Indexed(
+                    items = listOf(
+                        VaultItemUi(
+                            id = VaultItemId.create(random),
+                            name = "a.txt",
+                            kind = VaultContentKind.Document,
+                            sizeBytes = 1L,
+                            importedAtEpochMillis = 1L,
+                            mimeType = "text/plain",
+                        ),
+                    ),
+                ),
             ).canImport,
         )
     }

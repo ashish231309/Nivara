@@ -1,5 +1,6 @@
 package com.nivara.app.ui.vault
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -37,6 +38,9 @@ import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.components.NivaraMessageText
 import com.nivara.app.ui.theme.NivaraTheme
+import com.nivara.app.ui.vault.viewer.VaultItemViewerScreen
+import com.nivara.app.ui.vault.viewer.VaultViewerUiState
+import com.nivara.app.ui.vault.viewer.VaultViewerViewModel
 
 /**
  * Stateful entry point of the vault screen.
@@ -55,13 +59,10 @@ fun VaultRoute(
     onUnlock: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: VaultViewModel = viewModel(factory = VaultViewModel.Factory),
+    viewerViewModel: VaultViewerViewModel = viewModel(factory = VaultViewerViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    LifecycleResumeEffect(Unit) {
-        viewModel.onResumed()
-        onPauseOrDispose { }
-    }
+    val viewerState by viewerViewModel.uiState.collectAsStateWithLifecycle()
 
     // The view model reports that a change needs a session; this screen does not authenticate and
     // does not change anything by itself. It asks for the existing credential screen.
@@ -92,17 +93,42 @@ fun VaultRoute(
         uri?.let { chosen -> viewModel.onFileSelected(chosen.toString()) }
     }
 
-    VaultScreen(
-        uiState = uiState,
-        onChooseRoot = { picker.launch(null) },
-        onImport = { documentPicker.launch(arrayOf("*/*")) },
-        onInitialize = viewModel::initialize,
-        onReplaceUnreadable = viewModel::replaceUnreadable,
-        onRetry = viewModel::refresh,
-        onUnlock = onUnlock,
-        onMessageShown = viewModel::onMessageShown,
-        modifier = modifier,
-    )
+    if (viewerState is VaultViewerUiState.Closed) {
+        VaultScreen(
+            uiState = uiState,
+            onChooseRoot = { picker.launch(null) },
+            onImport = { documentPicker.launch(arrayOf("*/*")) },
+            onOpenItem = { item -> viewerViewModel.open(item) },
+            onInitialize = viewModel::initialize,
+            onReplaceUnreadable = viewModel::replaceUnreadable,
+            onRetry = viewModel::refresh,
+            onUnlock = onUnlock,
+            onMessageShown = viewModel::onMessageShown,
+            modifier = modifier,
+        )
+    } else {
+        // The viewer is part of this screen rather than a destination of its own: it is one file from
+        // the list, and leaving it leaves nothing behind — the view model that owns its content is
+        // cleared with the screen.
+        BackHandler { viewerViewModel.close() }
+        VaultItemViewerScreen(
+            state = viewerState,
+            image = viewerViewModel.image,
+            text = viewerViewModel.text,
+            documentPage = viewerViewModel.documentPage,
+            onPlay = viewerViewModel::onPlay,
+            onPause = viewerViewModel::onPause,
+            onSeekTo = viewerViewModel::onSeekTo,
+            onNextPage = viewerViewModel::onNextPage,
+            onPreviousPage = viewerViewModel::onPreviousPage,
+            onSurfaceAvailable = viewerViewModel::onSurfaceAvailable,
+            onSurfaceDestroyed = viewerViewModel::onSurfaceDestroyed,
+            onRetry = viewerViewModel::onRetry,
+            onUnlock = onUnlock,
+            onClose = viewerViewModel::close,
+            modifier = modifier,
+        )
+    }
 }
 
 /**
@@ -128,6 +154,7 @@ fun VaultScreen(
     uiState: VaultUiState,
     onChooseRoot: () -> Unit,
     onImport: () -> Unit,
+    onOpenItem: (VaultItemUi) -> Unit,
     onInitialize: () -> Unit,
     onReplaceUnreadable: () -> Unit,
     onRetry: () -> Unit,
@@ -157,6 +184,7 @@ private fun VaultContent(
     state: VaultUiState.Ready,
     onChooseRoot: () -> Unit,
     onImport: () -> Unit,
+    onOpenItem: (VaultItemUi) -> Unit,
     onInitialize: () -> Unit,
     onReplaceUnreadable: () -> Unit,
     onRetry: () -> Unit,
@@ -248,7 +276,7 @@ private fun VaultContent(
         // can succeed: a vault that opens, a list that can be read, no other change running, and an
         // open gate — importing is a durable change to the vault like any other.
         if (state.vault is VaultState.Ready) {
-            VaultIndexCard(index = state.index)
+            VaultIndexCard(index = state.index, onOpenItem = onOpenItem)
         }
 
         if (state.importing) {
@@ -329,6 +357,7 @@ private fun VaultStateCard(
 @Composable
 private fun VaultIndexCard(
     index: VaultIndexUiState,
+    onOpenItem: (VaultItemUi) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -360,26 +389,35 @@ private fun VaultIndexCard(
                 )
             }
             if (index is VaultIndexUiState.Indexed && index.items.isNotEmpty()) {
-                index.items.forEach { item -> VaultItemRow(item = item) }
+                index.items.forEach { item -> VaultItemRow(item = item, onOpen = onOpenItem) }
             }
         }
     }
 }
 
-/** One imported file: what it was called, what kind it is, how large it is and when it arrived. */
+/**
+ * One imported file: what it was called, what kind it is, how large it is and when it arrived.
+ *
+ * The whole row opens the file. A type Nivara has no viewer for is not marked as broken here — it is
+ * a file like any other in the list, and opening it says plainly that this version cannot show it.
+ */
 @Composable
 private fun VaultItemRow(
     item: VaultItemUi,
+    onOpen: (VaultItemUi) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val kind = stringResource(id = vaultItemTypeRes(item.mimeType))
+    val kind = stringResource(id = vaultItemTypeRes(item))
     val size = Formatter.formatShortFileSize(context, item.sizeBytes)
     val imported = DateUtils.getRelativeTimeSpanString(item.importedAtEpochMillis)
 
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .clickable(
+                onClickLabel = stringResource(id = R.string.vault_item_open_action),
+            ) { onOpen(item) }
             .padding(top = 4.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -496,6 +534,7 @@ private fun VaultNotConfiguredPreview() {
             uiState = previewState(VaultState.NotConfigured),
             onChooseRoot = {},
             onImport = {},
+            onOpenItem = {},
             onInitialize = {},
             onReplaceUnreadable = {},
             onRetry = {},
@@ -518,6 +557,7 @@ private fun VaultReadyPreview() {
             ),
             onChooseRoot = {},
             onImport = {},
+            onOpenItem = {},
             onInitialize = {},
             onReplaceUnreadable = {},
             onRetry = {},
@@ -535,6 +575,7 @@ private fun VaultUnreadablePreview() {
             uiState = previewState(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged)),
             onChooseRoot = {},
             onImport = {},
+            onOpenItem = {},
             onInitialize = {},
             onReplaceUnreadable = {},
             onRetry = {},

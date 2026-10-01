@@ -2,6 +2,8 @@ package com.nivara.app.ui.vault
 
 import com.nivara.app.R
 import com.nivara.app.domain.vault.VaultFailure
+import com.nivara.app.domain.vault.VaultContentClassification
+import com.nivara.app.domain.vault.VaultContentKind
 import com.nivara.app.domain.vault.VaultImportFailure
 import com.nivara.app.domain.vault.VaultIndexUnreadable
 import com.nivara.app.domain.vault.VaultState
@@ -134,20 +136,23 @@ internal fun VaultIndexUiState.noticesRes(): List<VaultIndexNotice> {
 /**
  * The generic kind of an imported file.
  *
- * Deliberately coarse: what a file *is* for storage purposes is its declared type, and Nivara shows
- * the broad family so a long list can be scanned. Reading the file's contents, extracting a thumbnail
- * or opening a viewer belongs to the stage that owns presentation.
+ * The kind comes from the vault's one classifier — the Android-free
+ * [VaultContentClassification] — rather than from a second set of prefix rules written for the screen.
+ * Two classifiers would eventually disagree, and a list that called a file a document while its
+ * viewer called it something else is a contradiction the user would see.
  */
-internal fun vaultItemTypeRes(mimeType: String?): Int {
-    val type = mimeType?.substringBefore('/')?.lowercase()
-    return when (type) {
-        "image" -> R.string.vault_item_type_image
-        "video" -> R.string.vault_item_type_video
-        "audio" -> R.string.vault_item_type_audio
-        "text" -> R.string.vault_item_type_text
-        "application" -> R.string.vault_item_type_document
-        else -> R.string.vault_item_type_other
-    }
+internal fun vaultItemTypeRes(item: VaultItemUi): Int = when (item.kind) {
+    VaultContentKind.Image -> R.string.vault_item_type_image
+    VaultContentKind.Video -> R.string.vault_item_type_video
+    VaultContentKind.Audio -> R.string.vault_item_type_audio
+    VaultContentKind.Document ->
+        if (VaultContentClassification.isReadableText(item.mimeType)) {
+            R.string.vault_item_type_text
+        } else {
+            R.string.vault_item_type_document
+        }
+
+    VaultContentKind.Other -> R.string.vault_item_type_other
 }
 
 /**

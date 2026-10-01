@@ -195,6 +195,11 @@ notes.append(f"{len(string_names)} string resources, {len(referenced_strings)} r
 
 # ---------------------------------------------------------------- manifest + resources
 manifest = (ROOT / "app/src/main/AndroidManifest.xml").read_text()
+# A permission, an attribute or a capability is *declared* by an element, never by prose. A
+# comment explaining that Nivara does not request something — which is exactly the kind of note a
+# security-sensitive manifest should carry — must not be read as the thing it warns about, so
+# every scan for a name looks at the manifest with its comments removed.
+manifest_declarations = re.sub(r"<!--.*?-->", "", manifest, flags=re.S)
 res_dir = ROOT / "app/src/main/res"
 
 
@@ -270,7 +275,7 @@ for deferred_permission, reason in (
      "detection reads usage events; an accessibility service is not used and would be a much "
      "broader capability"),
 ):
-    if deferred_permission in manifest:
+    if deferred_permission in manifest_declarations:
         err(f"manifest declares '{deferred_permission}': {reason}")
 
 # Components that are not entry points are private: a service another application could start or
@@ -296,11 +301,11 @@ else:
     if extra_query_packages:
         warn(f"manifest <queries> exposes whole packages: {sorted(extra_query_packages)}")
 
-if 'android:usesCleartextTraffic="false"' not in manifest:
+if 'android:usesCleartextTraffic="false"' not in manifest_declarations:
     err("manifest does not disable cleartext traffic")
-if 'android:allowBackup="false"' not in manifest:
+if 'android:allowBackup="false"' not in manifest_declarations:
     err("manifest does not disable backup")
-if "android:debuggable" in manifest:
+if "android:debuggable" in manifest_declarations:
     err("manifest sets android:debuggable explicitly")
 if not (res_dir / "xml" / "data_extraction_rules.xml").exists():
     err("res/xml/data_extraction_rules.xml (referenced by the manifest) is missing")
@@ -1468,7 +1473,7 @@ for path in vault_domain_sources + vault_data_sources + vault_ui_sources:
 # public directory, not the application's own private storage, and no silent migration between them.
 for permission in ("MANAGE_EXTERNAL_STORAGE", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE",
                    "READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_MEDIA_AUDIO"):
-    if permission in manifest:
+    if permission in manifest_declarations:
         err(f"the vault must not require {permission}: it uses the Storage Access Framework")
 for path in vault_domain_sources + vault_data_sources:
     code = strip_comments(path.read_text())
@@ -1744,8 +1749,8 @@ if vault_repository_source.exists():
 for path in vault_domain_sources + vault_data_sources:
     code = strip_comments(path.read_text())
     for pattern, why in (
-        (r"\breadBytes\s*\(", "reading a whole file into memory"),
-        (r"\breadText\s*\(", "reading a whole file into memory"),
+        (r"\breadBytes\s*\(\s*\)", "reading a whole file into memory"),
+        (r"\breadText\s*\(\s*\)", "reading a whole file into memory"),
         (r"\bBase64\b", "base64-encoding a file"),
     ):
         if re.search(pattern, code):
@@ -1836,6 +1841,299 @@ content_tests = sum(len(re.findall(r"@Test\b", (ROOT / suite).read_text()))
 notes.append(f"vault review: {len(vault_domain_sources)} domain, {len(vault_data_sources)} data and "
              f"{len(vault_ui_sources)} presentation sources; {vault_tests} local vault tests; "
              f"{content_tests} content tests")
+
+# ---------------------------------------------------------------- vault viewing (stage 15)
+#
+# A viewer is the first thing that turns encrypted content into something a person sees, so its rules
+# are about what it may touch rather than about what it draws: the one decryption path, no key
+# anywhere near a screen, no plaintext on disk, no export, no session of its own. Each rule below is
+# written against a source file so it can be broken on purpose and seen to fail.
+viewer_data_dir = vault_data_dir / "viewer"
+viewer_data_sources = sorted(viewer_data_dir.glob("*.kt")) if viewer_data_dir.is_dir() else []
+viewer_ui_dir = vault_ui_dir / "viewer"
+viewer_ui_sources = sorted(viewer_ui_dir.glob("*.kt")) if viewer_ui_dir.is_dir() else []
+viewer_sources = viewer_data_sources + viewer_ui_sources
+
+for name in ("VaultImageEngine.kt", "VaultMediaEngine.kt", "VaultDocumentEngine.kt",
+             "VaultMediaDataSource.kt", "VaultViewerFailure.kt"):
+    if name not in [path.name for path in viewer_data_sources]:
+        err(f"the vault's viewing layer is missing data/vault/viewer/{name}")
+for name in ("VaultViewerUiState.kt", "VaultViewerViewModel.kt", "VaultItemViewerScreen.kt",
+             "VaultViewerMessages.kt"):
+    if name not in [path.name for path in viewer_ui_sources]:
+        err(f"the vault's viewer is missing ui/vault/viewer/{name}")
+if not viewer_data_sources or not viewer_ui_sources:
+    err("no vault viewer sources were found")
+
+# One decryption path: the engines read through the Stage 14 content reader, and only the vault's own
+# storage adapter reaches storage. A second reader, a second cipher or a direct open would each be a
+# way for a viewer to see bytes the vault had not authenticated.
+viewer_code = {path: strip_comments(path.read_text()) for path in viewer_sources}
+handle_source = vault_data_dir / "VaultContentHandleImpl.kt"
+handle_code = strip_comments(handle_source.read_text()) if handle_source.exists() else ""
+if not handle_code:
+    err("the vault must have one content handle that serves decrypted bytes")
+reader_source = vault_domain_dir / "VaultContentReader.kt"
+reader_code = strip_comments(reader_source.read_text()) if reader_source.exists() else ""
+if not reader_code:
+    err("the vault must have a content reader contract the viewers read through")
+# The three engines are the only things that open content, and each does it through the reader.
+for engine in ("VaultImageEngine.kt", "VaultMediaEngine.kt", "VaultDocumentEngine.kt"):
+    path = viewer_data_dir / engine
+    if path.exists() and "withContent(" not in strip_comments(path.read_text()):
+        err(f"data/vault/viewer/{engine} must open content through VaultContentReader.withContent")
+    if path.exists() and "VaultContentReader" not in strip_comments(path.read_text()):
+        err(f"data/vault/viewer/{engine} must depend on the content reader contract")
+# The screen never reads content itself: it asks an engine.
+viewer_screen_code = strip_comments((viewer_ui_dir / "VaultItemViewerScreen.kt").read_text()) \
+    if (viewer_ui_dir / "VaultItemViewerScreen.kt").exists() else ""
+for token in ("VaultContentReader", "withContent(", "VaultContentHandle"):
+    if token in viewer_screen_code:
+        err(f"the viewer screen must not read content itself ('{token}')")
+index_repository_code_stage15 = strip_comments(
+    (vault_data_dir / "NivaraVaultIndexRepository.kt").read_text()
+)
+if index_repository_code_stage15:
+    if "VaultContentReader" not in index_repository_code_stage15:
+        err("the vault's repository must serve content through the content reader")
+    if "VaultContentHandleImpl(" not in index_repository_code_stage15:
+        err("the vault's repository must open the one content handle this project has")
+
+# No second cryptography: a viewer that reached for a cipher, a digest or a key would be a second
+# implementation of the rules the vault already has.
+for path, code in list(viewer_code.items()) + ([(handle_source, handle_code)] if handle_code else []):
+    for pattern, why in (
+        (r"\bjavax\.crypto\b", "a cipher of its own"),
+        (r"\bCipher\b", "a cipher of its own"),
+        (r"\bSecretKey\b", "a key of its own"),
+        (r"\bSecretKeySpec\b", "a key of its own"),
+        (r"\bMessageDigest\b", "a digest of its own"),
+        (r"\bMac\b", "a MAC of its own"),
+        (r"\bSecureRandom\b", "a random source of its own"),
+        (r"\bHKDF\b|\bHkdf\b", "a key-derivation function of its own"),
+        (r"\bBase64\b", "base64 encoding"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: a viewer must not have {why} ('{pattern}')")
+
+# No key material, no credential and no session of its own anywhere in a viewer. The viewer asks
+# whether the gate is open; it never opens it, never lengthens it and never touches a credential.
+for path, code in viewer_code.items():
+    for pattern, why in (
+        (r"\bEncryptionKey\b", "key material"),
+        (r"\bSensitiveBytes\b", "raw secret bytes"),
+        (r"\bKeyStore\b|\bKeystore\b", "the platform key store"),
+        (r"\bContentKeyWrapper\b", "key wrapping"),
+        (r"\bEncryptedEnvelope\b", "the envelope format"),
+        (r"\bEncryptionService\b", "the encryption service"),
+        (r"\bVaultKeyAccess\b", "the vault's key borrow"),
+        (r"\bCredentialManager\b", "the credential layer"),
+        (r"\bKeyDerivationService\b", "credential-based key derivation"),
+        (r"\bBiometricAuthenticator\b", "biometrics"),
+        (r"\bSessionTimeoutPolicy\b", "a session policy of its own"),
+        (r"\.establish\s*\(", "the ability to open a session"),
+        (r"\blockNow\s*\(", "the ability to lock a session"),
+        (r"\bSavedStateHandle\b", "a saved instance state"),
+        (r"\brememberSaveable\b", "a saved Compose state"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the viewer must not hold {why} ('{pattern}')")
+    if not re.search(r"\bcurrentState\s*\(|\bisAuthenticated\b|sessionManager\.state", code):
+        if path.name in ("VaultViewerViewModel.kt",):
+            err(f"{path.relative_to(ROOT)}: the viewer must ask the existing session, never open one")
+
+# The viewer's state carries facts and never content: a bitmap, a stream or a byte array in the state
+# would be decrypted content living in a Compose state object.
+viewer_state_source = viewer_ui_dir / "VaultViewerUiState.kt"
+viewer_state_code = strip_comments(viewer_state_source.read_text()) if viewer_state_source.exists() else ""
+if viewer_state_code:
+    for pattern, why in (
+        (r"\bBitmap\b", "a decoded image"),
+        (r"\bByteArray\b", "raw bytes"),
+        (r"\bInputStream\b|\bOutputStream\b", "a stream"),
+        (r"\bSurface\b", "a drawing surface"),
+        (r"\bMediaPlayer\b", "a media player"),
+        (r"\bPdfRenderer\b", "a renderer"),
+        (r"\bEncryptionKey\b", "key material"),
+    ):
+        if re.search(pattern, viewer_state_code):
+            err(f"the viewer's state must not carry {why} ('{pattern}')")
+
+# Bound memory: nothing in the viewing path reads an item whole, and the one place that moves content
+# does it through a bounded pipe. The image decoder is bounded by an explicit sample, which is the
+# only case where content is inherently memory-backed.
+for path, code in list(viewer_code.items()) + ([(handle_source, handle_code)] if handle_code else []):
+    for pattern, why in (
+        (r"\breadBytes\s*\(\s*\)", "a whole file read at once"),
+        (r"\breadText\s*\(\s*\)", "a whole file read at once"),
+        (r"\bcacheDir\b|\bfilesDir\b|\bgetExternalFilesDir\b", "a private copy on disk"),
+        (r"\bcreateTempFile\b", "a temporary file"),
+        (r"\bFileOutputStream\b|\bFileWriter\b", "a file of its own"),
+        (r"\bjava\.io\.File\b", "a filesystem path"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the viewer must not use {why} ('{pattern}')")
+if handle_code:
+    if "PipedInputStream" not in handle_code or "PIPE_BYTES" not in handle_code:
+        err("the content handle must move plaintext through one bounded pipe")
+    if "decryptStream(" not in handle_code:
+        err("the content handle must decrypt through the existing streaming service")
+    if "authorize()" not in handle_code:
+        err("the content handle must ask the session before it serves a byte")
+image_engine_code = strip_comments((viewer_data_dir / "VaultImageEngine.kt").read_text()) \
+    if (viewer_data_dir / "VaultImageEngine.kt").exists() else ""
+if image_engine_code:
+    if "inJustDecodeBounds" not in image_engine_code or "inSampleSize" not in image_engine_code:
+        err("the image engine must bound a decode before it decodes")
+    if "MAXIMUM_PIXELS" not in image_engine_code or "MAXIMUM_DIMENSION" not in image_engine_code:
+        err("the image engine must bound a decode by pixels as well as by dimension")
+document_engine_code = strip_comments((viewer_data_dir / "VaultDocumentEngine.kt").read_text()) \
+    if (viewer_data_dir / "VaultDocumentEngine.kt").exists() else ""
+if document_engine_code:
+    if "openProxyFileDescriptor" not in document_engine_code:
+        err("a document renderer that needs a file descriptor must be given a proxy descriptor, "
+            "never a plaintext file")
+    if "MAXIMUM_TEXT_BYTES" not in document_engine_code:
+        err("a text document must be read into a bounded preview")
+
+# A document renderer and a media player are the only platform shapes a viewer may hold, and they
+# stay below the UI: the domain describes what a vault holds, not what draws it.
+for path in sorted((ROOT / "app/src/main/java/com/nivara/app/domain").rglob("*.kt")):
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bandroid\.", "an Android type"),
+        (r"\bBitmap\b", "a decoded image"),
+        (r"\bSurface\b", "a drawing surface"),
+        (r"\bMediaPlayer\b|\bMediaDataSource\b", "the platform media stack"),
+        (r"\bPdfRenderer\b", "a document renderer"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the domain must not mention {why} ('{pattern}')")
+for path in sorted((ROOT / "app/src/main/java/com/nivara/app/ui").rglob("*.kt")):
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bMediaPlayer\b", "the platform media player"),
+        (r"\bMediaDataSource\b", "a media data source"),
+        (r"\bPdfRenderer\b", "a document renderer"),
+        (r"\bEncryptionService\b", "the encryption service"),
+        (r"\bEncryptedStream\b", "the streaming format"),
+        (r"\bPipedInputStream\b|\bPipedOutputStream\b", "a decryption pipe"),
+        (r"\bVaultContentHandleImpl\b", "the content handle's implementation"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: a screen must not hold {why} ('{pattern}')")
+
+# A viewer reads and shows; it never changes the vault, never deletes content and never repairs it.
+for path, code in viewer_code.items():
+    for pattern, why in (
+        (r"\bimportFile\s*\(", "an import"),
+        (r"\bcommitIndex\s*\(", "an index commit"),
+        (r"\bdeleteObject\s*\(", "a deletion of content"),
+        (r"\bdeleteDocument\s*\(", "a deletion of a document"),
+        (r"\brenameDocument\s*\(", "a rename of a document"),
+        (r"\bcreateDocument\s*\(", "a creation of a document"),
+        (r"\.delete\s*\(\s*\)", "a deletion"),
+        (r"\bAtomicFiles\b", "the atomic-write mechanism"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the viewer must not perform {why} ('{pattern}')")
+
+# No export, no share and no second way out of the vault: decrypted content leaves through a screen
+# and nowhere else.
+for path in sorted((ROOT / "app/src/main/java/com/nivara/app").rglob("*.kt")):
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"ACTION_SEND", "sharing"),
+        (r"Intent\.createChooser", "a chooser"),
+        (r"\bACTION_VIEW\b", "handing a file to another application"),
+        (r"\bACTION_CREATE_DOCUMENT\b", "writing a file out"),
+        (r"\bMediaStore\b", "the media store"),
+        (r"\bDownloadManager\b", "a download"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: Nivara must not use {why} ('{pattern}')")
+
+# A thumbnail is generated when it is drawn and never kept: no thumbnail store, no compression of a
+# decrypted image into a file, no cache of pictures anywhere.
+for path in sorted((ROOT / "app/src/main/java/com/nivara/app").rglob("*.kt")):
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bThumbnailUtils\b", "a platform thumbnail helper"),
+        (r"\bgetThumbnail\b", "a stored thumbnail"),
+        (r"\.compress\s*\(", "an encoded copy of a decoded image"),
+        (r"\bLruCache\b|\bDiskLruCache\b", "a memory or disk cache of content"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: Nivara must not keep {why} ('{pattern}')")
+
+# The viewer watches the session and releases everything when it ends; the handle stops serving on its
+# own. Together they are what makes Quick Lock close open content.
+viewer_view_model_source = viewer_ui_dir / "VaultViewerViewModel.kt"
+viewer_view_model_code = strip_comments(viewer_view_model_source.read_text()) \
+    if viewer_view_model_source.exists() else ""
+if viewer_view_model_code:
+    for token, why in (
+        ("sessionManager.state", "the viewer must watch the existing session"),
+        ("releaseContent(", "the viewer must release content when it closes"),
+        ("onSessionEnded", "the viewer must end content when the session does"),
+        ("onCleared", "the viewer must release content when its screen is gone"),
+        ("onPaused", "the viewer must stop playback when the screen leaves the foreground"),
+    ):
+        if token not in viewer_view_model_code:
+            err(f"the viewer view model is missing {why} ('{token}')")
+
+# Nothing that belongs to a later stage: no albums, no search, no trash, no restore, no export and no
+# recovery appear in the vault's own sources.
+for path in vault_domain_sources + vault_data_sources + vault_ui_sources + viewer_sources:
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bAlbum\w*", "albums"),
+        (r"\bTrash\w*", "trash"),
+        (r"\bRestore\w*", "restore"),
+        (r"\bSearchQuery\b|\bSearchRepository\b|\bSearchScreen\b", "search"),
+        (r"\bRecovery\w*|\bReinstall\w*", "recovery"),
+        (r"\bBackup\w*|\bCloudSync\w*", "backup"),
+        (r"\bExport\w*|\bShareAction\b", "export"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the vault must not contain {why} yet ('{pattern}')")
+
+# The viewing suites: classification, the content handle, the engines, the viewer's state machine and
+# its wording, and the screen itself where a device can run it.
+viewer_suites = (
+    "app/src/test/java/com/nivara/app/domain/vault/VaultContentClassificationTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/VaultContentReaderTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/viewer/VaultViewerEngineTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/viewer/VaultViewerViewModelTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/viewer/VaultViewerPresentationTest.kt",
+)
+for suite in viewer_suites:
+    if not (ROOT / suite).exists():
+        err(f"the vault viewing test suite is missing: {suite}")
+instrumented_viewer_suite = "app/src/androidTest/java/com/nivara/app/ui/vault/viewer/VaultViewerScreenTest.kt"
+if not (ROOT / instrumented_viewer_suite).exists():
+    err(f"the vault viewing instrumented suite is missing: {instrumented_viewer_suite}")
+
+viewer_tests = sum(len(re.findall(r"@Test\b", (ROOT / suite).read_text()))
+                   for suite in viewer_suites if (ROOT / suite).exists())
+
+# Every new permission would be a way to reach content outside the vault; the allow-list is checked
+# above, and these names must never appear anywhere in the application.
+permission_scan = sorted((ROOT / "app/src/main").rglob("*.kt")) + sorted((ROOT / "app/src/main").rglob("*.xml"))
+for path in permission_scan:
+    if path.suffix == ".kt":
+        text = strip_comments(path.read_text())
+    else:
+        # A manifest may explain why a permission is not requested; only the declarations count here.
+        text = re.sub(r"<!--.*?-->", "", path.read_text(), flags=re.S)
+    for permission in ("READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_MEDIA_AUDIO", "READ_MEDIA_VISUAL",
+                      "MANAGE_EXTERNAL_STORAGE", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE",
+                      "ACCESS_MEDIA_LOCATION"):
+        if permission in text:
+            err(f"{path.relative_to(ROOT)}: the vault must not request {permission}")
+
+notes.append(f"vault viewing review: {len(viewer_data_sources)} engine and {len(viewer_ui_sources)} "
+             f"viewer sources; {viewer_tests} viewer tests")
 
 # ---------------------------------------------------------------- wrapper / hygiene
 wrapper_props = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()

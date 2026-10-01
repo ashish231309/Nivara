@@ -19,8 +19,9 @@ session, and the settings screen that chooses which applications are protected �
 manages it, the **launcher**: Nivara as the device's Home application, with an app drawer that
 leaves hidden applications out and can show them again for as long as Nivara is unlocked — the
 **application identity**: the name and icon Nivara's launcher entry presents, and the ordinary route
-back to Nivara's own — and the **vault storage foundation**: the folder the user chooses, the
-authenticated record that says a vault is there, and creating one.
+back to Nivara's own — and the **vault**: the folder the user chooses, the authenticated record that
+says a vault is there, the encrypted store imported files go into, and opening one of those files
+again.
 
 What works today:
 
@@ -68,8 +69,13 @@ What works today:
   Android's Keystore. What is at the folder is reported as one of a fixed set of states, so a record that
   cannot be opened is never drawn as an empty vault: damaged metadata, a lost platform key, an
   unfinished setup, a newer format, unreachable storage and a revoked grant are each their own
-  answer, and none of them deletes or repairs anything. Importing files, media, albums, search and
-  trash are later stages, and the screen says nothing it does not do;
+  answer, and none of them deletes or repairs anything. One document at a time is then imported —
+  chosen through Android's own picker, read once, encrypted as a bounded stream and recorded in an
+  authenticated index — and a listed file can be opened again: pictures, video and audio through the
+  platform's own decoders over the vault's decryption, text as a bounded preview, PDF as rendered
+  pages served through a proxy file descriptor. Everything else is described with its facts rather
+  than guessed at, and albums, search, trash and sharing are later stages, so the screen says nothing
+  it does not do;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
@@ -78,8 +84,7 @@ Biometric unlock never replaces the primary credential and never unlocks anythin
 the session is not one either: it is an authorization state held only while the process lives, and
 it holds no credential, no key and nothing on disk. Detection decides and publishes; the surface
 that presents a requirement is separate from it, holds no credential of its own and can do exactly
-one thing with an authentication result — hand it to the session gate. The vault is storage and a state model, not a way
-to store a file yet — that is the stage that follows, and it consumes the layers described in
+one thing with an authentication result — hand it to the session gate. The vault consumes the layers described in
 [`docs/crypto/README.md`](docs/crypto/README.md),
 [`docs/credential/README.md`](docs/credential/README.md),
 [`docs/biometric/README.md`](docs/biometric/README.md),
@@ -93,7 +98,10 @@ drawer leaves it out; Android's launcher still shows every application, and both
 documentation say so. Camouflage means Nivara's own launcher entry shows a different name and icon;
 Android still lists Nivara by its package, and the screen that offers it says that too. Vault storage
 means the vault lives in a folder the user picked, protected by encryption rather than by its
-location — the folder itself is not a secret, and the screen that configures it says so.
+location — the folder itself is not a secret, and the screen that configures it says so. Opening an
+imported file means reading it back through the same decryption that wrote it, in bounded pieces, with
+no plaintext copy anywhere: what Nivara can actually draw, play or read is listed below, and anything
+else is described rather than guessed at.
 
 ## Planned capabilities
 
@@ -109,8 +117,9 @@ project is clear; each one is implemented in its own release and is not present 
   icon for Nivara's launcher entry, with Nivara's own identity one selection away and reachable from
   Android's application list at any time. Camouflage is not a security boundary, hides nothing from
   Android, and does not pretend to be a different application: it changes what the home screen shows
-- External encrypted vault storage — not started
-- An encrypted file vault, including media, albums and a recycle bin
+- External encrypted vault storage — delivered
+- Importing files into the vault, and opening them again — delivered
+- An encrypted file vault's organisation: albums, search and sorting, and a recycle bin — not started
 - Recovery and session management
 - Security settings, themes and the final visual design
 
@@ -144,7 +153,7 @@ app/src/main/java/com/nivara/app/
 │   ├── apphide/                Hidden set, its repository contract and its failure cases
 │   ├── launcher/               What a launcher may draw, and the fail-closed rule for it
 │   ├── camouflage/             What an identity is, and which one the device is presenting
-│   └── vault/                  What is at the vault root, its states and its failures
+│   └── vault/                  What is at the vault root, what a stored file is, and how it is read
 ├── data/                       Platform-backed implementations of those contracts
 │   ├── app/                    Launcher-entry discovery through the package manager
 │   ├── applock/                Usage-event detector, protected set store, monitor, service
@@ -153,7 +162,8 @@ app/src/main/java/com/nivara/app/
 │   ├── biometric/              Android's prompt, the NVBT record and its store
 │   ├── permissions/            Usage Access app-op check, overlay check, settings entry points
 │   ├── session/                The in-memory session manager
-│   ├── vault/                  The storage seam, the two record codecs and the repository
+│   ├── vault/                  The storage seam, the record and index codecs, the import pipeline
+│   │   └── viewer/             The platform decoders: images, the media stack and documents
 │   └── security/               JCA, Android Keystore and device state
 └── ui/                         Compose UI
     ├── NivaraApp.kt            Root composable: app bar + navigation host
@@ -171,7 +181,8 @@ app/src/main/java/com/nivara/app/
     ├── apphide/                Choosing which applications Nivara keeps out of sight
     ├── launcher/               The Home activity, the home surface and the app drawer
     ├── camouflage/             Choosing the name and icon Nivara presents under
-    ├── vault/                  Choosing the vault folder, and what is at it
+    ├── vault/                  Choosing the vault folder, importing a file, the list and the viewer
+    │   └── viewer/             The viewer's state, wording and controls
     └── session/                Session text shared by the screens that show it
 ```
 
@@ -504,12 +515,17 @@ devices.
 | Importing a file | One document at a time, chosen through Android's own picker; read once, never moved or modified, and encrypted into the vault in bounded pieces |
 | What a stored file is | One encrypted object named after a random per-file identifier, listed by an authenticated index that never holds a key or a source reference |
 | When a file counts as imported | Only after its object is complete and read back, and the index that names it has itself been read back and opened |
-| The list on the screen | Name, generic kind, size and arrival time, plus honest states for an index that cannot be read, a newer format, unfinished imports and encrypted files that are not listed |
-| What it is not | A media viewer, a gallery, an album or search, trash or restore, a second password, or a hidden route: the vault is reached from the home screen like any other settings screen |
+| The list on the screen | Name, type, size and arrival time, plus honest states for an index that cannot be read, a newer format, unfinished imports and encrypted files that are not listed; a tap opens the file |
+| Opening a file | Read back through the same streaming decryption that wrote it, in bounded pieces, with the session asked before each one and no plaintext copy on disk |
+| What can be shown | JPEG, PNG, WebP, GIF, BMP, HEIC and HEIF pictures (bounded decode); MP4, WebM, 3GPP, MPEG and Matroska video; MP3, AAC/M4A, WAV, OGG, FLAC and Opus audio through the platform's player; plain text, CSV, Markdown, XML and JSON as a bounded preview; PDF as rendered pages |
+| What is described instead | Office documents, archives, and any file whose declared type is missing, malformed or unfamiliar: the facts are shown and the screen says plainly that this build has no viewer |
+| When the session ends | Playback stops, every decoder and the content are released, and the viewer says the vault is locked; Quick Lock does the same instantly, and reopening goes through the credential screen that already exists |
+| What it never does | No key, cipher or storage handle reaches a screen; no plaintext temporary file, cache or thumbnail is ever written; and no sharing, exporting or "open with" exists anywhere in the application |
+| What it is not | A gallery, an album or search, trash or restore, a second password, or a hidden route: the vault is reached from the home screen like any other settings screen |
 
 The full contract — the structure, the metadata format, the content format, the index format, the
-import pipeline, the key hierarchy, the failure states and the verification status — is in
-[`docs/vault/README.md`](docs/vault/README.md).
+import pipeline, the classification rules, what each viewer does, the failure states and the
+verification status — is in [`docs/vault/README.md`](docs/vault/README.md).
 
 ## Repository checks
 

@@ -3,6 +3,9 @@ package com.nivara.app.ui.vault
 import com.nivara.app.domain.vault.VaultIndexState
 import com.nivara.app.domain.vault.VaultIndexUnreadable
 import com.nivara.app.domain.vault.VaultItem
+import com.nivara.app.domain.vault.VaultContentClassification
+import com.nivara.app.domain.vault.VaultContentKind
+import com.nivara.app.domain.vault.VaultItemId
 
 /**
  * What the vault screen knows about the list of files in the vault.
@@ -75,9 +78,15 @@ sealed interface VaultIndexUiState {
  *
  * The name is the name the file had when it was imported, kept inside the authenticated index — it is
  * never a path and never the name of anything on storage, which is why showing it is safe.
+ *
+ * @property id the item's identifier, which is how the vault finds its encrypted object. It is not
+ *   displayed: it is what a viewer is handed, and it is the one piece of an item that a screen needs
+ *   in order to ask for the content behind it.
  */
 data class VaultItemUi(
+    val id: VaultItemId,
     val name: String,
+    val kind: VaultContentKind,
     val sizeBytes: Long,
     val importedAtEpochMillis: Long,
     val mimeType: String?,
@@ -112,7 +121,11 @@ internal fun VaultIndexState.toUiState(): VaultIndexUiState = when (this) {
 }
 
 private fun VaultItem.toUi(): VaultItemUi = VaultItemUi(
+    id = id,
     name = name,
+    // Classified once, here, from the authenticated type: the list, the viewer and the engine all
+    // read this one answer rather than each deciding for itself.
+    kind = VaultContentClassification.kindOf(mimeType),
     sizeBytes = sizeBytes,
     importedAtEpochMillis = importedAtEpochMillis,
     mimeType = mimeType,

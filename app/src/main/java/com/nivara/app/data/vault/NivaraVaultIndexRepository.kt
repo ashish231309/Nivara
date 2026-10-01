@@ -9,6 +9,10 @@ import com.nivara.app.domain.security.EncryptionKey
 import com.nivara.app.domain.security.EncryptionService
 import com.nivara.app.domain.security.SecureRandomGenerator
 import com.nivara.app.domain.vault.VaultContentDigest
+import com.nivara.app.domain.vault.VaultContentException
+import com.nivara.app.domain.vault.VaultContentFailure
+import com.nivara.app.domain.vault.VaultContentHandle
+import com.nivara.app.domain.vault.VaultContentReader
 import com.nivara.app.domain.vault.VaultContentSource
 import com.nivara.app.domain.vault.VaultFailure
 import com.nivara.app.domain.vault.VaultImportFailure
@@ -75,7 +79,7 @@ internal class NivaraVaultIndexRepository(
     private val random: SecureRandomGenerator,
     private val clock: () -> Long = System::currentTimeMillis,
     private val importLock: Mutex = Mutex(),
-) : VaultIndexRepository {
+) : VaultIndexRepository, VaultContentReader {
 
     /**
      * The whole import runs under one lock, so two imports cannot interleave their index
@@ -286,6 +290,72 @@ internal class NivaraVaultIndexRepository(
             expectedGeneration = headerGeneration,
         ) ?: return IndexOpen.Damaged
         return IndexOpen.Opened(generation = payload.generation, items = payload.items)
+    }
+
+    // ------------------------------------------------------------------ reading content
+
+    /**
+     * Opens one item's plaintext, runs [block] with it, and closes everything afterwards.
+     *
+     * The whole read happens inside one borrow of the vault key, which is why the key is alive for
+     * exactly as long as the viewer is: [block] returns when the viewer is done, and the borrow ends
+     * with it. Nothing here decides how much is read or how fast — the handle is a cursor and the
+     * caller drives it — and nothing here knows what the bytes are.
+     *
+     * The object is named from [itemId] alone, so a viewer can only ever reach an object the index
+     * named: there is no path, no source reference and no user text in the way of finding it.
+     */
+    override suspend fun <T> withContent(
+        itemId: VaultItemId,
+        sizeBytes: Long,
+        authorize: () -> Boolean,
+        block: suspend (VaultContentHandle) -> NivaraResult<T>,
+    ): NivaraResult<T> {
+        // Asked before the key is even borrowed: a closed gate must not open storage, let alone
+        // decrypt anything.
+        if (!authorize()) {
+            return NivaraResult.Failure(
+                VaultContentException(VaultContentFailure.NotAuthorized),
+            )
+        }
+
+        val outcome = keyAccess.withVaultKey { location, key ->
+            val handle = VaultContentHandleImpl(
+                itemId = itemId,
+                sizeBytes = sizeBytes,
+                storage = contentStorageFactory(location),
+                entryName = VaultContentNames.objectName(itemId),
+                encryptionService = encryptionService,
+                key = key,
+                authorize = authorize,
+            )
+            try {
+                block(handle)
+            } finally {
+                handle.close()
+            }
+        }
+        // A borrow that was refused, or a cryptographic failure inside a read, is translated here:
+        // a caller of the reader is told one of [VaultContentFailure] and never the vault's own
+        // operation vocabulary. A failure the block itself reported travels exactly as it was, and a
+        // successful read is a successful read.
+        return when (outcome) {
+            is NivaraResult.Success -> outcome
+            // Only the vault's own operation failures — a key borrow that was refused, a stored
+            // record that did not authenticate — are translated into the reader's vocabulary. A
+            // failure the block itself reported, and a typed content failure it raised, travel
+            // exactly as they were.
+            is NivaraResult.Failure -> when (val error = outcome.error) {
+                is VaultFailure,
+                is CryptographicFailure,
+                is VaultContentFailure,
+                is VaultContentException,
+                null,
+                -> NivaraResult.Failure(VaultContentException(error.asContentFailure()))
+
+                else -> outcome
+            }
+        }
     }
 
     // ------------------------------------------------------------------ importing
