@@ -346,9 +346,10 @@ class NivaraVaultTrashRepositoryTest {
 
     @Test
     fun a_change_reads_the_record_back_after_writing_it() = runTest {
-        indexState = VaultIndexState.Ready(items = listOf(testItem(seed = 1)))
+        indexState = VaultIndexState.Ready(items = listOf(testItem(seed = 1), testItem(seed = 2)))
+        putRecord(listOf(testTrashEntry(seed = 1)))
         val readsBefore = metadata.readCalls
-        repository().trash(itemId = testItemId(1), authorize = ::authorize)
+        repository().trash(itemId = testItemId(2), authorize = ::authorize)
         // One read of the slot that holds the previous state, and one read-back of the slot that was
         // just written: a write that is never read again is never verified.
         assertTrue(metadata.readCalls >= readsBefore + 2)

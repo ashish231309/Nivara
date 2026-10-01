@@ -5,6 +5,7 @@ import com.nivara.app.core.common.NivaraResult
 import com.nivara.app.data.vault.FakeReadyVaultRepository
 import com.nivara.app.data.vault.FakeVaultLocationStore
 import com.nivara.app.domain.credential.AuthenticationOutcome
+import com.nivara.app.domain.credential.TimeProvider
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.vault.VaultFailure
 import com.nivara.app.domain.vault.VaultImportProgress
@@ -52,7 +53,7 @@ import org.junit.Test
 class VaultTrashViewModelTest {
 
     private var now: Long = 1_700_000_000_000L
-    private val clock = { now }
+    private val clock = TimeProvider { now }
 
     @Before
     fun setUp() {
