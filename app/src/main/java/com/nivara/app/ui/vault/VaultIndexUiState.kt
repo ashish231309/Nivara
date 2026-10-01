@@ -123,11 +123,16 @@ internal fun VaultIndexState.toUiState(): VaultIndexUiState =
 internal fun VaultIndexState.toUiState(
     ordering: VaultOrdering,
     query: VaultSearchQuery,
+    trashedItemIds: Set<VaultItemId> = emptySet(),
 ): VaultIndexUiState = when (this) {
     VaultIndexState.Missing -> VaultIndexUiState.Empty
 
     is VaultIndexState.Ready -> VaultIndexUiState.Indexed(
-        items = VaultSearch.filter(items, query)
+        // The active collection is everything the vault lists except what its trash record says is out
+        // of sight. Filtering here — before the search and before the order — is what makes every list,
+        // every result and every count below the same active collection rather than a second opinion.
+        items = items.filterNot { item -> item.id in trashedItemIds }
+            .let { active -> VaultSearch.filter(active, query) }
             .inOrder(ordering)
             .map { item -> item.toItemUi() },
         missingContent = missingContent.size,

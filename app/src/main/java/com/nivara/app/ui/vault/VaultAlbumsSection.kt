@@ -66,6 +66,7 @@ internal fun VaultAlbumsCard(
     onAddItem: (VaultItemId) -> Unit,
     onRemoveItem: (VaultItemId) -> Unit,
     onOpenItem: (VaultItemUi) -> Unit,
+    onTrashItem: ((VaultItemUi) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     // While the vault itself is unopened the vault's own card is the whole story; there is nothing to
@@ -87,6 +88,7 @@ internal fun VaultAlbumsCard(
             onAddItem = onAddItem,
             onRemoveItem = onRemoveItem,
             onOpenItem = onOpenItem,
+            onTrashItem = onTrashItem,
             modifier = modifier,
         )
         return
@@ -312,6 +314,7 @@ private fun VaultAlbumDetailCard(
     onAddItem: (VaultItemId) -> Unit,
     onRemoveItem: (VaultItemId) -> Unit,
     onOpenItem: (VaultItemUi) -> Unit,
+    onTrashItem: ((VaultItemUi) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -346,9 +349,19 @@ private fun VaultAlbumDetailCard(
                 )
 
                 is VaultAlbumContentsUi.Resolved -> {
-                    if (contents.items.isEmpty() && contents.staleItemIds.isEmpty()) {
+                    if (contents.items.isEmpty() &&
+                        contents.staleItemIds.isEmpty() &&
+                        contents.trashedItemIds.isEmpty()
+                    ) {
                         Text(
                             text = stringResource(id = R.string.vault_album_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else if (contents.items.isEmpty() && contents.staleItemIds.isEmpty()) {
+                        // The album's members exist, but every one of them is out of the active
+                        // collection: the album is not empty, it is out of sight.
+                        Text(
+                            text = stringResource(id = R.string.vault_album_all_trashed),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     } else if (contents.items.isEmpty()) {
@@ -358,7 +371,9 @@ private fun VaultAlbumDetailCard(
                         )
                     }
 
-                    contents.items.forEach { item -> VaultItemRow(item = item, onOpen = onOpenItem) }
+                    contents.items.forEach { item ->
+                        VaultItemRow(item = item, onOpen = onOpenItem, onTrash = onTrashItem)
+                    }
 
                     contents.staleItemIds.forEach { itemId ->
                         StaleAlbumItem(
@@ -543,14 +558,27 @@ private fun AlbumNameForm(
  */
 @Composable
 private fun VaultAlbumUi.memberCountText(): String = if (resolved) {
-    if (staleCount > 0) {
-        stringResource(
+    when {
+        staleCount > 0 && trashedCount > 0 -> stringResource(
+            id = R.string.vault_album_member_count_partial_trashed_format,
+            memberCount,
+            staleCount,
+            trashedCount,
+        )
+
+        staleCount > 0 -> stringResource(
             id = R.string.vault_album_member_count_partial_format,
             memberCount,
             staleCount,
         )
-    } else {
-        stringResource(id = R.string.vault_album_member_count_format, memberCount)
+
+        trashedCount > 0 -> stringResource(
+            id = R.string.vault_album_member_count_trashed_format,
+            memberCount,
+            trashedCount,
+        )
+
+        else -> stringResource(id = R.string.vault_album_member_count_format, memberCount)
     }
 } else {
     stringResource(id = R.string.vault_album_count_unresolved_format, memberCount)

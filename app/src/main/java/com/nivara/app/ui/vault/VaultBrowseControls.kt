@@ -22,6 +22,8 @@ import com.nivara.app.R
 import com.nivara.app.domain.vault.VaultOrdering
 import com.nivara.app.domain.vault.VaultSortDirection
 import com.nivara.app.domain.vault.VaultSortField
+import com.nivara.app.domain.vault.VaultTrashOrdering
+import com.nivara.app.domain.vault.VaultTrashSortField
 
 /**
  * The vault screen's own controls: which collection is shown, what is searched for, and how the list
@@ -37,12 +39,15 @@ internal fun VaultBrowseControls(
     section: VaultSection,
     searchQuery: String,
     ordering: VaultOrdering,
+    trashOrdering: VaultTrashOrdering,
     busy: Boolean,
     onSectionSelected: (VaultSection) -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onSearchCleared: () -> Unit,
     onSortFieldSelected: (VaultSortField) -> Unit,
     onSortDirectionToggled: () -> Unit,
+    onTrashSortFieldSelected: (VaultTrashSortField) -> Unit,
+    onTrashSortDirectionToggled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -62,6 +67,13 @@ internal fun VaultBrowseControls(
                 labelRes = R.string.vault_section_albums,
                 enabled = !busy,
                 onClick = { onSectionSelected(VaultSection.Albums) },
+                modifier = Modifier.weight(1f),
+            )
+            SectionButton(
+                selected = section == VaultSection.Trash,
+                labelRes = R.string.vault_section_trash,
+                enabled = !busy,
+                onClick = { onSectionSelected(VaultSection.Trash) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -86,13 +98,81 @@ internal fun VaultBrowseControls(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        SortControls(
-            ordering = ordering,
-            busy = busy,
-            onSortFieldSelected = onSortFieldSelected,
-            onSortDirectionToggled = onSortDirectionToggled,
-        )
+        // The trash has a field the vault's list does not — when the file was moved there — so the
+        // control shows the fields that make sense for the collection being looked at.
+        if (section == VaultSection.Trash) {
+            TrashSortControls(
+                ordering = trashOrdering,
+                busy = busy,
+                onSortFieldSelected = onTrashSortFieldSelected,
+                onSortDirectionToggled = onTrashSortDirectionToggled,
+            )
+        } else {
+            SortControls(
+                ordering = ordering,
+                busy = busy,
+                onSortFieldSelected = onSortFieldSelected,
+                onSortDirectionToggled = onSortDirectionToggled,
+            )
+        }
     }
+}
+
+/**
+ * The order the trash list is drawn in.
+ *
+ * The same shape as the vault's own sort control, with the one field that belongs to the trash:
+ * when the file was moved out of the active collection.
+ */
+@Composable
+private fun TrashSortControls(
+    ordering: VaultTrashOrdering,
+    busy: Boolean,
+    onSortFieldSelected: (VaultTrashSortField) -> Unit,
+    onSortDirectionToggled: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(id = R.string.vault_sort_field_label),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            VaultTrashSortField.entries.forEach { field ->
+                val selected = ordering.field == field
+                if (selected) {
+                    Button(onClick = { onSortFieldSelected(field) }, enabled = !busy) {
+                        Text(text = stringResource(id = field.trashLabelRes()))
+                    }
+                } else {
+                    OutlinedButton(onClick = { onSortFieldSelected(field) }, enabled = !busy) {
+                        Text(text = stringResource(id = field.trashLabelRes()))
+                    }
+                }
+            }
+            OutlinedButton(onClick = onSortDirectionToggled, enabled = !busy, modifier = Modifier.padding(start = 8.dp)) {
+                Text(text = stringResource(id = ordering.direction.labelRes()))
+            }
+        }
+    }
+}
+
+/** The name of a trash sort field, in the words this screen uses for it. */
+private fun VaultTrashSortField.trashLabelRes(): Int = when (this) {
+    VaultTrashSortField.TrashedAt -> R.string.vault_trash_sort_by_trashed
+    VaultTrashSortField.Name -> R.string.vault_sort_by_name
+    VaultTrashSortField.Size -> R.string.vault_sort_by_size
+    VaultTrashSortField.ImportedAt -> R.string.vault_sort_by_imported
+    VaultTrashSortField.Kind -> R.string.vault_sort_by_type
 }
 
 /**
@@ -201,9 +281,10 @@ internal fun VaultSearchResultCard(
 ) {
     if (search == VaultSearchUiState.NotAsked) return
 
-    // The question was about files or about albums, and the answer is worded for the collection the
-    // person is actually looking at.
+    // The question was about files, albums or the trash, and the answer is worded for the collection
+    // the person is actually looking at.
     val albumsSurface = section == VaultSection.Albums
+    val trashSurface = section == VaultSection.Trash
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -220,10 +301,10 @@ internal fun VaultSearchResultCard(
                 VaultSearchUiState.Matches -> if (matchCount != null && totalCount != null) {
                     Text(
                         text = stringResource(
-                            id = if (albumsSurface) {
-                                R.string.vault_search_albums_result_format
-                            } else {
-                                R.string.vault_search_result_format
+                            id = when {
+                                albumsSurface -> R.string.vault_search_albums_result_format
+                                trashSurface -> R.string.vault_trash_search_result_format
+                                else -> R.string.vault_search_result_format
                             },
                             matchCount,
                             totalCount,
@@ -232,24 +313,31 @@ internal fun VaultSearchResultCard(
                     )
                 }
 
-                VaultSearchUiState.NoMatches -> Text(
-                    text = stringResource(
-                        id = if (albumsSurface) {
-                            R.string.vault_search_no_album_matches
-                        } else {
-                            R.string.vault_search_no_matches
-                        },
-                        searchQuery.trim(),
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                VaultSearchUiState.NoMatches -> if (trashSurface) {
+                    Text(
+                        text = stringResource(id = R.string.vault_trash_search_no_matches, searchQuery.trim()),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else {
+                    Text(
+                        text = stringResource(
+                            id = if (albumsSurface) {
+                                R.string.vault_search_no_album_matches
+                            } else {
+                                R.string.vault_search_no_matches
+                            },
+                            searchQuery.trim(),
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
 
                 VaultSearchUiState.CannotSearch -> Text(
                     text = stringResource(
-                        id = if (albumsSurface) {
-                            R.string.vault_search_cannot_search_albums
-                        } else {
-                            R.string.vault_search_cannot_search
+                        id = when {
+                            albumsSurface -> R.string.vault_search_cannot_search_albums
+                            trashSurface -> R.string.vault_trash_search_cannot_search
+                            else -> R.string.vault_search_cannot_search
                         },
                     ),
                     style = MaterialTheme.typography.bodyMedium,

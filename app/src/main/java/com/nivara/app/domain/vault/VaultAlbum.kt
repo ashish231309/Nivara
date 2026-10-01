@@ -112,10 +112,20 @@ sealed interface VaultAlbumContents {
         override val album: VaultAlbum,
         val items: List<VaultItem>,
         val staleItemIds: List<VaultItemId>,
+        /**
+         * Ids the album names that the vault still holds but that are currently in the trash.
+         *
+         * The membership is preserved — the album record still names them, and restoring the item makes
+         * it appear here again — but a trashed file is not active content, so it is not drawn as one.
+         * This list is how a screen says a file is out of sight rather than pretending the album never
+         * held it.
+         */
+        val trashedItemIds: List<VaultItemId> = emptyList(),
     ) : VaultAlbumContents {
 
         /** Whether the album holds nothing at all — which is a valid, deliberately-created state. */
-        val isEmpty: Boolean get() = items.isEmpty() && staleItemIds.isEmpty()
+        val isEmpty: Boolean
+            get() = items.isEmpty() && staleItemIds.isEmpty() && trashedItemIds.isEmpty()
     }
 
     /**
@@ -138,21 +148,42 @@ sealed interface VaultAlbumContents {
  * as stale. Nothing here removes, repairs or rewrites anything — the only thing that removes a stale
  * reference is a person asking to.
  */
-fun List<VaultAlbum>.resolveAgainst(index: VaultIndexState): List<VaultAlbumContents> =
-    map { album -> album.resolveAgainst(index) }
+fun List<VaultAlbum>.resolveAgainst(
+    index: VaultIndexState,
+    trashedItemIds: Set<VaultItemId> = emptySet(),
+): List<VaultAlbumContents> = map { album -> album.resolveAgainst(index, trashedItemIds) }
 
-/** Resolves one album against the vault's index, exactly as [resolveAgainst] does for a list. */
-fun VaultAlbum.resolveAgainst(index: VaultIndexState): VaultAlbumContents {
+/**
+ * Resolves one album against the vault's index, exactly as [resolveAgainst] does for a list.
+ *
+ * @param trashedItemIds the items the vault's trash record says are out of the active collection. A
+ *   member in this set is kept as a reference and reported separately, never drawn as active content
+ *   and never dropped: the album record names it, and that is what decides membership.
+ */
+fun VaultAlbum.resolveAgainst(
+    index: VaultIndexState,
+    trashedItemIds: Set<VaultItemId> = emptySet(),
+): VaultAlbumContents {
     val readable = index as? VaultIndexState.Ready
         ?: return VaultAlbumContents.Unresolved(album = this, index = index)
     val byId = readable.items.associateBy { item -> item.id }
     val items = ArrayList<VaultItem>(itemIds.size)
     val stale = ArrayList<VaultItemId>()
+    val trashed = ArrayList<VaultItemId>()
     for (itemId in itemIds) {
         val item = byId[itemId]
-        if (item == null) stale += itemId else items += item
+        when {
+            item == null -> stale += itemId
+            itemId in trashedItemIds -> trashed += itemId
+            else -> items += item
+        }
     }
-    return VaultAlbumContents.Resolved(album = this, items = items, staleItemIds = stale)
+    return VaultAlbumContents.Resolved(
+        album = this,
+        items = items,
+        staleItemIds = stale,
+        trashedItemIds = trashed,
+    )
 }
 
 /**

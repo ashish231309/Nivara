@@ -76,6 +76,13 @@ data class VaultAlbumUi(
     val memberCount: Int,
     val staleCount: Int,
     val resolved: Boolean,
+    /**
+     * How many of the album's members are in the vault's trash.
+     *
+     * The membership is preserved — restoring the item puts it back in the album's drawn contents —
+     * but a trashed file is not active content, so it is counted apart rather than drawn as one.
+     */
+    val trashedCount: Int = 0,
 )
 
 /**
@@ -105,6 +112,7 @@ sealed interface VaultAlbumContentsUi {
     data class Resolved(
         val items: List<VaultItemUi>,
         val staleItemIds: List<VaultItemId>,
+        val trashedItemIds: List<VaultItemId> = emptyList(),
     ) : VaultAlbumContentsUi
 
     /** The index cannot be read, so the album's references cannot be resolved into files. */
@@ -119,6 +127,15 @@ enum class VaultSection {
 
     /** The albums, and the one that is open when there is one. */
     Albums,
+
+    /**
+     * The files the vault has moved out of the active collection.
+     *
+     * Its own collection, and not a filter over the first one: what is in the trash is metadata the
+     * index does not carry, and a person looking at their trash is asking a different question than a
+     * person looking at their files.
+     */
+    Trash,
 }
 
 /** Turns what the repository read into what the screen draws, without inventing anything. */
@@ -154,6 +171,7 @@ internal fun VaultAlbumContents.toUiState(): VaultAlbumContentsUi = when (this) 
         // index, never from a copy kept in the album.
         items = items.map { item -> item.toItemUi() },
         staleItemIds = staleItemIds,
+        trashedItemIds = trashedItemIds,
     )
 
     is VaultAlbumContents.Unresolved -> VaultAlbumContentsUi.Unresolved(index = index.toUiState())
@@ -165,9 +183,10 @@ internal fun VaultAlbum.toAlbumUi(contents: VaultAlbumContents): VaultAlbumUi = 
         id = id,
         name = name,
         createdAtEpochMillis = createdAtEpochMillis,
-        memberCount = contents.items.size + contents.staleItemIds.size,
+        memberCount = contents.items.size + contents.staleItemIds.size + contents.trashedItemIds.size,
         staleCount = contents.staleItemIds.size,
         resolved = true,
+        trashedCount = contents.trashedItemIds.size,
     )
 
     is VaultAlbumContents.Unresolved -> VaultAlbumUi(

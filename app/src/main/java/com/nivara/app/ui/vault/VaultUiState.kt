@@ -3,6 +3,7 @@ package com.nivara.app.ui.vault
 import com.nivara.app.domain.vault.VaultAlbumId
 import com.nivara.app.domain.vault.VaultImportProgress
 import com.nivara.app.domain.vault.VaultOrdering
+import com.nivara.app.domain.vault.VaultTrashOrdering
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraMessage
@@ -60,11 +61,22 @@ sealed interface VaultUiState {
         val vault: VaultState,
         val index: VaultIndexUiState = VaultIndexUiState.Loading,
         val organization: VaultOrganizationUiState = VaultOrganizationUiState.Loading,
+        val trash: VaultTrashUiState = VaultTrashUiState.Loading,
         val section: VaultSection = VaultSection.AllItems,
         val searchQuery: String = "",
         val search: VaultSearchUiState = VaultSearchUiState.NotAsked,
         val searchSummary: VaultSearchSummary? = null,
         val ordering: VaultOrdering = VaultOrdering(),
+        val trashOrdering: VaultTrashOrdering = VaultTrashOrdering(),
+        /**
+         * Whether the files drawn below may include ones that are out of the active collection,
+         * because the trash record could not be read.
+         *
+         * `false` whenever the trash record answered — including when it says nothing is trashed —
+         * and `true` only when Nivara cannot say which files are out of sight. The screen says so
+         * instead of letting a list that may contain trashed files look like the active collection.
+         */
+        val trashStateUnknown: Boolean = false,
         val openAlbum: VaultAlbumDetailUi? = null,
         val renamingAlbumId: VaultAlbumId? = null,
         val confirmingAlbumDeleteId: VaultAlbumId? = null,

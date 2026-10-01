@@ -36,6 +36,7 @@ import com.nivara.app.domain.vault.VaultAlbumId
 import com.nivara.app.domain.vault.VaultImportProgress
 import com.nivara.app.domain.vault.VaultItemId
 import com.nivara.app.domain.vault.VaultSortField
+import com.nivara.app.domain.vault.VaultTrashSortField
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraLoadingState
@@ -129,6 +130,10 @@ fun VaultRoute(
             onAlbumItemsEditingChanged = viewModel::onAlbumItemsEditingChanged,
             onAlbumItemAdded = viewModel::onAddItemToAlbum,
             onAlbumItemRemoved = viewModel::onRemoveItemFromAlbum,
+            onTrashItem = viewModel::onTrashItemRequested,
+            onRestoreItem = viewModel::onRestoreRequested,
+            onTrashSortFieldSelected = viewModel::onTrashSortFieldSelected,
+            onTrashSortDirectionToggled = viewModel::onTrashSortDirectionToggled,
             modifier = modifier,
         )
     } else {
@@ -202,6 +207,10 @@ fun VaultScreen(
     onAlbumItemsEditingChanged: (Boolean) -> Unit,
     onAlbumItemAdded: (VaultItemId) -> Unit,
     onAlbumItemRemoved: (VaultItemId) -> Unit,
+    onTrashItem: (VaultItemId) -> Unit = {},
+    onRestoreItem: (VaultItemId) -> Unit = {},
+    onTrashSortFieldSelected: (VaultTrashSortField) -> Unit = {},
+    onTrashSortDirectionToggled: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -234,6 +243,10 @@ fun VaultScreen(
             onAlbumItemsEditingChanged = onAlbumItemsEditingChanged,
             onAlbumItemAdded = onAlbumItemAdded,
             onAlbumItemRemoved = onAlbumItemRemoved,
+            onTrashItem = onTrashItem,
+            onRestoreItem = onRestoreItem,
+            onTrashSortFieldSelected = onTrashSortFieldSelected,
+            onTrashSortDirectionToggled = onTrashSortDirectionToggled,
             modifier = modifier,
         )
     }
@@ -267,6 +280,10 @@ private fun VaultContent(
     onAlbumItemsEditingChanged: (Boolean) -> Unit,
     onAlbumItemAdded: (VaultItemId) -> Unit,
     onAlbumItemRemoved: (VaultItemId) -> Unit,
+    onTrashItem: (VaultItemId) -> Unit,
+    onRestoreItem: (VaultItemId) -> Unit,
+    onTrashSortFieldSelected: (VaultTrashSortField) -> Unit,
+    onTrashSortDirectionToggled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -357,12 +374,15 @@ private fun VaultContent(
                 section = state.section,
                 searchQuery = state.searchQuery,
                 ordering = state.ordering,
+                trashOrdering = state.trashOrdering,
                 busy = state.busy,
                 onSectionSelected = onSectionSelected,
                 onSearchQueryChanged = onSearchQueryChanged,
                 onSearchCleared = onSearchCleared,
                 onSortFieldSelected = onSortFieldSelected,
                 onSortDirectionToggled = onSortDirectionToggled,
+                onTrashSortFieldSelected = onTrashSortFieldSelected,
+                onTrashSortDirectionToggled = onTrashSortDirectionToggled,
             )
 
             VaultSearchResultCard(
@@ -373,10 +393,28 @@ private fun VaultContent(
                 totalCount = state.searchSummary?.total,
             )
 
+            // The trash record cannot be read, so Nivara cannot say which of the files below are out
+            // of the active collection. Saying so is the only honest thing to do with a list that may
+            // contain files whose state is unknown.
+            if (state.trashStateUnknown && state.section != VaultSection.Trash) {
+                Text(
+                    text = stringResource(id = R.string.vault_trash_state_unknown_notice),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
             when (state.section) {
                 VaultSection.AllItems -> VaultIndexCard(
                     index = state.index,
                     onOpenItem = onOpenItem,
+                    onTrashItem = if (state.trash.acceptsChanges) onTrashItem else null,
+                )
+
+                VaultSection.Trash -> VaultTrashCard(
+                    trash = state.trash,
+                    busy = state.busy,
+                    onRestore = onRestoreItem,
                 )
 
                 VaultSection.Albums -> VaultAlbumsCard(
@@ -401,6 +439,7 @@ private fun VaultContent(
                     onAddItem = onAlbumItemAdded,
                     onRemoveItem = onAlbumItemRemoved,
                     onOpenItem = onOpenItem,
+                    onTrashItem = if (state.trash.acceptsChanges) onTrashItem else null,
                 )
             }
         }
@@ -484,6 +523,7 @@ private fun VaultStateCard(
 private fun VaultIndexCard(
     index: VaultIndexUiState,
     onOpenItem: (VaultItemUi) -> Unit,
+    onTrashItem: ((VaultItemUi) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -515,7 +555,9 @@ private fun VaultIndexCard(
                 )
             }
             if (index is VaultIndexUiState.Indexed && index.items.isNotEmpty()) {
-                index.items.forEach { item -> VaultItemRow(item = item, onOpen = onOpenItem) }
+                index.items.forEach { item ->
+                    VaultItemRow(item = item, onOpen = onOpenItem, onTrash = onTrashItem)
+                }
             }
         }
     }
@@ -535,6 +577,7 @@ private fun VaultIndexCard(
 internal fun VaultItemRow(
     item: VaultItemUi,
     onOpen: (VaultItemUi) -> Unit,
+    onTrash: ((VaultItemUi) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -560,6 +603,13 @@ internal fun VaultItemRow(
             text = stringResource(id = R.string.vault_item_imported_format, imported),
             style = MaterialTheme.typography.bodySmall,
         )
+        // Moving a file out of the active collection is offered only where the trash record can be
+        // read: a control that cannot succeed is worse than no control.
+        if (onTrash != null) {
+            OutlinedButton(onClick = { onTrash(item) }) {
+                Text(text = stringResource(id = R.string.vault_trash_move_action))
+            }
+        }
     }
 }
 
@@ -687,6 +737,10 @@ private fun VaultNotConfiguredPreview() {
             onAlbumItemsEditingChanged = {},
             onAlbumItemAdded = {},
             onAlbumItemRemoved = {},
+            onTrashItem = {},
+            onRestoreItem = {},
+            onTrashSortFieldSelected = {},
+            onTrashSortDirectionToggled = {},
         )
     }
 }
@@ -727,6 +781,10 @@ private fun VaultReadyPreview() {
             onAlbumItemsEditingChanged = {},
             onAlbumItemAdded = {},
             onAlbumItemRemoved = {},
+            onTrashItem = {},
+            onRestoreItem = {},
+            onTrashSortFieldSelected = {},
+            onTrashSortDirectionToggled = {},
         )
     }
 }
@@ -762,6 +820,10 @@ private fun VaultUnreadablePreview() {
             onAlbumItemsEditingChanged = {},
             onAlbumItemAdded = {},
             onAlbumItemRemoved = {},
+            onTrashItem = {},
+            onRestoreItem = {},
+            onTrashSortFieldSelected = {},
+            onTrashSortDirectionToggled = {},
         )
     }
 }

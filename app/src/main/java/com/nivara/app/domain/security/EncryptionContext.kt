@@ -53,6 +53,17 @@ enum class EncryptionContext(val tag: Int) {
      * onto an index slot — or the reverse — fails before anything is decrypted.
      */
     VaultOrganization(tag = 0x08),
+
+    /**
+     * The record that holds the items a vault has moved out of its active collection.
+     *
+     * A fourth purpose for the vault's metadata, and a fourth place a ciphertext can belong to: what
+     * the vault holds, how its owner has organised those files, and which files are out of the active
+     * collection are three different things with three different lifetimes, and a ciphertext made for
+     * one must never be accepted for another. Since the purpose is authenticated, moving a trash record
+     * onto an album or index slot — or the reverse — fails before anything is decrypted.
+     */
+    VaultTrash(tag = 0x09),
     ;
 
     companion object {

@@ -123,4 +123,19 @@ internal object VaultStructure {
      * other even if one were moved onto the other's name.
      */
     val ORGANIZATION_SLOT_NAMES: List<String> = listOf("albums.0.nva", "albums.1.nva")
+
+    /**
+     * The two trash-record slots — the items the vault has moved out of the active collection.
+     *
+     * A fourth pair, written exactly like the other three and for exactly the same reason: a new trash
+     * generation goes into the slot that is not the current one, so the record a reader would pick is
+     * never the record being written. They live in the metadata area with the rest because they *are*
+     * metadata — a small authenticated record about the vault — and the content area's listing must
+     * keep meaning "objects, and nothing else".
+     *
+     * The marker inside them is `NVTR` rather than the index's `NVIN` or the album record's `NVAO`, and
+     * they are sealed under a purpose of their own, so a trash record can never be mistaken for either
+     * of the others even if one were moved onto the other's name.
+     */
+    val TRASH_SLOT_NAMES: List<String> = listOf("trash.0.nvt", "trash.1.nvt")
 }

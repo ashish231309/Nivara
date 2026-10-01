@@ -87,6 +87,22 @@ object VaultSearch {
     fun filterAlbums(albums: List<VaultAlbum>, query: VaultSearchQuery): List<VaultAlbum> =
         if (query.isBlank) albums else albums.filter { album -> matches(album, query) }
 
+    /**
+     * The trashed entries of [items] whose preserved metadata matches [query], in the order given.
+     *
+     * The trash surface reuses these matching rules rather than owning a second search, so a query
+     * means the same thing wherever it is asked. An entry whose item the index does not name — or
+     * cannot be asked about, because the index cannot be read — has no metadata to match and is not a
+     * match; the screen says the list could not be read rather than reporting an empty result as if
+     * the question had been answered.
+     */
+    fun filterTrash(items: List<VaultTrashItem>, query: VaultSearchQuery): List<VaultTrashItem> =
+        if (query.isBlank) {
+            items
+        } else {
+            items.filter { trashed -> trashed.item?.let { item -> matches(item, query) } == true }
+        }
+
     private fun matchesText(text: String, normalizedNeedle: String): Boolean =
         normalize(text).contains(normalizedNeedle)
 

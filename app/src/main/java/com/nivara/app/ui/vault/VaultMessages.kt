@@ -9,6 +9,8 @@ import com.nivara.app.domain.vault.VaultIndexUnreadable
 import com.nivara.app.domain.vault.VaultOrganizationFailure
 import com.nivara.app.domain.vault.VaultOrganizationUnreadable
 import com.nivara.app.domain.vault.VaultState
+import com.nivara.app.domain.vault.VaultTrashFailure
+import com.nivara.app.domain.vault.VaultTrashUnreadable
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraMessage
 
@@ -250,6 +252,72 @@ internal fun vaultOrganizationUnavailableMessage(): NivaraMessage =
 /** Shown when an album change failed for a reason Nivara cannot name. */
 internal fun vaultAlbumChangeFailedMessage(): NivaraMessage =
     NivaraMessage(textRes = R.string.vault_album_error_failed)
+
+/**
+ * Text for the trash record's own states.
+ *
+ * The headings and bodies sit beside the index's and the albums' for the same reason they have them: a
+ * record that cannot be read must be explained as *that*, and never allowed to read as "your trash is
+ * empty".
+ */
+internal fun VaultTrashUiState.titleRes(): Int? = when (this) {
+    VaultTrashUiState.Loading,
+    VaultTrashUiState.VaultNotReady,
+    VaultTrashUiState.Empty,
+    is VaultTrashUiState.Trashed,
+    -> null
+
+    is VaultTrashUiState.Unreadable -> R.string.vault_trash_unreadable_title
+    VaultTrashUiState.UnsupportedVersion -> R.string.vault_trash_unsupported_title
+    VaultTrashUiState.Unavailable -> R.string.vault_trash_unavailable_title
+    VaultTrashUiState.AccessDenied -> R.string.vault_trash_access_denied_title
+}
+
+/** The sentence under a trash-record state that needs one. */
+internal fun VaultTrashUiState.bodyRes(): Int? = when (this) {
+    is VaultTrashUiState.Unreadable -> when (reason) {
+        VaultTrashUnreadable.MetadataDamaged -> R.string.vault_trash_unreadable_body
+        VaultTrashUnreadable.KeyUnavailable -> R.string.vault_trash_key_unavailable_body
+    }
+
+    VaultTrashUiState.UnsupportedVersion -> R.string.vault_trash_unsupported_body
+    VaultTrashUiState.Unavailable -> R.string.vault_trash_unavailable_body
+    VaultTrashUiState.AccessDenied -> R.string.vault_trash_access_denied_body
+    else -> null
+}
+
+/** Every trash change that failed says why, and none of them says a file was deleted. */
+internal fun VaultTrashFailure.asMessage(): NivaraMessage = NivaraMessage(textRes = messageRes())
+
+private fun VaultTrashFailure.messageRes(): Int = when (this) {
+    VaultTrashFailure.NotAuthorized -> R.string.vault_trash_error_not_authorized
+    is VaultTrashFailure.VaultNotReady -> R.string.vault_trash_error_vault_not_ready
+    is VaultTrashFailure.TrashUnreadable -> when (reason) {
+        VaultTrashUnreadable.MetadataDamaged -> R.string.vault_trash_error_unreadable
+        VaultTrashUnreadable.KeyUnavailable -> R.string.vault_trash_error_key_unavailable
+    }
+    is VaultTrashFailure.UnsupportedVersion -> R.string.vault_trash_error_unsupported
+    VaultTrashFailure.MetadataUnavailable -> R.string.vault_trash_error_unavailable
+    VaultTrashFailure.AccessDenied -> R.string.vault_trash_error_access_denied
+    is VaultTrashFailure.IndexUnreadable -> R.string.vault_trash_error_index_unreadable
+    is VaultTrashFailure.IndexUnsupportedVersion -> R.string.vault_trash_error_index_unsupported
+    VaultTrashFailure.IndexUnavailable -> R.string.vault_trash_error_index_unavailable
+    VaultTrashFailure.ItemNotInVault -> R.string.vault_trash_error_item_not_in_vault
+    VaultTrashFailure.TrashFull -> R.string.vault_trash_error_full
+    VaultTrashFailure.StorageUnavailable -> R.string.vault_trash_error_storage_unavailable
+    VaultTrashFailure.WriteFailed -> R.string.vault_trash_error_write_failed
+    VaultTrashFailure.VerificationFailed -> R.string.vault_trash_error_not_verified
+    VaultTrashFailure.KeyUnavailable -> R.string.vault_trash_error_key_unavailable
+    VaultTrashFailure.CryptographyFailed -> R.string.vault_trash_error_cryptography
+}
+
+/** Shown when the trash was asked for while its record is not in a state that may be changed. */
+internal fun vaultTrashUnavailableMessage(): NivaraMessage =
+    NivaraMessage(textRes = R.string.vault_trash_error_not_writable)
+
+/** Shown when a trash change failed for a reason Nivara cannot name. */
+internal fun vaultTrashChangeFailedMessage(): NivaraMessage =
+    NivaraMessage(textRes = R.string.vault_trash_error_failed)
 
 /** Shown when the user asked to import while the gate was closed. */
 internal fun vaultImportLockedMessage(): NivaraMessage =

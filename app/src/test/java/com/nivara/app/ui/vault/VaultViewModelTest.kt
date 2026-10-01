@@ -24,6 +24,7 @@ import com.nivara.app.domain.vault.VaultRepository
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.testing.FakeVaultOrganizationRepository
+import com.nivara.app.testing.FakeVaultTrashRepository
 import com.nivara.app.testing.TEST_SESSION_TIMEOUT_MILLIS
 import com.nivara.app.testing.testSessionManager
 import kotlinx.coroutines.CompletableDeferred
@@ -519,12 +520,14 @@ class VaultViewModelTest {
         repository: VaultRepository,
         index: VaultIndexRepository = FakeVaultIndexRepository(),
         albums: VaultOrganizationRepository = FakeVaultOrganizationRepository(),
+        trash: FakeVaultTrashRepository = FakeVaultTrashRepository(),
         locations: FakeVaultLocationStore = FakeVaultLocationStore(),
         session: SessionManager = testSessionManager(clock),
     ): VaultViewModel = VaultViewModel(
         vaultRepository = repository,
         indexRepository = index,
         organizationRepository = albums,
+        trashRepository = trash,
         locationStore = locations,
         sessionManager = session,
     )

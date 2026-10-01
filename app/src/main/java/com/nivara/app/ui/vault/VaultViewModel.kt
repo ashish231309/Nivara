@@ -29,8 +29,14 @@ import com.nivara.app.domain.vault.VaultSearch
 import com.nivara.app.domain.vault.VaultSearchQuery
 import com.nivara.app.domain.vault.VaultSearchResult
 import com.nivara.app.domain.vault.VaultSortField
+import com.nivara.app.domain.vault.VaultTrashFailure
+import com.nivara.app.domain.vault.VaultTrashOrdering
+import com.nivara.app.domain.vault.VaultTrashRepository
+import com.nivara.app.domain.vault.VaultTrashSortField
+import com.nivara.app.domain.vault.VaultTrashState
 import com.nivara.app.domain.vault.VaultSourceReference
 import com.nivara.app.domain.vault.asOrganizationFailure
+import com.nivara.app.domain.vault.asTrashFailure
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.inOrder
 import com.nivara.app.domain.vault.resolveAgainst
@@ -78,6 +84,7 @@ class VaultViewModel(
     private val vaultRepository: VaultRepository,
     private val indexRepository: VaultIndexRepository,
     private val organizationRepository: VaultOrganizationRepository,
+    private val trashRepository: VaultTrashRepository,
     private val locationStore: VaultLocationStore,
     private val sessionManager: SessionManager,
 ) : ViewModel() {
@@ -99,7 +106,12 @@ class VaultViewModel(
     private var domainIndex: VaultIndexState? = null
     private var indexState: VaultIndexUiState = VaultIndexUiState.Loading
     private var domainOrganization: VaultOrganizationState? = null
+
+    /** The trash record as the domain reported it, kept beside what the screen draws from it. */
+    private var domainTrash: VaultTrashState? = null
+    private var trashState: VaultTrashUiState = VaultTrashUiState.Loading
     private var ordering: VaultOrdering = VaultOrdering()
+    private var trashOrdering: VaultTrashOrdering = VaultTrashOrdering()
     private var query: VaultSearchQuery = VaultSearchQuery.NONE
     private var queryText: String = ""
     private var section: VaultSection = VaultSection.AllItems
@@ -355,7 +367,7 @@ class VaultViewModel(
         // Leaving the albums closes whatever album was open: the section is the collection being
         // shown, and an album card inside the file list would be a second screen's worth of state
         // surviving a navigation the user made.
-        if (section == VaultSection.AllItems) {
+        if (section != VaultSection.Albums) {
             openAlbumId = null
             editingAlbumItems = false
             renamingAlbumId = null
@@ -394,6 +406,37 @@ class VaultViewModel(
     fun onSortDirectionToggled() {
         ordering = ordering.toggled()
         publish()
+    }
+
+    /** Chooses the field the trash list is ordered by. The direction is kept. */
+    fun onTrashSortFieldSelected(field: VaultTrashSortField) {
+        if (trashOrdering.field == field) return
+        trashOrdering = trashOrdering.copy(field = field)
+        publish()
+    }
+
+    /** Reverses the trash order. */
+    fun onTrashSortDirectionToggled() {
+        trashOrdering = trashOrdering.toggled()
+        publish()
+    }
+
+    /** Moves [itemId] out of the active collection. The file itself is untouched. */
+    fun onTrashItemRequested(itemId: VaultItemId) {
+        if (!canChangeTrash()) return
+        changeTrash(
+            work = { authorize -> trashRepository.trash(itemId = itemId, authorize = authorize) },
+            onDone = { R.string.vault_trash_notice_trashed },
+        )
+    }
+
+    /** Moves [itemId] back into the active collection. The same file, the same identifier. */
+    fun onRestoreRequested(itemId: VaultItemId) {
+        if (!canChangeTrash()) return
+        changeTrash(
+            work = { authorize -> trashRepository.restore(itemId = itemId, authorize = authorize) },
+            onDone = { R.string.vault_trash_notice_restored },
+        )
     }
 
     /** Opens an album: its items are resolved from the index that was already read. */
@@ -595,6 +638,76 @@ class VaultViewModel(
         }
     }
 
+    /**
+     * Whether the trash may be changed right now.
+     *
+     * Three things, asked at the moment of the tap: the vault is open, its trash record can be read
+     * (or does not exist yet), and the existing gate is open. A record that cannot be read is never
+     * written over, and the refusal is explained with the same wording every other refused change on
+     * this screen uses.
+     */
+    private fun canChangeTrash(): Boolean {
+        val current = readyState() ?: return false
+        if (current.busy || current.importing) return false
+        val vault = current.vault
+        if (vault !is VaultState.Ready || !current.trash.acceptsChanges) {
+            failure = vaultTrashUnavailableMessage()
+            noticeRes = null
+            publish()
+            return false
+        }
+        return hasSession()
+    }
+
+    /**
+     * Runs one trash change, then reads the record back.
+     *
+     * The same shape as an album change and for the same reason: the screen shows what the record
+     * says after the change, never what the change intended. The new list is read from storage
+     * whatever the outcome, so a write that did not verify is drawn as the trash that is actually
+     * there.
+     */
+    private fun changeTrash(
+        work: suspend (authorize: () -> Boolean) -> NivaraResult<*>,
+        onDone: () -> Int,
+    ) {
+        busy = true
+        failure = null
+        noticeRes = null
+        publish()
+
+        viewModelScope.launch {
+            val result = try {
+                work { sessionManager.currentState().isAuthenticated }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                // The contract reports failures as results. An implementation that throws anyway is
+                // reported as a failed change, never as a change that happened.
+                null
+            }
+
+            busy = false
+            when {
+                result == null -> failure = vaultTrashChangeFailedMessage()
+
+                result is NivaraResult.Failure -> {
+                    val typed = result.error.asTrashFailure()
+                    if (typed == VaultTrashFailure.NotAuthorized) unlockRequired = true
+                    failure = typed?.asMessage() ?: vaultTrashChangeFailedMessage()
+                    noticeRes = null
+                }
+
+                else -> {
+                    failure = null
+                    noticeRes = onDone()
+                }
+            }
+            readTrash()
+            publish()
+        }
+    }
+
     /** Clears the last failure or confirmation, so a message does not outlive the moment. */
     fun onMessageShown() {
         if (failure == null && noticeRes == null) return
@@ -682,10 +795,14 @@ class VaultViewModel(
                 // The albums are a third fact, read from their own record. Like the index they are
                 // never rebuilt, and a record that cannot be read stays a record that cannot be read.
                 readOrganization()
+                // The trash is a fourth fact, read from a record of its own. It is never inferred
+                // from what the index does or does not list.
+                readTrash()
             } else {
                 domainIndex = VaultIndexState.VaultNotReady(state)
                 indexState = drawnIndex()
                 domainOrganization = VaultOrganizationState.VaultNotReady(state)
+                domainTrash = VaultTrashState.VaultNotReady(state)
             }
             if (!keepMessages) {
                 failure = null
@@ -723,7 +840,33 @@ class VaultViewModel(
      */
     private fun drawnIndex(): VaultIndexUiState {
         val index = domainIndex ?: return VaultIndexUiState.Loading
-        return index.toUiState(ordering = ordering, query = query)
+        // The active collection is everything the vault lists except what the trash record names.
+        // When that record cannot be read the set is empty and the screen says the list may contain
+        // files whose state is unknown, rather than silently claiming every file is active.
+        return index.toUiState(
+            ordering = ordering,
+            query = query,
+            trashedItemIds = activeTrashedItemIds(),
+        )
+    }
+
+    /** The identifiers the trash record says are out of the active collection. */
+    private fun activeTrashedItemIds(): Set<VaultItemId> =
+        domainTrash?.trashedItemIdsOrNull ?: emptySet()
+
+    /**
+     * The trash as the screen draws it: the record's entries, joined with the index that was already
+     * read, filtered by the search box and ordered by the trash's own sort control.
+     */
+    private fun drawnTrash(): VaultTrashUiState {
+        val trash = domainTrash ?: return VaultTrashUiState.Loading
+        return trash.toUiState(
+            index = domainIndex ?: VaultIndexState.Missing,
+            ordering = trashOrdering,
+            // The search box asks about the collection being looked at: on the trash surface it is a
+            // question about trashed files, and nowhere else is it asked of them.
+            query = if (section == VaultSection.Trash) query else VaultSearchQuery.NONE,
+        )
     }
 
     /**
@@ -744,6 +887,23 @@ class VaultViewModel(
     }
 
     /**
+     * Reads the vault's trash.
+     *
+     * A record that cannot be read stays its own state: nothing here turns it into an empty trash,
+     * because doing so would tell a person their files are gone when the record that names them is
+     * still on storage.
+     */
+    private suspend fun readTrash() {
+        domainTrash = try {
+            trashRepository.read()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            VaultTrashState.Unavailable
+        }
+    }
+
+    /**
      * The albums as the screen draws them, each resolved against the index that was read.
      *
      * On the albums surface the search box filters them by title — album names are metadata Nivara
@@ -754,7 +914,9 @@ class VaultViewModel(
         val domain = domainOrganization ?: return VaultOrganizationUiState.Loading
         val index = domainIndex ?: VaultIndexState.Missing
         val visible = if (section == VaultSection.Albums) domain.matchingQuery() else domain
-        return visible.toUiState { album -> album.resolveAgainst(index) }
+        return visible.toUiState { album ->
+            album.resolveAgainst(index, activeTrashedItemIds())
+        }
     }
 
     /** The readable albums whose title matches the current query, or this state unchanged. */
@@ -781,13 +943,17 @@ class VaultViewModel(
         val albumId = openAlbumId ?: return null
         val readable = domainOrganization as? VaultOrganizationState.Ready ?: return null
         val album = readable.album(albumId) ?: return null
-        val contents = album.resolveAgainst(domainIndex ?: VaultIndexState.Missing)
+        val contents = album.resolveAgainst(
+            index = domainIndex ?: VaultIndexState.Missing,
+            trashedItemIds = activeTrashedItemIds(),
+        )
         val drawn = when (contents) {
             is VaultAlbumContents.Resolved -> VaultAlbumContentsUi.Resolved(
                 items = VaultSearch.filter(contents.items, query)
                     .inOrder(ordering)
                     .map { item -> item.toItemUi() },
                 staleItemIds = contents.staleItemIds,
+                trashedItemIds = contents.trashedItemIds,
             )
 
             is VaultAlbumContents.Unresolved ->
@@ -811,6 +977,7 @@ class VaultViewModel(
         val state = vaultState ?: return
         indexState = drawnIndex()
         val organization = drawnOrganization()
+        trashState = drawnTrash()
         val openAlbum = drawnOpenAlbum()
         // An album that is no longer in the record is not left open: the screen would otherwise draw a
         // detail card for something that was deleted.
@@ -822,11 +989,14 @@ class VaultViewModel(
             vault = state,
             index = indexState,
             organization = organization,
+            trash = trashState,
             section = section,
             searchQuery = queryText,
-            search = searchState(indexState, organization),
-            searchSummary = searchSummary(indexState, organization),
+            search = searchState(indexState, organization, trashState),
+            searchSummary = searchSummary(indexState, organization, trashState),
             ordering = ordering,
+            trashOrdering = trashOrdering,
+            trashStateUnknown = domainTrash?.trashedItemIdsOrNull == null,
             openAlbum = openAlbum,
             renamingAlbumId = renamingAlbumId,
             confirmingAlbumDeleteId = confirmingDeleteId,
@@ -851,6 +1021,7 @@ class VaultViewModel(
     private fun searchState(
         index: VaultIndexUiState,
         organization: VaultOrganizationUiState,
+        trash: VaultTrashUiState,
     ): VaultSearchUiState = when {
         query.isBlank -> VaultSearchUiState.NotAsked
 
@@ -864,15 +1035,26 @@ class VaultViewModel(
             else -> VaultSearchUiState.CannotSearch
         }
 
-        // The domain answers this one, so the screen cannot invent a different set of rules: a vault
-        // with no list record answers "nothing matches", and a list that cannot be read refuses to be
-        // asked at all.
-        else -> when (val asked = (domainIndex ?: VaultIndexState.Missing).search(query)) {
-            VaultSearchResult.NotAsked -> VaultSearchUiState.NotAsked
-            is VaultSearchResult.Found ->
-                if (asked.items.isEmpty()) VaultSearchUiState.NoMatches else VaultSearchUiState.Matches
+        // On the trash surface the question is about trashed files, so it can be answered only when
+        // both the trash record and the vault's list — which holds the names being matched — can be
+        // read. Anything else is "the question could not be asked", never "nothing matched".
+        section == VaultSection.Trash -> when {
+            trash is VaultTrashUiState.Trashed ->
+                if (trash.items.isEmpty()) VaultSearchUiState.NoMatches else VaultSearchUiState.Matches
 
-            is VaultSearchResult.CannotSearch -> VaultSearchUiState.CannotSearch
+            trash is VaultTrashUiState.Empty -> VaultSearchUiState.NoMatches
+            else -> VaultSearchUiState.CannotSearch
+        }
+
+        // Everywhere else the answer is read from the list as the screen draws it — the active
+        // collection, with the trash already subtracted — so a query that matches only a trashed file
+        // cannot be answered "1 of 12 files" while the list shows none.
+        else -> when (index) {
+            is VaultIndexUiState.Indexed ->
+                if (index.items.isEmpty()) VaultSearchUiState.NoMatches else VaultSearchUiState.Matches
+
+            VaultIndexUiState.Empty -> VaultSearchUiState.NoMatches
+            else -> VaultSearchUiState.CannotSearch
         }
     }
 
@@ -885,6 +1067,7 @@ class VaultViewModel(
     private fun searchSummary(
         index: VaultIndexUiState,
         organization: VaultOrganizationUiState,
+        trash: VaultTrashUiState,
     ): VaultSearchSummary? {
         if (query.isBlank) return null
         if (section == VaultSection.Albums) {
@@ -892,14 +1075,29 @@ class VaultViewModel(
             val total = (domainOrganization as? VaultOrganizationState.Ready)?.albums?.size ?: return null
             return VaultSearchSummary(matches = drawn.albums.size, total = total)
         }
+        if (section == VaultSection.Trash) {
+            val total = when (trash) {
+                is VaultTrashUiState.Trashed -> (domainTrash as? VaultTrashState.Ready)?.entries?.size
+                VaultTrashUiState.Empty -> 0
+                else -> null
+            } ?: return null
+            val matches = (trash as? VaultTrashUiState.Trashed)?.items?.size ?: return null
+            return VaultSearchSummary(matches = matches, total = total)
+        }
         val domain = domainIndex ?: return null
+        val drawn = (index as? VaultIndexUiState.Indexed)?.items?.size ?: return null
         val total = when (domain) {
-            is VaultIndexState.Ready -> domain.items.size
+            is VaultIndexState.Ready -> {
+                // The active collection, when the trash record can say which files are out of it; the
+                // whole list otherwise, with the screen warning that some of it may be out of sight.
+                val trashed = domainTrash?.trashedItemIdsOrNull
+                if (trashed == null) domain.items.size else domain.items.count { item -> item.id !in trashed }
+            }
+
             VaultIndexState.Missing -> 0
             else -> return null
         }
-        val matches = (index as? VaultIndexUiState.Indexed)?.items?.size ?: return null
-        return VaultSearchSummary(matches = matches, total = total)
+        return VaultSearchSummary(matches = drawn, total = total)
     }
 
     companion object {
@@ -929,6 +1127,7 @@ class VaultViewModel(
                     vaultRepository = container.vaultRepository,
                     indexRepository = container.vaultIndexRepository,
                     organizationRepository = container.vaultOrganizationRepository,
+                    trashRepository = container.vaultTrashRepository,
                     locationStore = container.vaultLocationStore,
                     sessionManager = container.sessionManager,
                 )

@@ -23,6 +23,7 @@ import com.nivara.app.domain.vault.VaultSortField
 import com.nivara.app.domain.vault.VaultSourceReference
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.testing.FakeVaultOrganizationRepository
+import com.nivara.app.testing.FakeVaultTrashRepository
 import com.nivara.app.testing.testAlbumId
 import com.nivara.app.testing.testItem
 import com.nivara.app.testing.testItemId
@@ -619,12 +620,14 @@ class VaultOrganizationViewModelTest {
     private fun viewModel(
         index: VaultIndexRepository = VaultIndexRepositoryDouble(VaultIndexState.Missing),
         albums: FakeVaultOrganizationRepository = FakeVaultOrganizationRepository(),
+        trash: FakeVaultTrashRepository = FakeVaultTrashRepository(),
         repository: VaultRepository = FakeReadyVaultRepository(),
         session: SessionManager = testSessionManager(clock),
     ): VaultViewModel = VaultViewModel(
         vaultRepository = repository,
         indexRepository = index,
         organizationRepository = albums,
+        trashRepository = trash,
         locationStore = FakeVaultLocationStore(),
         sessionManager = session,
     )

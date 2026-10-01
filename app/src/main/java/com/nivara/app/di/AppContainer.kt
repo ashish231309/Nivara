@@ -23,6 +23,7 @@ import com.nivara.app.data.session.InMemorySessionManager
 import com.nivara.app.data.vault.FileVaultLocationStore
 import com.nivara.app.data.vault.NivaraVaultIndexRepository
 import com.nivara.app.data.vault.NivaraVaultOrganizationRepository
+import com.nivara.app.data.vault.NivaraVaultTrashRepository
 import com.nivara.app.data.vault.NivaraVaultRepository
 import com.nivara.app.data.vault.SafDocumentSourceOpener
 import com.nivara.app.data.vault.SafVaultContentStorage
@@ -63,6 +64,7 @@ import com.nivara.app.domain.security.SecureRandomGenerator
 import com.nivara.app.domain.vault.VaultContentReader
 import com.nivara.app.domain.vault.VaultIndexRepository
 import com.nivara.app.domain.vault.VaultOrganizationRepository
+import com.nivara.app.domain.vault.VaultTrashRepository
 import com.nivara.app.domain.vault.VaultLocationStore
 import com.nivara.app.domain.vault.VaultRepository
 import com.nivara.app.ui.applications.ApplicationIconLoader
@@ -271,6 +273,16 @@ interface AppContainer {
      * or delete a single file. See docs/vault/README.md.
      */
     val vaultOrganizationRepository: VaultOrganizationRepository
+
+    /**
+     * The vault's trash: which of the files it holds are out of the active collection.
+     *
+     * A third repository over the same vault, not a second vault: it borrows the same key, reads and
+     * writes one small authenticated record of its own, and refers to items by the identifiers the
+     * index gives them. Moving a file to trash writes one line into that record; it never touches
+     * content and never deletes anything. See docs/vault/README.md.
+     */
+    val vaultTrashRepository: VaultTrashRepository
 
     /**
      * The vault's content, opened for reading.
@@ -559,6 +571,26 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     override val vaultOrganizationRepository: VaultOrganizationRepository get() = nivaraVaultOrganization
+
+    /**
+     * The trash record, written and read by the same rules the index and the albums follow: the same
+     * vault root, the same key borrow, the same two-slot generational write with a read-back before
+     * anything is pruned — and a purpose of its own, so a trash record can never be accepted for an
+     * album or index record.
+     */
+    private val nivaraVaultTrash: NivaraVaultTrashRepository by lazy {
+        NivaraVaultTrashRepository(
+            vaultRepository = nivaraVaultStorage,
+            indexRepository = nivaraVaultIndex,
+            keyAccess = nivaraVaultStorage,
+            metadataStorageFactory = { location ->
+                SafVaultRootStorage(context = applicationContext, location = location)
+            },
+            encryptionService = encryptionService,
+        )
+    }
+
+    override val vaultTrashRepository: VaultTrashRepository get() = nivaraVaultTrash
 
     /**
      * The vault's content, as a viewer's engines read it.
