@@ -11,10 +11,12 @@ frameworks, and no dependencies that are not justified by code that exists.
 ## Project status
 
 The repository contains the **foundation release**, the **cryptographic core**, **primary
-credential enrolment**, **biometric unlock as a secondary path**, the **session layer** and the
+credential enrolment**, **biometric unlock as a secondary path**, the **session layer**, the
 **App Lock layer** — launcher discovery, the two Android capabilities it needs, foreground
 detection, the protection surface that presents the requirement and routes authentication into the
-session, and the settings screen that chooses which applications are protected.
+session, and the settings screen that chooses which applications are protected — and the
+**hidden-app layer**: the record of which applications Nivara keeps out of sight, and the screen
+that manages it.
 
 What works today:
 
@@ -38,6 +40,10 @@ What works today:
   stored set gives each of them, search and two orderings, and protect/unprotect through the same
   repository detection reads — a change requiring a valid session, reading the list requiring
   none;
+- hidden-application management: every application the device can launch, which of them Nivara is
+  asked to keep out of sight, search and two orderings, and hide/unhide through the one repository
+  that stores that decision — a separate record from App Lock, requiring a valid session to change
+  and none to read, and honest that Android's own launcher is not affected by it;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
@@ -46,22 +52,26 @@ Biometric unlock never replaces the primary credential and never unlocks anythin
 the session is not one either: it is an authorization state held only while the process lives, and
 it holds no credential, no key and nothing on disk. Detection decides and publishes; the surface
 that presents a requirement is separate from it, holds no credential of its own and can do exactly
-one thing with an authentication result — hand it to the session gate. There is still no app
-hiding, no vault and no recovery flow — those are the stages that follow,
-and they consume the layers
-described in [`docs/crypto/README.md`](docs/crypto/README.md),
+one thing with an authentication result — hand it to the session gate. There is still no
+custom launcher, no vault and no recovery flow — those are the stages that follow, and they consume
+the layers described in [`docs/crypto/README.md`](docs/crypto/README.md),
 [`docs/credential/README.md`](docs/credential/README.md),
 [`docs/biometric/README.md`](docs/biometric/README.md),
-[`docs/session/README.md`](docs/session/README.md) and
-[`docs/applock/README.md`](docs/applock/README.md).
+[`docs/session/README.md`](docs/session/README.md),
+[`docs/applock/README.md`](docs/applock/README.md) and
+[`docs/apphide/README.md`](docs/apphide/README.md). Hiding an application today means Nivara's own
+launcher will keep it out of sight when that launcher arrives; Android's launcher still shows every
+application, and the screen says so.
 
 ## Planned capabilities
 
 These are the areas Nivara is being built for. They are listed here so the direction of the
 project is clear; each one is implemented in its own release and is not present yet.
 
-- Authentication and biometric unlock
-- App locking and app hiding
+- Authentication and biometric unlock — delivered
+- App locking — delivered
+- Recording which applications are hidden — delivered; hiding them in Nivara's own launcher follows
+  with the launcher itself
 - An optional home-screen (launcher) experience
 - An encrypted file vault, including media, albums and a recycle bin
 - Recovery and session management
@@ -91,12 +101,14 @@ app/src/main/java/com/nivara/app/
 ├── di/                         Hand-written composition root (AppContainer)
 ├── core/common/                Types shared across layers (NivaraResult)
 ├── domain/                     Contracts the app depends on (no Android types)
-│   ├── app/                    Installed-application model, ordering and search rule
+│   ├── app/                    Installed-application model, package-name rule, ordering, search
 │   ├── permissions/            Usage Access and overlay capabilities, setup aggregate
-│   └── applock/                Protected set, detection, decision rule, overlay contract
+│   ├── applock/                Protected set, detection, decision rule, overlay contract
+│   └── apphide/                Hidden set, its repository contract and its failure cases
 ├── data/                       Platform-backed implementations of those contracts
 │   ├── app/                    Launcher-entry discovery through the package manager
 │   ├── applock/                Usage-event detector, protected set store, monitor, service
+│   ├── apphide/                The hidden set's versioned file format and its file repository
 │   ├── credential/             Credential record, counters and verifier
 │   ├── biometric/              Android's prompt, the NVBT record and its store
 │   ├── permissions/            Usage Access app-op check, overlay check, settings entry points
@@ -111,9 +123,11 @@ app/src/main/java/com/nivara/app/
     ├── about/                  About screen
     ├── credential/             Enrolment, verification and change screens
     ├── biometric/              Biometric settings, state and view model
+    ├── applications/           Application icons and the two orderings, shared by both lists
     ├── applock/                App Lock preparation screen, state and view model
     │   ├── management/         Choosing which applications are protected
     │   └── overlay/            The protection window, its lifecycle and its content
+    ├── apphide/                Choosing which applications Nivara keeps out of sight
     └── session/                Session text shared by the screens that show it
 ```
 
@@ -210,6 +224,18 @@ stored set that cannot be read and is therefore never reported as empty, a chang
 through the repository and read back from it, a stale row that writes nothing, and the session
 policy that lets the list be read by anyone and a change be made only while the gate is open.
 
+The hidden-application layer is covered the same way: the package-name identity rule and its
+refusals, the three outcomes of reading the stored set (and the rule that an unreadable one is never
+an empty one), the file format's rejection of every damaged shape — unknown magic or version,
+truncated, trailing bytes, a broken checksum, an implausible count, a name that is not a package, a
+duplicate entry — against real files, idempotent hide and unhide, serialised concurrent changes, a
+write that cannot be completed leaving the previous set authoritative, all four combinations of
+protected and hidden side by side, and the screen's state machine: what a row may claim in every
+combination of stored set and discovery, a search result that is never confused with an empty
+device, a stale row that writes nothing, a change that is read back from the repository, and the
+session policy that lets the list be read by anyone and a change be made only while the gate is
+open.
+
 Instrumented tests cover what only a device can prove: Android Keystore key generation,
 non-exportability, invalidation detection and use through a cipher, and that the biometric key
 refuses to produce output until Android has authorised a single operation. They are never simulated
@@ -235,6 +261,17 @@ Security behaviour is built into the project's defaults rather than added at the
   already shows those applications to anyone holding the phone; changing the set needs a valid
   session from the existing gate, opened through the existing credential or biometric flows, because
   unprotecting an application is the one action that can undo App Lock for it.
+- **Hiding is recorded, never enforced.** Nivara keeps one set of package names — the applications
+  the user asked to keep out of sight — in one file, owned by one repository, written atomically and
+  never read as empty when it cannot be read: a damaged or unreachable file refuses changes and
+  claims nothing about any application rather than quietly treating the set as empty. Nothing in
+  that path disables an application, touches another application's components or its enabled state,
+  asks for accessibility or device administration, or manipulates Android's launcher; the record is
+  a Nivara preference, and the screen and the documentation both say so. An application that
+  disappears from the device keeps its entry — a discovery gap must never delete the user's
+  configuration — and an application that comes back is hidden again. Changing the set requires the
+  existing session; reading it requires nothing, because it is the same information the device's
+  launcher already shows.
 - **Detection without privileges it does not need.** The App Lock service is a plain, unexported
   started service: no foreground service, no notification and no accessibility service, and no
   battery-exemption request. Detector code holds no overlay window of its own — the very same
@@ -335,6 +372,26 @@ Quick Lock are documented in [`docs/session/README.md`](docs/session/README.md).
 | Quick Lock | `sessionManager.lockNow()`: immediate, idempotent, and reusable by later features |
 | Persistence | None. No preferences, files or database; ending the process ends the session |
 | Failure counters | Never read, advanced or reset by the session; credential and biometric policies are untouched |
+
+## Hidden applications
+
+Nivara records which applications the user wants kept out of sight. That record is a set of package
+names and nothing else — no labels, no icons, no timestamps, no UI state — kept by one repository
+that the management screen reads and writes through, and that Nivara's own launcher will read when
+it arrives. The format, the failure cases and the boundary are documented in
+[`docs/apphide/README.md`](docs/apphide/README.md).
+
+| Concern | Behaviour |
+| --- | --- |
+| What is stored | Exact package names, in one versioned, checksummed file written atomically |
+| What is not | Nothing on the device is changed: no component disabled, no package manager call, no accessibility, no device admin |
+| Reading the set | Three outcomes — read (possibly empty), unreadable, unavailable — and never the last two as the first |
+| Damage | Reported as damage: changes are refused, the file is left as it was found, and no application is claimed to be visible or hidden |
+| Changing the set | The exact package name, through the repository, followed by a fresh read; idempotent, and never optimistic |
+| Who may change it | Whoever holds a valid session from the existing gate; reading needs none |
+| Relationship to App Lock | Independent: an application can be protected, hidden, both or neither, and neither screen touches the other's record |
+| An application that is gone | Keeps its entry and is hidden again if it returns; the screen counts it rather than deleting it |
+| Honesty | Android's launcher still shows these applications. This governs Nivara's own launcher, and the screen states that in as many words |
 
 ## Repository checks
 

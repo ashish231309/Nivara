@@ -461,7 +461,7 @@ for path in sorted((ROOT / "app/src/main/java/com/nivara/app/domain/security").g
 # The App Lock domain packages stay as free of the platform as the security domain does: no
 # Context, no PackageManager, no Intent, no UsageStatsManager, no Uri and no Settings. Those belong
 # to the data layer that implements the contracts.
-for domain_package in ("domain/app", "domain/permissions", "domain/applock"):
+for domain_package in ("domain/app", "domain/permissions", "domain/applock", "domain/apphide"):
     domain_dir = ROOT / f"app/src/main/java/com/nivara/app/{domain_package}"
     if not domain_dir.is_dir():
         err(f"{domain_package} is missing")
@@ -610,6 +610,139 @@ for directory in applock_presentation_dirs:
             if forbidden in text:
                 err(f"{rel}: {forbidden} — {reason}")
 
+# ---------------------------------------------------------------- hidden applications
+# Hiding is recorded, never enforced. Nivara keeps a set of package names and nothing else, so the
+# feature may not reach for any of the ways an application *could* take another one out of view: no
+# component or enabled-state manipulation, no accessibility service, no device administrator, no
+# second launcher, no cryptography and no logging. The rule is written over the whole feature rather
+# than over one file, because the temptation to "actually hide" something would arrive as a helper.
+hidden_dirs = [
+    ROOT / "app/src/main/java/com/nivara/app/domain/apphide",
+    ROOT / "app/src/main/java/com/nivara/app/data/apphide",
+    ROOT / "app/src/main/java/com/nivara/app/ui/apphide",
+]
+for directory in hidden_dirs:
+    if not directory.is_dir():
+        err(f"{directory.relative_to(ROOT)} is missing")
+for directory in hidden_dirs:
+    for path in sorted(directory.rglob("*.kt")):
+        rel = path.relative_to(ROOT)
+        text = strip_comments(path.read_text())
+        for forbidden, reason in (
+            ("setApplicationEnabledSetting", "hiding never changes an application's enabled state"),
+            ("setComponentEnabledSetting", "hiding never disables another application's components"),
+            ("PackageManager", "hiding is recorded from the catalogue discovery already produced"),
+            ("ApplicationInfo", "no platform application type belongs to the hidden set"),
+            ("PackageInfo", "no platform application type belongs to the hidden set"),
+            ("Drawable", "the hidden set is package names, never icons"),
+            ("AccessibilityService", "hiding does not read the screen"),
+            ("DevicePolicyManager", "hiding is not device administration"),
+            ("CATEGORY_HOME", "the launcher is a later stage; hiding does not replace it"),
+            ("java.security", "hidden state is not cryptography"),
+            ("javax.crypto", "hidden state is not cryptography"),
+            ("MessageDigest", "hidden state is not cryptography"),
+            ("KeyDerivationService", "key derivation belongs to the credential layer"),
+            ("EncryptionService", "encryption belongs to the security layer"),
+            ("Log.", "hiding must not log: package names must never reach a log"),
+            ("println(", "hiding must not print: package names must never be logged"),
+            ("HttpURLConnection", "hiding transmits nothing"),
+            ("okhttp", "hiding transmits nothing"),
+        ):
+            if forbidden in text:
+                err(f"{rel}: {forbidden} — {reason}")
+
+# Hiding consumes the existing session gate instead of growing one of its own: no hidden-app
+# password, no second unlock flag, no authentication cache, no failure counter. If a file in the
+# feature reads the session at all, it reads it through the gate's authoritative currentState().
+for directory in hidden_dirs:
+    for path in sorted(directory.rglob("*.kt")):
+        rel = path.relative_to(ROOT)
+        text = strip_comments(path.read_text())
+        for match in re.finditer(
+            r"^(?:internal |private |public )*(?:sealed |data |enum |abstract |open )*"
+            r"(?:class|interface|object)\s+([A-Za-z_]\w*)",
+            text,
+            re.MULTILINE,
+        ):
+            name = match.group(1)
+            if re.search(r"Session|Unlock|Password|Passcode|Biometric|Authenticat", name):
+                err(f"{rel}: hiding declares '{name}'; the session and its unlocked state belong "
+                    f"to the existing SessionManager")
+        if "SessionManager" in text and "currentState()" not in text:
+            err(f"{rel}: hiding reads the session without the gate's authoritative currentState()")
+
+# Hiding and App Lock are separate dimensions. Nothing in the hiding feature may read, write or
+# depend on the protected set, and all four combinations of the two are legitimate configuration.
+for directory in hidden_dirs:
+    for path in sorted(directory.rglob("*.kt")):
+        rel = path.relative_to(ROOT)
+        text = strip_comments(path.read_text())
+        for forbidden in ("ProtectedApplication", "ProtectedApplicationCodec", "AppLockMonitor",
+                          "ApplicationProtectionState", "AppLockProtectionRunner"):
+            if forbidden in text:
+                err(f"{rel}: {forbidden} — hiding must not depend on the protected set (Stage 7/8)")
+
+# The stored hidden set has exactly one owner, and it is the repository under data/apphide. The UI
+# reads and writes it through the contract, so nothing there may reach for the storage helper, the
+# codec, the file name or a store of its own: a second store would be a second answer to "what is
+# hidden?", and the two would disagree invisibly.
+for path in sorted((ROOT / "app/src/main/java/com/nivara/app/ui/apphide").rglob("*.kt")):
+    rel = path.relative_to(ROOT)
+    text = strip_comments(path.read_text())
+    for forbidden in ("AtomicFiles", "HiddenApplicationCodec", "FileHiddenApplicationRepository",
+                      "HIDDEN_APPLICATIONS_FILE", "APP_HIDE_DIRECTORY", "SharedPreferences",
+                      "DataStore", "RoomDatabase", "openFileOutput", "FileOutputStream"):
+        if forbidden in text:
+            err(f"{rel}: {forbidden} — the hidden-application UI goes through the "
+                f"hidden-application repository, never storage of its own")
+
+hidden_writers = [p for p in main_kt if "AtomicFiles" in p.read_text() and "apphide" in str(p)]
+if len(hidden_writers) != 1:
+    err(f"{len(hidden_writers)} files under data/apphide write the hidden set; it must have "
+        f"exactly one owner")
+hidden_implementations = [
+    p for p in (ROOT / "app/src/main/java/com/nivara/app/data").rglob("*.kt")
+    if re.search(r":\s*HiddenApplicationRepository\b", p.read_text())
+]
+if len(hidden_implementations) != 1:
+    err(f"{len(hidden_implementations)} implementations of HiddenApplicationRepository; the stored "
+        f"hidden set must have exactly one owner")
+for path in main_kt:
+    text = strip_comments(path.read_text())
+    for match in re.finditer(r"\b(?:class|interface|object)\s+([A-Za-z_]\w*)", text):
+        name = match.group(1)
+        if re.search(r"Hidden[A-Za-z]*(Store|Cache|Database|Preferences)$", name) or (
+            "Hidden" in name and name.endswith(("SettingsRepository", "UiStore"))
+        ):
+            err(f"{path.relative_to(ROOT)}: '{name}' — hidden-application state belongs to the one "
+                f"repository, not to a store, cache or settings copy")
+
+# The screen that shows which applications are hidden is as sensitive as the App Lock settings
+# screen, so it applies the project's single screenshot-protection implementation.
+hidden_screens = sorted((ROOT / "app/src/main/java/com/nivara/app/ui/apphide").rglob("*Screen.kt"))
+if not hidden_screens:
+    err("no hidden-application screen was found")
+for path in hidden_screens:
+    if "SecureScreenEffect()" not in path.read_text():
+        err(f"{path.relative_to(ROOT)}: a hidden-application screen must apply SecureScreenEffect()")
+
+# The hidden set stores package names and nothing else: no labels, no icons, no timestamps, no UI
+# state. Names, not application objects, are what a launcher needs and what a file may hold.
+for path in sorted((ROOT / "app/src/main/java/com/nivara/app/data/apphide").glob("*.kt")) + sorted(
+    (ROOT / "app/src/main/java/com/nivara/app/domain/apphide").glob("*.kt")
+):
+    rel = path.relative_to(ROOT)
+    text = strip_comments(path.read_text())
+    for forbidden, reason in (
+        ("Drawable", "the hidden set stores package names, never icons"),
+        ("label", "the hidden set stores package names, never labels"),
+        ("icon", "the hidden set stores package names, never icons"),
+        ("System.currentTimeMillis", "the hidden set carries no timestamps"),
+        ("Date(", "the hidden set carries no timestamps"),
+    ):
+        if forbidden in text:
+            err(f"{rel}: {forbidden} — {reason}")
+
 # Discovery is rebuilt on demand and kept in memory: no cache, no file and no database may appear
 # behind it.
 app_discovery_dir = ROOT / "app/src/main/java/com/nivara/app/data/app"
@@ -638,7 +771,7 @@ for contract in contracts:
 # The App Lock contracts follow the same rule: exposed by the container, implemented under data.
 applock_contracts = sorted(
     p.stem
-    for package in ("domain/app", "domain/permissions", "domain/applock")
+    for package in ("domain/app", "domain/permissions", "domain/applock", "domain/apphide")
     for p in (ROOT / f"app/src/main/java/com/nivara/app/{package}").glob("*.kt")
     if p.stem.endswith(("Repository", "Detector", "Monitor", "Runner")))
 for contract in applock_contracts:
@@ -682,7 +815,8 @@ for name in declared_destinations:
         err(f"destination '{name}' is declared but has no composable in the navigation graph")
 
 # documentation that the code refers to must exist
-for doc in ("docs/crypto/envelope-format.md", "docs/crypto/README.md", "tools/crypto_reference.py"):
+for doc in ("docs/crypto/envelope-format.md", "docs/crypto/README.md", "docs/apphide/README.md",
+            "tools/crypto_reference.py"):
     if not (ROOT / doc).exists():
         err(f"documentation or tooling referenced by the code is missing: {doc}")
 

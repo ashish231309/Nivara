@@ -22,6 +22,10 @@ Stages 6 and 7 draw nothing. The surface that presents a requirement is neither 
 last chapter to touch the screen, and it remains the only place Nivara asks Android for a way to
 appear above another application.
 
+The document ends with the boundary between App Lock and hidden applications (Stage 10): the two
+features share the discovery catalogue, the session gate and the screen conventions, and share no
+stored state at all.
+
 # Stage 6: discovery, permission setup and preparation
 
 ## Scope of this stage
@@ -855,3 +859,35 @@ The same boundary as every earlier stage applies, and this chapter is honest abo
   observed; the refresh-on-resume path is covered by JVM tests with fake repositories.
 * **Navigation, layout and talkback behaviour were not seen.** The composition of the screen runs
   only when the application is launched on a device.
+
+# App Lock and hidden applications (the Stage 10 boundary)
+
+Locking an application and keeping it out of sight are **different decisions**, made on different
+screens, stored in different records, and neither one implies the other. All four combinations are
+ordinary configuration:
+
+| | protected | not protected |
+| --- | --- | --- |
+| **hidden** | authentication is required to open it, and it is kept out of Nivara's own launcher | it opens freely, and it is still kept out of Nivara's own launcher |
+| **visible** | authentication is required to open it | the default |
+
+The consequences for App Lock are narrow and deliberate:
+
+* **Detection and the protection surface never read the hidden record.** Whether an application is
+  in front, whether the protected set requires authentication for it and whether the surface is
+  drawn are decided from the protected set, the session and the platform, exactly as Stages 7 and 8
+  describe. Hiding cannot change what App Lock does, and un-hiding cannot either.
+* **Hiding never locks and locking never hides.** A hidden, unprotected application opens freely
+  when something else launches it — hiding is not a protection mechanism, and the management screen
+  does not offer it as one. A protected, visible application is locked as usual.
+* **Two records, two files, two repositories, no shared mutable state.** The protected set
+  (`NVPL`, `data/applock`) and the hidden set (`NVHA`, `data/apphide`) share only the low-level byte
+  helpers that read and write integers and checksums. Damage to one is never read as the other, and
+  neither feature can write the other's file.
+* **One session gate, one policy.** Both screens read without a session and change only while the
+  existing gate is open, checked through the same `SessionManager.currentState()`. Neither feature
+  grows a password, a timeout or a failure counter of its own.
+
+The hidden record, its format, its fail-closed behaviour, the management screen and the contract
+Nivara's own launcher will consume are documented in
+[`docs/apphide/README.md`](../apphide/README.md).
