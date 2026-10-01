@@ -79,27 +79,45 @@ class LauncherActivityTest {
     }
 
     @Test
-    fun the_exported_activities_are_only_the_apps_own_entry_and_the_home_activity() {
+    fun the_exported_surface_is_the_entry_point_the_home_activity_and_the_declared_identities() {
         // The exported surface is what any application on the device can reach, so it is asserted
-        // from the outside rather than read off the manifest. Two components are exported on
-        // purpose — the application's own launcher entry, which every installed application has,
-        // and the Home activity — and nothing else may be.
+        // from the outside rather than read off the manifest. Three kinds of component are exported
+        // on purpose: the application's own launcher entry, which every installed application has;
+        // the Home activity, which Android can only start if it is allowed to; and a declared
+        // camouflage identity, which is the same activity presented under another name. Nothing else
+        // may be exported, and the two components that must always be there are asserted first.
         val exported = nivaraActivities()
             .filter { activity -> activity.exported }
             .map { activity -> activity.name.removePrefix(context.packageName + ".") }
             .toSet()
         val ownEntry = appEntryActivityName()
 
-        assertEquals(
-            "the exported surface is the entry point and the Home activity, nothing else",
-            setOf(ownEntry, LAUNCHER_ACTIVITY_NAME),
-            exported,
+        assertTrue(
+            "the application's own entry point must stay exported",
+            exported.contains(ownEntry),
         )
         assertTrue(
-            "the Home activity must be one of the two exported components",
+            "the Home activity must stay exported, or Android cannot start Nivara as Home",
             exported.contains(LAUNCHER_ACTIVITY_NAME),
         )
+        assertTrue(
+            "no component outside the entry point, the Home activity and the declared identities "
+                + "may be exported",
+            exported.all { name -> name in exportedSurface },
+        )
     }
+
+    /**
+     * Everything the manifest is allowed to export: the two entry points and one component per
+     * declared camouflage identity. The repository checker pins the same list statically.
+     */
+    private val exportedSurface: Set<String> get() = setOf(
+        appEntryActivityName(),
+        LAUNCHER_ACTIVITY_NAME,
+        "CamouflageNotes",
+        "CamouflageCalculator",
+        "CamouflageWeather",
+    )
 
     /** The activity Android starts when the user opens Nivara from whichever launcher they use. */
     private fun appEntryActivityName(): String {
