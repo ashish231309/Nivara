@@ -491,14 +491,14 @@ private fun ApplicationRow(
         inStoredSet -> R.string.applock_manage_action_unprotect_description
         else -> R.string.applock_manage_action_protect_description
     }
-    val onAction: () -> Unit = when (row.state) {
+    // Named rather than inlined: an empty lambda inside a `when` branch leaves the expression's
+    // type to inference, and an explicitly typed value cannot be misread.
+    val noAction: () -> Unit = {}
+    val onAction: () -> Unit = when {
         // Nothing may be claimed about this application's protection, so nothing is offered for it.
-        null -> {}
-        ApplicationProtectionState.Protected,
-        ApplicationProtectionState.ProtectedButUnavailable,
-        -> onUnprotect
-
-        ApplicationProtectionState.NotProtected -> onProtect
+        row.state == null -> noAction
+        inStoredSet -> onUnprotect
+        else -> onProtect
     }
 
     Row(

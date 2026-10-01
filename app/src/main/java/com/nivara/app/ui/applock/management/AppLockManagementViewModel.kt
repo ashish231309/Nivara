@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.nivara.app.NivaraApplication
 import com.nivara.app.R
 import com.nivara.app.core.common.NivaraResult
+import com.nivara.app.core.common.fold
 import com.nivara.app.core.common.isSuccess
 import com.nivara.app.core.common.valueOrNull
 import com.nivara.app.domain.app.ApplicationRepository
