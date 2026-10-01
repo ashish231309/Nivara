@@ -1,5 +1,7 @@
 package com.nivara.app.domain.applock
 
+import com.nivara.app.domain.app.PackageNames
+
 /**
  * An application the user asked Nivara to protect.
  *

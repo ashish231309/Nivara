@@ -26,6 +26,7 @@ import com.nivara.app.domain.permissions.OverlayCapabilityRepository
 import com.nivara.app.domain.permissions.UsageAccessRepository
 import com.nivara.app.domain.permissions.UsageAccessStatus
 import com.nivara.app.domain.security.SessionManager
+import com.nivara.app.ui.applications.ApplicationSortOrder
 import com.nivara.app.ui.applock.protectionRunState
 import com.nivara.app.ui.components.NivaraMessage
 import kotlinx.coroutines.CancellationException

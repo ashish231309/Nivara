@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
 import com.nivara.app.core.common.nivaraRunCatching
 import com.nivara.app.core.common.valueOrNull
-import com.nivara.app.ui.applock.management.ApplicationIconLoader
+import com.nivara.app.ui.applications.ApplicationIconLoader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

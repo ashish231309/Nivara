@@ -47,7 +47,7 @@ import com.nivara.app.domain.security.RecoveryKeyEnvelopeService
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.security.SessionTimeoutPolicy
 import com.nivara.app.domain.security.SecureRandomGenerator
-import com.nivara.app.ui.applock.management.ApplicationIconLoader
+import com.nivara.app.ui.applications.ApplicationIconLoader
 import com.nivara.app.ui.applock.overlay.AppLockSurfaceController
 import com.nivara.app.ui.applock.overlay.WindowManagerOverlaySurface
 import java.io.File

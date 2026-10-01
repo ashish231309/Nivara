@@ -1,5 +1,6 @@
 package com.nivara.app.domain.applock
 
+import com.nivara.app.domain.app.PackageNames
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals

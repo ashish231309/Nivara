@@ -10,6 +10,8 @@ import com.nivara.app.R
 import com.nivara.app.domain.app.InstalledApplication
 import com.nivara.app.domain.applock.ApplicationProtectionState
 import com.nivara.app.domain.permissions.AppLockPrerequisite
+import com.nivara.app.ui.applications.ApplicationIconLoader
+import com.nivara.app.ui.applications.ApplicationSortOrder
 import com.nivara.app.ui.applock.ProtectionRunState
 import com.nivara.app.ui.theme.NivaraTheme
 import org.junit.Assert.assertTrue

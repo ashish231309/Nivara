@@ -21,6 +21,7 @@ import com.nivara.app.domain.permissions.UsageAccessRepository
 import com.nivara.app.domain.permissions.UsageAccessStatus
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.testing.testSessionManager
+import com.nivara.app.ui.applications.ApplicationSortOrder
 import com.nivara.app.ui.applock.ProtectionRunState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers

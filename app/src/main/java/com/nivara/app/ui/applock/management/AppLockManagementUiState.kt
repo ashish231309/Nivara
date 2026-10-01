@@ -1,6 +1,7 @@
 package com.nivara.app.ui.applock.management
 
 import com.nivara.app.domain.permissions.AppLockPrerequisite
+import com.nivara.app.ui.applications.ApplicationSortOrder
 import com.nivara.app.ui.applock.ProtectionRunState
 import com.nivara.app.ui.components.NivaraMessage
 

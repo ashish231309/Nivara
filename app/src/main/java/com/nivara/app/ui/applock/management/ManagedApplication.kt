@@ -21,22 +21,6 @@ enum class ApplicationSection {
 }
 
 /**
- * How the managed list is ordered. One value, one direction, both taken from the domain's ordering.
- *
- * The screen offers these two and nothing else. There is deliberately no "recently used" or
- * "recommended" order: Nivara has no usage history, and inventing a ranking would mean either
- * collecting one or guessing.
- */
-enum class ApplicationSortOrder {
-
-    /** Labels A–Z, case-insensitively, with the package name breaking ties. */
-    NameAscending,
-
-    /** The same comparison, reversed. */
-    NameDescending,
-}
-
-/**
  * One application in the management list: what the device has, and what Nivara currently says about
  * protecting it.
  *

@@ -1,5 +1,7 @@
 package com.nivara.app.domain.applock
 
+import com.nivara.app.domain.app.PackageNames
+
 /**
  * The application the user is currently looking at, as the platform reported it.
  *

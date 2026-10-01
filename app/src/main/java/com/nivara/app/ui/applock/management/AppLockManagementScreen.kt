@@ -1,13 +1,11 @@
 package com.nivara.app.ui.applock.management
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
@@ -30,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -46,6 +43,9 @@ import com.nivara.app.R
 import com.nivara.app.domain.app.InstalledApplication
 import com.nivara.app.domain.applock.ApplicationProtectionState
 import com.nivara.app.domain.permissions.AppLockPrerequisite
+import com.nivara.app.ui.applications.ApplicationIconLoader
+import com.nivara.app.ui.applications.ApplicationSortOrder
+import com.nivara.app.ui.applications.NivaraApplicationIcon
 import com.nivara.app.ui.applock.ProtectionRunState
 import com.nivara.app.ui.applock.prerequisiteNameRes
 import com.nivara.app.ui.components.NivaraErrorState
@@ -508,7 +508,7 @@ private fun ApplicationRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ApplicationIcon(icon = icon)
+        NivaraApplicationIcon(icon = icon)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(text = row.label, style = MaterialTheme.typography.bodyLarge)
             Text(
@@ -526,35 +526,6 @@ private fun ApplicationRow(
         ) {
             Text(text = stringResource(id = actionLabelRes))
         }
-    }
-}
-
-/**
- * The application's icon, or a neutral placeholder when the device cannot produce one.
- *
- * The icon is decoration: the application's label sits beside it and is what identifies the row, so
- * the image carries no content description of its own — a screen reader reads the label once rather
- * than announcing a picture, and the row stays intelligible without any image at all.
- */
-@Composable
-private fun ApplicationIcon(
-    icon: ImageBitmap?,
-    modifier: Modifier = Modifier,
-) {
-    // Drawn slightly smaller than it is loaded, so the bitmap is never scaled up and never blurry.
-    val iconSize = Modifier.size(40.dp)
-    if (icon != null) {
-        Image(
-            bitmap = icon,
-            contentDescription = null,
-            modifier = modifier.then(iconSize),
-        )
-    } else {
-        Image(
-            painter = painterResource(id = R.drawable.ic_app_placeholder),
-            contentDescription = null,
-            modifier = modifier.then(iconSize),
-        )
     }
 }
 

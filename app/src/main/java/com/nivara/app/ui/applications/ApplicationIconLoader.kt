@@ -1,10 +1,9 @@
-package com.nivara.app.ui.applock.management
+package com.nivara.app.ui.applications
 
 import androidx.compose.ui.graphics.ImageBitmap
 
 /**
- * Supplies the image a management row draws for an application, or `null` when the device cannot
- * produce one.
+ * Supplies the image an application row draws, or `null` when the device cannot produce one.
  *
  * ### Why this is a seam
  *
@@ -18,8 +17,8 @@ import androidx.compose.ui.graphics.ImageBitmap
  *
  * A `null` answer is ordinary rather than exceptional: an application can be uninstalled between
  * discovery and drawing, an icon resource can be missing, and a device can refuse the query. The
- * row draws its fallback and carries on; nothing about protection depends on this call, and no
- * failure here is allowed to look like a protection failure.
+ * row draws its fallback and carries on; nothing about protection or hiding depends on this call,
+ * and no failure here is allowed to look like a failure of either.
  */
 fun interface ApplicationIconLoader {
 

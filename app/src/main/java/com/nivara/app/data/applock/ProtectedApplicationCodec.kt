@@ -3,7 +3,7 @@ package com.nivara.app.data.applock
 import com.nivara.app.data.credential.checksum
 import com.nivara.app.data.credential.readInt
 import com.nivara.app.data.credential.writeInt
-import com.nivara.app.domain.applock.PackageNames
+import com.nivara.app.domain.app.PackageNames
 import com.nivara.app.domain.applock.ProtectedApplication
 
 /**

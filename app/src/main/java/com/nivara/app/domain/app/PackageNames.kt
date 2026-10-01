@@ -1,16 +1,18 @@
-package com.nivara.app.domain.applock
+package com.nivara.app.domain.app
 
 /**
  * The package names an application can have, validated in one place.
  *
  * Android package names are dot-separated segments of letters, digits and underscores. The rule
  * here is deliberately a little looser than the platform's own — a name this layer rejects is a
- * name it can never protect or recognise — but it still refuses anything that could not be a
- * package name at all: blanks, whitespace, path separators and unbounded lengths.
+ * name it can never recognise — but it still refuses anything that could not be a package name at
+ * all: blanks, whitespace, path separators and unbounded lengths.
  *
- * Both sides of App Lock use it. A [ProtectedApplication] only exists if the user chose a usable
- * name, and a [ForegroundApplication] is only believed when the platform reports one, so an
- * unexpected event cannot inject a value that is not an application.
+ * It lives with the application identity model because more than one feature uses it and none of
+ * them owns it: [InstalledApplication]'s siblings in this package, App Lock's protected set and
+ * hidden-app set all accept only names this rule allows, so an unexpected value from a platform
+ * event or from a screen can never be mistaken for an application. The rule is stated once so that
+ * two features cannot drift into disagreeing about what an application is.
  */
 internal object PackageNames {
 
