@@ -2601,7 +2601,6 @@ for token, why in (
 strings = (ROOT / "app/src/main/res/values/strings.xml").read_text()
 for token, why in (
     ("vault_section_trash", "the trash section's own name"),
-    ("not deleted", "the explanation that trashing is not a deletion"),
     ("vault_trash_restore_action", "the one action a trashed row offers"),
     ("vault_trash_unreadable_body", "an unreadable record's own explanation"),
     ("vault_trash_empty", "an empty trash worded as itself"),
@@ -2609,6 +2608,16 @@ for token, why in (
 ):
     if token not in strings:
         err(f"the trash wording is missing {why} ('{token}')")
+
+# The empty trash and the explanation must say, in the trash's own words, that moving a file there is
+# not a deletion. Pinned to the trash's strings rather than to a token the other records share, so the
+# sentence cannot drift into something a person could read as a deletion.
+trash_empty_match = re.search(r'name="vault_trash_empty">([^<]*)<', strings)
+if not trash_empty_match or "not deleted" not in trash_empty_match.group(1):
+    err("the empty trash must say that nothing is deleted ('vault_trash_empty')")
+trash_explanation_match = re.search(r'name="vault_trash_explanation">([^<]*)<', strings)
+if not trash_explanation_match or "without deleting" not in trash_explanation_match.group(1):
+    err("the trash explanation must say moving a file is not deleting it ('vault_trash_explanation')")
 
 for forbidden in ("vault_trash_empty_all", "vault_trash_delete", "vault_trash_empty_action",
                   "vault_trash_erase", "vault_trash_expire"):
