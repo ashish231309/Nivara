@@ -129,6 +129,24 @@ class CredentialVerificationViewModelTest {
     }
 
     @Test
+    fun `the return to the entry step keeps the configured method`() = runTest {
+        val manager = sessionManager()
+        val viewModel = viewModel(sessionManager = manager)
+        viewModel.submit(pin())
+        viewModel.lockNow()
+
+        // Without the method, the entry field could not be drawn again and the next attempt would
+        // be refused as an unusable configuration.
+        assertEquals(PrimaryCredentialType.Pin, readyState(viewModel).type)
+        assertEquals(CredentialVerificationStep.Enter, readyState(viewModel).step)
+
+        viewModel.submit(pin())
+
+        assertEquals(CredentialVerificationStep.Succeeded, readyState(viewModel).step)
+        assertTrue(manager.isAuthenticated())
+    }
+
+    @Test
     fun `Quick Lock returns the screen to asking for the credential`() = runTest {
         val manager = sessionManager()
         val viewModel = viewModel(sessionManager = manager)

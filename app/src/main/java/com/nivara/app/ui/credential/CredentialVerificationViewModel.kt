@@ -158,6 +158,9 @@ class CredentialVerificationViewModel(
                 // other than a real success.
                 is AuthenticationOutcome.Succeeded -> CredentialVerificationUiState(
                     step = CredentialVerificationStep.Succeeded,
+                    // The configured method is kept: it is not a secret, it is already on screen,
+                    // and the screen needs it to offer the entry field again when the session ends.
+                    type = type,
                     session = sessionManager.establish(outcome),
                 )
                 is AuthenticationOutcome.NotConfigured -> CredentialVerificationUiState(
