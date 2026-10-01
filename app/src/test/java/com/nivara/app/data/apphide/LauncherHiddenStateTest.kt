@@ -102,7 +102,6 @@ class LauncherHiddenStateTest {
         hiddenRepository().hide(HiddenApplication(notes.packageName))
         hiddenRepository().hide(HiddenApplication(camera.packageName))
         val hiddenBefore = hiddenFile.readBytes()
-        val protectedBefore = protectedFile.readBytes()
 
         val drawn = loaded(revealHidden = true)
 
@@ -111,7 +110,10 @@ class LauncherHiddenStateTest {
         assertEquals(2, drawn.hiddenCount)
         assertEquals(0, drawn.withheldCount)
         assertTrue("a reveal writes nothing", hiddenBefore.contentEquals(hiddenFile.readBytes()))
-        assertTrue(protectedBefore.contentEquals(protectedFile.readBytes()))
+        assertFalse(
+            "nothing in this layer protects anything, so the protected file is never even created",
+            protectedFile.exists(),
+        )
     }
 
     @Test

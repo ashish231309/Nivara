@@ -358,7 +358,11 @@ class LauncherViewModelTest {
 
         val state = readyState(opened)
         assertEquals(LauncherSection.Hidden, state.section)
-        assertEquals(listOf("com.example.notes"), state.entries.map { it.label })
+        assertEquals(
+            "the tail of the drawer is the one stored application, matched by package name",
+            listOf(notes.packageName),
+            state.entries.map { it.packageName },
+        )
 
         opened.concealHiddenApplications()
 
@@ -370,14 +374,26 @@ class LauncherViewModelTest {
     }
 
     @Test
-    fun `an empty hidden section says nothing is hidden rather than nothing was found`() = runTest {
-        val model = viewModel(session = authenticatedSession())
+    fun `a hidden section that empties says nothing is hidden rather than nothing was found`() = runTest {
+        val hidden = FakeHiddenApplicationRepository(setOf(notes.packageName))
+        val model = viewModel(hidden = hidden, session = authenticatedSession())
         model.revealHiddenApplications()
-
         model.onSectionChange(LauncherSection.Hidden)
+        assertEquals(
+            listOf(notes.packageName),
+            readyState(model).entries.map { it.packageName },
+        )
+
+        // The stored set changes elsewhere — the management screen unhides the last application —
+        // and the launcher comes back to find it. The session is still valid, so the reveal and the
+        // section survive, but the section is empty and the wording must say which nothing this is.
+        hidden.stored = emptySet()
+        model.onResumed()
 
         val state = readyState(model)
         assertTrue(state.entries.isEmpty())
+        assertTrue("the reveal is still authorized", state.revealed)
+        assertEquals(0, state.hiddenCount)
         assertEquals(LauncherListEmptiness.NothingHidden, state.emptiness)
     }
 
