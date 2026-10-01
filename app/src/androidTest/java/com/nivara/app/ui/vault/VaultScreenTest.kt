@@ -14,7 +14,7 @@ import com.nivara.app.R
 import com.nivara.app.domain.security.SecureRandomGenerator
 import com.nivara.app.domain.vault.VaultIdentity
 import com.nivara.app.domain.vault.VaultState
-import com.nivara.app.domain.vault.VaultUnreadable
+import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraMessage
 import com.nivara.app.ui.theme.NivaraTheme
 import org.junit.Assert.assertEquals
@@ -90,6 +90,7 @@ class VaultScreenTest {
 
         rule.onNodeWithText(string(R.string.vault_locked)).assertIsDisplayed()
         rule.onNodeWithText(string(R.string.vault_initialize_action)).assertDoesNotExist()
+        rule.onNodeWithText(string(R.string.vault_choose_root_action)).assertIsNotEnabled()
         rule.onNodeWithText(string(R.string.vault_unlock_action)).performClick()
 
         assertEquals("the screen hands the user to the credential screen", 1, unlocks)
@@ -101,7 +102,7 @@ class VaultScreenTest {
         var replacements = 0
         rule.setContent {
             content(
-                readyState(VaultState.Unreadable(VaultUnreadable.MetadataDamaged)),
+                readyState(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged)),
                 onReplaceUnreadable = { replacements++ },
             )
         }
@@ -118,7 +119,7 @@ class VaultScreenTest {
     @Test
     fun an_unfinished_setup_is_completed_rather_than_replaced() {
         rule.setContent {
-            content(readyState(VaultState.Unreadable(VaultUnreadable.StructureIncomplete)))
+            content(readyState(VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete)))
         }
 
         rule.onNodeWithText(string(R.string.vault_state_incomplete_title)).assertIsDisplayed()

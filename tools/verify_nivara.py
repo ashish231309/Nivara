@@ -1532,10 +1532,15 @@ if vault_messages_source.exists() and vault_state_source.exists():
     for state in re.findall(r"data (?:object|class) (\w+)\s*:\s*VaultState", state_code):
         if f"VaultState.{state}" not in messages_code:
             err(f"the vault screen has no wording for the state '{state}'")
-    reasons_block = re.search(r"enum class VaultUnreadable\s*\{(.*?)\}", state_code, re.S)
-    for reason in re.findall(r"^\s+(\w+),$", reasons_block.group(1) if reasons_block else "", re.M):
-        if f"VaultUnreadable.{reason}" not in messages_code:
-            err(f"the vault screen has no wording for the reason '{reason}'")
+    # The reasons are an enum of their own, and a rule that could not find it would silently stop
+    # checking them — which is the kind of rule that passes for the wrong reason.
+    reasons_block = re.search(r"enum class VaultUnreadableReason\s*\{(.*?)\}", state_code, re.S)
+    if reasons_block is None:
+        err("the reasons a vault cannot be opened must be declared as an enum")
+    else:
+        for reason in re.findall(r"^\s+(\w+),$", reasons_block.group(1), re.M):
+            if f"VaultUnreadableReason.{reason}" not in messages_code:
+                err(f"the vault screen has no wording for the reason '{reason}'")
 
 # The vault is reached from the home screen like every other settings screen: under whatever identity
 # Nivara presents, through the ordinary surface, with no hidden route of its own.

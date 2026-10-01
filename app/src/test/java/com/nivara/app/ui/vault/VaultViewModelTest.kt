@@ -15,7 +15,7 @@ import com.nivara.app.domain.vault.VaultLocation
 import com.nivara.app.domain.vault.VaultLocationRead
 import com.nivara.app.domain.vault.VaultRepository
 import com.nivara.app.domain.vault.VaultState
-import com.nivara.app.domain.vault.VaultUnreadable
+import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.testing.TEST_SESSION_TIMEOUT_MILLIS
 import com.nivara.app.testing.testSessionManager
 import kotlinx.coroutines.CompletableDeferred
@@ -105,7 +105,7 @@ class VaultViewModelTest {
     @Test
     fun `an unreadable vault offers replacement and never creation`() = runTest {
         val model = viewModel(
-            repository = FakeVaultRepository(VaultState.Unreadable(VaultUnreadable.MetadataDamaged)),
+            repository = FakeVaultRepository(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged)),
             session = authenticatedSession(),
         )
 
@@ -117,7 +117,7 @@ class VaultViewModelTest {
     @Test
     fun `an unfinished setup is completed rather than replaced`() = runTest {
         val model = viewModel(
-            repository = FakeVaultRepository(VaultState.Unreadable(VaultUnreadable.StructureIncomplete)),
+            repository = FakeVaultRepository(VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete)),
             session = authenticatedSession(),
         )
 
@@ -212,7 +212,7 @@ class VaultViewModelTest {
 
     @Test
     fun `an unreadable vault is only replaced when that is what was asked for`() = runTest {
-        val repository = FakeVaultRepository(VaultState.Unreadable(VaultUnreadable.MetadataDamaged))
+        val repository = FakeVaultRepository(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged))
         val model = viewModel(repository = repository, session = authenticatedSession())
 
         model.initialize()
@@ -383,6 +383,29 @@ class VaultViewModelTest {
             "and the pick does not wait for a later unlock",
             emptyList<VaultLocation>(),
             locations.adopted,
+        )
+    }
+
+    @Test
+    fun `a selection Nivara cannot use is refused before it is remembered`() = runTest {
+        val locations = FakeVaultLocationStore()
+        val model = viewModel(
+            repository = FakeVaultRepository(VaultState.NotConfigured),
+            locations = locations,
+            session = authenticatedSession(),
+        )
+
+        model.onRootSelected("")
+
+        assertEquals(
+            "nothing unusable ever reaches the location store",
+            emptyList<VaultLocation>(),
+            locations.adopted,
+        )
+        assertEquals(
+            "and the screen says the selection failed",
+            R.string.vault_error_selection_failed,
+            readyState(model).failure?.textRes,
         )
     }
 

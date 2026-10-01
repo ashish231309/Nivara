@@ -5,7 +5,7 @@ import com.nivara.app.domain.security.SecureRandomGenerator
 import com.nivara.app.domain.vault.VaultFailure
 import com.nivara.app.domain.vault.VaultIdentity
 import com.nivara.app.domain.vault.VaultState
-import com.nivara.app.domain.vault.VaultUnreadable
+import com.nivara.app.domain.vault.VaultUnreadableReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -28,9 +28,9 @@ class VaultPresentationTest {
         VaultState.LocationUnknown,
         VaultState.Missing,
         VaultState.Ready(VaultIdentity.create(random), formatVersion = 1),
-        VaultState.Unreadable(VaultUnreadable.MetadataDamaged),
-        VaultState.Unreadable(VaultUnreadable.StructureIncomplete),
-        VaultState.Unreadable(VaultUnreadable.KeyUnavailable),
+        VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged),
+        VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete),
+        VaultState.Unreadable(VaultUnreadableReason.KeyUnavailable),
         VaultState.UnsupportedVersion(fileVersion = 2),
         VaultState.Unavailable,
         VaultState.AccessDenied,
@@ -42,9 +42,9 @@ class VaultPresentationTest {
         VaultFailure.AccessDenied,
         VaultFailure.StorageUnavailable,
         VaultFailure.VaultAlreadyExists,
-        VaultFailure.VaultUnreadable(VaultUnreadable.MetadataDamaged),
-        VaultFailure.VaultUnreadable(VaultUnreadable.StructureIncomplete),
-        VaultFailure.VaultUnreadable(VaultUnreadable.KeyUnavailable),
+        VaultFailure.VaultUnreadable(VaultUnreadableReason.MetadataDamaged),
+        VaultFailure.VaultUnreadable(VaultUnreadableReason.StructureIncomplete),
+        VaultFailure.VaultUnreadable(VaultUnreadableReason.KeyUnavailable),
         VaultFailure.UnsupportedVersion(fileVersion = 2),
         VaultFailure.WriteFailed,
         VaultFailure.VerificationFailed,
@@ -73,8 +73,8 @@ class VaultPresentationTest {
 
     @Test
     fun `an unreadable record and an unfinished setup are explained differently`() {
-        val damaged = VaultState.Unreadable(VaultUnreadable.MetadataDamaged)
-        val incomplete = VaultState.Unreadable(VaultUnreadable.StructureIncomplete)
+        val damaged = VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged)
+        val incomplete = VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete)
 
         assertNotEquals(
             "one is a vault that cannot be opened, the other is a setup that did not finish",
@@ -86,8 +86,8 @@ class VaultPresentationTest {
 
     @Test
     fun `a lost platform key is not described as damage`() {
-        val lost = VaultState.Unreadable(VaultUnreadable.KeyUnavailable)
-        val damaged = VaultState.Unreadable(VaultUnreadable.MetadataDamaged)
+        val lost = VaultState.Unreadable(VaultUnreadableReason.KeyUnavailable)
+        val damaged = VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged)
 
         assertNotEquals(lost.bodyRes(), damaged.bodyRes())
     }
@@ -115,9 +115,9 @@ class VaultPresentationTest {
             VaultFailure.AccessDenied to R.string.vault_error_access_denied,
             VaultFailure.StorageUnavailable to R.string.vault_error_storage_unavailable,
             VaultFailure.VaultAlreadyExists to R.string.vault_error_already_exists,
-            VaultFailure.VaultUnreadable(VaultUnreadable.MetadataDamaged) to R.string.vault_error_not_replaced,
-            VaultFailure.VaultUnreadable(VaultUnreadable.StructureIncomplete) to R.string.vault_error_not_replaced,
-            VaultFailure.VaultUnreadable(VaultUnreadable.KeyUnavailable) to R.string.vault_error_not_replaced,
+            VaultFailure.VaultUnreadable(VaultUnreadableReason.MetadataDamaged) to R.string.vault_error_not_replaced,
+            VaultFailure.VaultUnreadable(VaultUnreadableReason.StructureIncomplete) to R.string.vault_error_not_replaced,
+            VaultFailure.VaultUnreadable(VaultUnreadableReason.KeyUnavailable) to R.string.vault_error_not_replaced,
             VaultFailure.UnsupportedVersion(fileVersion = 2) to R.string.vault_error_not_replaced,
             VaultFailure.WriteFailed to R.string.vault_error_write_failed,
             VaultFailure.VerificationFailed to R.string.vault_error_not_verified,
@@ -138,8 +138,8 @@ class VaultPresentationTest {
     @Test
     fun `a refusal to replace is never reported as nothing to do`() {
         val notReplaced = setOf(
-            VaultFailure.VaultUnreadable(VaultUnreadable.MetadataDamaged),
-            VaultFailure.VaultUnreadable(VaultUnreadable.KeyUnavailable),
+            VaultFailure.VaultUnreadable(VaultUnreadableReason.MetadataDamaged),
+            VaultFailure.VaultUnreadable(VaultUnreadableReason.KeyUnavailable),
             VaultFailure.UnsupportedVersion(fileVersion = 2),
         )
 

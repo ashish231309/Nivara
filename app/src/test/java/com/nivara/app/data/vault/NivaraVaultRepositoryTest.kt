@@ -6,9 +6,10 @@ import com.nivara.app.data.security.NivaraContentKeyWrapper
 import com.nivara.app.domain.security.SecureRandomGenerator
 import com.nivara.app.domain.vault.VaultFailure
 import com.nivara.app.domain.vault.VaultLocation
+import com.nivara.app.domain.vault.VaultIdentity
 import com.nivara.app.domain.vault.VaultLocationRead
 import com.nivara.app.domain.vault.VaultState
-import com.nivara.app.domain.vault.VaultUnreadable
+import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.testing.randomKey
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -91,15 +92,26 @@ class NivaraVaultRepositoryTest {
     }
 
     @Test
-    fun `someone else's file in the metadata area is not a vault`() = runTest {
+    fun `a name that only happens to look like a slot is not a vault`() = runTest {
         storage.metadataDirectory = true
+        storage.documents[slot(0)] = "hello".toByteArray()
+
+        val state = inspect()
+
+        assertFalse("another application's file is not a record", state is VaultState.Ready)
+        assertEquals(
+            "and Nivara's own area without a record is an unfinished setup, not an empty folder",
+            VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete),
+            state,
+        )
+    }
+
+    @Test
+    fun `a foreign file beside the records is ignored`() = runTest {
+        createVault()
         storage.documents["notes.txt"] = "hello".toByteArray()
 
-        assertEquals(
-            "a foreign file is not evidence of a vault and not evidence of damage",
-            VaultState.Missing,
-            inspect(),
-        )
+        assertEquals("a person's own file in the area changes nothing", VaultState.Ready, inspect())
     }
 
     @Test
@@ -107,7 +119,7 @@ class NivaraVaultRepositoryTest {
         storage.metadataDirectory = true
         storage.documents[slot(0)] = ByteArray(0)
 
-        assertEquals(VaultState.Unreadable(VaultUnreadable.StructureIncomplete), inspect())
+        assertEquals(VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete), inspect())
     }
 
     @Test
@@ -119,7 +131,7 @@ class NivaraVaultRepositoryTest {
         val state = inspect()
 
         assertNotEquals("a damaged record must not read as a folder without a vault", VaultState.Missing, state)
-        assertEquals(VaultState.Unreadable(VaultUnreadable.MetadataDamaged), state)
+        assertEquals(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged), state)
     }
 
     @Test
@@ -127,7 +139,7 @@ class NivaraVaultRepositoryTest {
         storage.metadataDirectory = true
         storage.unreadableDocuments += slot(0)
 
-        assertEquals(VaultState.Unreadable(VaultUnreadable.MetadataDamaged), inspect())
+        assertEquals(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged), inspect())
     }
 
     @Test
@@ -146,7 +158,7 @@ class NivaraVaultRepositoryTest {
         val ready = createVault()
 
         assertEquals(VaultRecordCodec.VERSION, ready.formatVersion)
-        assertEquals(64, ready.identity.value.length)
+        assertEquals(VaultIdentity.BYTES * 2, ready.identity.value.length)
 
         val again = inspect() as VaultState.Ready
 
@@ -158,7 +170,7 @@ class NivaraVaultRepositoryTest {
         createVault()
         storage.contentDirectory = false
 
-        assertEquals(VaultState.Unreadable(VaultUnreadable.StructureIncomplete), inspect())
+        assertEquals(VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete), inspect())
     }
 
     @Test
@@ -166,7 +178,7 @@ class NivaraVaultRepositoryTest {
         createVault()
         deviceKeyStore.destroyKey()
 
-        assertEquals(VaultState.Unreadable(VaultUnreadable.KeyUnavailable), inspect())
+        assertEquals(VaultState.Unreadable(VaultUnreadableReason.KeyUnavailable), inspect())
     }
 
     @Test
@@ -180,7 +192,7 @@ class NivaraVaultRepositoryTest {
 
         assertFalse("wrong key material must never open a vault", state is VaultState.Ready)
         assertNotEquals("and it must not look like a folder without a vault", VaultState.Missing, state)
-        assertEquals(VaultState.Unreadable(VaultUnreadable.MetadataDamaged), state)
+        assertEquals(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged), state)
     }
 
     @Test
@@ -190,7 +202,7 @@ class NivaraVaultRepositoryTest {
         // Promote the generation in the clear header only: the sealed payload still says 1.
         stored[6 + VaultRecordCodec.GENERATION_SIZE - 1] = 99
 
-        assertEquals(VaultState.Unreadable(VaultUnreadable.MetadataDamaged), inspect())
+        assertEquals(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged), inspect())
     }
 
     @Test
@@ -325,7 +337,7 @@ class NivaraVaultRepositoryTest {
         val refused = initialize()
 
         assertEquals(
-            VaultFailure.VaultUnreadable(VaultUnreadable.MetadataDamaged),
+            VaultFailure.VaultUnreadable(VaultUnreadableReason.MetadataDamaged),
             (refused as NivaraResult.Failure).error,
         )
         assertEquals("a refusal changes nothing", before, storage.snapshot())
@@ -354,12 +366,12 @@ class NivaraVaultRepositoryTest {
         val refused = initialize()
 
         assertEquals(
-            VaultFailure.VaultUnreadable(VaultUnreadable.KeyUnavailable),
+            VaultFailure.VaultUnreadable(VaultUnreadableReason.KeyUnavailable),
             (refused as NivaraResult.Failure).error,
         )
         assertEquals(
             "a refusal changes nothing at all",
-            VaultState.Unreadable(VaultUnreadable.KeyUnavailable),
+            VaultState.Unreadable(VaultUnreadableReason.KeyUnavailable),
             inspect(),
         )
 
@@ -427,7 +439,7 @@ class NivaraVaultRepositoryTest {
         assertEquals("nothing is left where a record belongs", emptyList<String>(), storage.documents.keys.toList())
         assertEquals(
             "the folder says an initialization did not finish, not that a vault is missing",
-            VaultState.Unreadable(VaultUnreadable.StructureIncomplete),
+            VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete),
             inspect(),
         )
 
@@ -440,13 +452,27 @@ class NivaraVaultRepositoryTest {
     fun `an interrupted write leaves bytes that are not treated as a vault`() = runTest {
         storage.writeFailure = VaultFailure.WriteFailed
         storage.writeFailureAfterBytes = 20
+        // The cleanup cannot run either, so the partial bytes stay exactly where the interruption left
+        // them — the case a device can produce and a reader has to survive.
+        storage.deleteFailure = VaultFailure.WriteFailed
 
         val result = initialize()
 
         assertEquals(VaultFailure.WriteFailed, (result as NivaraResult.Failure).error)
+        assertEquals(
+            "half a record was left behind and nothing removed it",
+            listOf(slot(0)),
+            storage.documents.keys.toList(),
+        )
         val state = inspect()
         assertFalse("half a record is not a vault", state is VaultState.Ready)
-        assertNotEquals(VaultState.Missing, state)
+        assertNotEquals("and it is not an empty folder either", VaultState.Missing, state)
+        assertEquals(
+            "an unopenable record is damage, and it stays that way until someone decides otherwise",
+            VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged),
+            state,
+        )
+        assertEquals("nothing was repaired", listOf(slot(0)), storage.documents.keys.toList())
     }
 
     @Test
@@ -514,7 +540,7 @@ class NivaraVaultRepositoryTest {
         assertEquals("no record is written when its key material does not exist", 0, storage.writeCalls)
         assertEquals(
             "the folder is left saying the setup did not finish",
-            VaultState.Unreadable(VaultUnreadable.StructureIncomplete),
+            VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete),
             inspect(),
         )
     }
@@ -590,7 +616,7 @@ class NivaraVaultRepositoryTest {
 
         assertEquals(
             "a cached answer would keep a vault that is no longer there",
-            VaultState.Unreadable(VaultUnreadable.StructureIncomplete),
+            VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete),
             inspect(),
         )
     }
@@ -611,7 +637,7 @@ class NivaraVaultRepositoryTest {
     }
 
     @Test
-    fun `an initialization that follows another keeps the generation rising`() = runTest {
+    fun `the first vault is written into the first slot at the first generation`() = runTest {
         // Two slots and a rising generation are what make a replacement safe. The repository writes the
         // first vault into the first slot; the state it reports is what a later stage will build on.
         createVault()

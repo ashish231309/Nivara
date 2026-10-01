@@ -23,9 +23,9 @@ class VaultStateTest {
         VaultState.LocationUnknown,
         VaultState.Missing,
         VaultState.Ready(VaultIdentity.create(random), formatVersion = 1),
-        VaultState.Unreadable(VaultUnreadable.MetadataDamaged),
-        VaultState.Unreadable(VaultUnreadable.StructureIncomplete),
-        VaultState.Unreadable(VaultUnreadable.KeyUnavailable),
+        VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged),
+        VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete),
+        VaultState.Unreadable(VaultUnreadableReason.KeyUnavailable),
         VaultState.UnsupportedVersion(fileVersion = 2),
         VaultState.Unavailable,
         VaultState.AccessDenied,
@@ -52,9 +52,9 @@ class VaultStateTest {
         // nothing here", which is the collapse this stage exists to prevent.
         val trouble = listOf(
             VaultState.LocationUnknown,
-            VaultState.Unreadable(VaultUnreadable.MetadataDamaged),
-            VaultState.Unreadable(VaultUnreadable.StructureIncomplete),
-            VaultState.Unreadable(VaultUnreadable.KeyUnavailable),
+            VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged),
+            VaultState.Unreadable(VaultUnreadableReason.StructureIncomplete),
+            VaultState.Unreadable(VaultUnreadableReason.KeyUnavailable),
             VaultState.UnsupportedVersion(fileVersion = 2),
             VaultState.Unavailable,
             VaultState.AccessDenied,
@@ -77,9 +77,9 @@ class VaultStateTest {
     @Test
     fun `the three reasons a vault cannot be opened are distinct values`() {
         val reasons = listOf(
-            VaultUnreadable.MetadataDamaged,
-            VaultUnreadable.StructureIncomplete,
-            VaultUnreadable.KeyUnavailable,
+            VaultUnreadableReason.MetadataDamaged,
+            VaultUnreadableReason.StructureIncomplete,
+            VaultUnreadableReason.KeyUnavailable,
         ).map { reason -> VaultState.Unreadable(reason) }
 
         assertEquals("each reason keeps its own state", reasons.size, reasons.toSet().size)
@@ -104,7 +104,7 @@ class VaultStateTest {
         assertNotEquals(
             "a newer format is not a damaged record",
             state,
-            VaultState.Unreadable(VaultUnreadable.MetadataDamaged),
+            VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged),
         )
     }
 
