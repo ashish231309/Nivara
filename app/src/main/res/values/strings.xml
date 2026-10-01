@@ -366,7 +366,31 @@
     <string name="launcher_error_not_installed">That application is not installed any more. Nothing was opened, and the list has been refreshed.</string>
     <string name="launcher_error_launch_failed">Nivara could not open that application.</string>
     <string name="launcher_error_discovery">Nivara could not read the device\'s applications this time. The list below is the last one it read.</string>
+
+    <!--
+      Application identity (camouflage). The copy states the limitation as plainly as the feature:
+      renaming the launcher entry changes presentation, is not a security boundary, and does not
+      remove Nivara from Android's own lists. Recovery is described as the ordinary thing it is.
+    -->
+    <string name="home_camouflage_title">Application identity</string>
+    <string name="home_camouflage_summary">Choose the name and icon Nivara\'s launcher entry shows. Presentation only: Android still lists Nivara, and this is not a way to hide it.</string>
+    <string name="home_camouflage_action">Choose an application identity</string>
+    <string name="camouflage_title">Application identity</string>
+    <string name="camouflage_summary">Choose the name and icon Nivara\'s launcher entry shows. Nivara\'s package, data, protection and settings are unchanged.</string>
+    <string name="camouflage_current_title">Shown now</string>
+    <string name="camouflage_current_summary">Nivara\'s launcher entry currently shows as %1$s.</string>
+    <string name="camouflage_choose_label">Show Nivara as</string>
+    <string name="camouflage_profile_notes_label">Notes</string>
+    <string name="camouflage_profile_calculator_label">Calculator</string>
+    <string name="camouflage_profile_weather_label">Weather</string>
+    <string name="camouflage_action_use">Use this identity</string>
+    <string name="camouflage_action_current">In use</string>
+    <string name="camouflage_limitation_title">What this does not do</string>
+    <string name="camouflage_limitation">This changes presentation only. Nivara stays installed under the same package name, so Android\'s settings, the package manager and any device or work-profile management tool still list it, and it is not a way to hide Nivara or any other application from someone who looks. It is not a security boundary and not a secret: your credential, biometric unlock, App Lock and the session timeout are what protect you, and none of them changes.</string>
+    <string name="camouflage_recovery_title">Getting back to Nivara</string>
+    <string name="camouflage_recovery">However Nivara is named right now, it can always be opened: from its launcher entry, or from Android\'s application list, where it is still Nivara. It opens on Nivara\'s home screen, and this screen is one card down from there. If you forget which name you chose, Android\'s settings still say Nivara. Nothing about reaching Nivara is hidden, and no code or gesture is needed to find it.</string>
+    <string name="camouflage_locked">Unlock Nivara to change its identity. You can look at this screen without unlocking.</string>
+    <string name="camouflage_unlock_action">Unlock Nivara</string>
+    <string name="camouflage_notice_changed">Identity changed. Android\'s launcher may take a moment to show the new entry.</string>
+    <string name="camouflage_error_not_changed">Nivara could not change its launcher identity. Nothing was changed, and the identity shown above is the one in use.</string>
 </resources>
-
-
-

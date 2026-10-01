@@ -62,6 +62,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:enabled="true"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Nivara"
@@ -71,6 +72,63 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          Camouflage identities.
+
+          Each alias is a second way of presenting and starting the same activity — the same
+          component, the same task, the same data — under a different label and icon. Selecting an
+          identity enables one of these and disables the others; nothing else about the application
+          changes, and no second activity class exists.
+
+          android:enabled="false" is what makes the shipped default Nivara's own identity: on a fresh
+          install exactly one launcher entry is enabled, and the aliases stay out of the launcher
+          until the user chooses one. The platform reports an untouched component as DEFAULT, so the
+          manifest's declared state is the effective one, and the verifier pins that shape.
+
+          An alias is never a hiding mechanism: the application stays installed under the same
+          package, and Android's settings, the package manager and every management tool still list
+          it. What the alias changes is the name and the icon on the home screen. See
+          docs/camouflage/README.md.
+        -->
+        <activity-alias
+            android:name=".CamouflageNotes"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_camouflage_notes"
+            android:label="@string/camouflage_profile_notes_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".CamouflageCalculator"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_camouflage_calculator"
+            android:label="@string/camouflage_profile_calculator_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".CamouflageWeather"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_camouflage_weather"
+            android:label="@string/camouflage_profile_weather_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <!--
           Nivara as the device's Home application.

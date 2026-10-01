@@ -11,6 +11,7 @@ import com.nivara.app.ui.applock.AppLockSetupRoute
 import com.nivara.app.ui.apphide.management.HiddenManagementRoute
 import com.nivara.app.ui.applock.management.AppLockManagementRoute
 import com.nivara.app.ui.biometric.BiometricRoute
+import com.nivara.app.ui.camouflage.CamouflageRoute
 import com.nivara.app.ui.credential.CredentialChangeRoute
 import com.nivara.app.ui.credential.CredentialSetupRoute
 import com.nivara.app.ui.credential.CredentialVerifyRoute
@@ -58,6 +59,7 @@ fun NivaraNavHost(
                 onOpenBiometric = { navController.navigateTo(NivaraDestination.Biometric) },
                 onOpenAppLock = { navController.navigateTo(NivaraDestination.AppLock) },
                 onOpenHiddenApps = { navController.navigateTo(NivaraDestination.HiddenApps) },
+                onOpenCamouflage = { navController.navigateTo(NivaraDestination.Camouflage) },
             )
         }
         composable(route = NivaraDestination.About.route) {
@@ -86,6 +88,14 @@ fun NivaraNavHost(
             HiddenManagementRoute(
                 // The credential screen is the one place a session is opened. Hiding does not
                 // reimplement it, and does not keep a session of its own.
+                onUnlock = { navController.navigateTo(NivaraDestination.CredentialVerify) },
+            )
+        }
+        composable(route = NivaraDestination.Camouflage.route) {
+            CamouflageRoute(
+                // The credential screen is the one place a session is opened. Changing the
+                // application's own identity does not reimplement it, and does not keep a session of
+                // its own.
                 onUnlock = { navController.navigateTo(NivaraDestination.CredentialVerify) },
             )
         }

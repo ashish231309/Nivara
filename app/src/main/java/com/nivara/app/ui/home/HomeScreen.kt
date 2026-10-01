@@ -47,6 +47,7 @@ fun HomeRoute(
     onOpenBiometric: () -> Unit,
     onOpenAppLock: () -> Unit,
     onOpenHiddenApps: () -> Unit,
+    onOpenCamouflage: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
@@ -63,6 +64,7 @@ fun HomeRoute(
         onOpenBiometric = onOpenBiometric,
         onOpenAppLock = onOpenAppLock,
         onOpenHiddenApps = onOpenHiddenApps,
+        onOpenCamouflage = onOpenCamouflage,
         modifier = modifier,
     )
 }
@@ -82,6 +84,7 @@ fun HomeScreen(
     onOpenBiometric: () -> Unit,
     onOpenAppLock: () -> Unit,
     onOpenHiddenApps: () -> Unit,
+    onOpenCamouflage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -101,6 +104,7 @@ fun HomeScreen(
             onOpenBiometric = onOpenBiometric,
             onOpenAppLock = onOpenAppLock,
             onOpenHiddenApps = onOpenHiddenApps,
+            onOpenCamouflage = onOpenCamouflage,
             modifier = modifier,
         )
     }
@@ -121,6 +125,7 @@ private fun HomeContent(
     onOpenBiometric: () -> Unit,
     onOpenAppLock: () -> Unit,
     onOpenHiddenApps: () -> Unit,
+    onOpenCamouflage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -175,6 +180,8 @@ private fun HomeContent(
             title = stringResource(id = R.string.home_launcher_title),
             body = stringResource(id = R.string.home_launcher_summary),
         )
+
+        CamouflageCard(onOpenCamouflage = onOpenCamouflage)
 
         Button(onClick = onOpenAbout) {
             Text(text = stringResource(id = R.string.home_about_action))
@@ -344,6 +351,30 @@ private fun HiddenAppsCard(
         )
         OutlinedButton(onClick = onOpenHiddenApps, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(id = R.string.home_apphide_action))
+        }
+    }
+}
+
+/**
+ * The way into the application-identity screen.
+ *
+ * The card names the feature for what it is — a name and an icon — and repeats the limitation the
+ * screen behind it states in full, so the home screen cannot be read as offering a way to hide
+ * Nivara from Android. It also names both ways back to Nivara, because that is the part a user
+ * needs before changing the name, not after.
+ */
+@Composable
+private fun CamouflageCard(
+    onOpenCamouflage: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        InfoCard(
+            title = stringResource(id = R.string.home_camouflage_title),
+            body = stringResource(id = R.string.home_camouflage_summary),
+        )
+        OutlinedButton(onClick = onOpenCamouflage, modifier = Modifier.fillMaxWidth()) {
+            Text(text = stringResource(id = R.string.home_camouflage_action))
         }
     }
 }

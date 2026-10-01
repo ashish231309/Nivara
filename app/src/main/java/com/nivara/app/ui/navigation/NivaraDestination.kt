@@ -89,6 +89,19 @@ sealed interface NivaraDestination {
     }
 
     /**
+     * The identity Nivara presents to the device's launcher.
+     *
+     * An ordinary settings screen, reached from the home screen like every other one, and the
+     * documented way to put Nivara's own name and icon back. Nothing about reaching Nivara depends
+     * on it: the entry that starts the application is always enabled, and this screen is one card
+     * down from the home screen it opens on.
+     */
+    data object Camouflage : NivaraDestination {
+        override val route: String = "camouflage"
+        override val titleRes: Int = R.string.camouflage_title
+    }
+
+    /**
      * Nivara as the device's Home application: the launcher surface and its app drawer.
      *
      * A destination like any other, so that reaching Nivara's settings from the launcher is ordinary
@@ -118,6 +131,7 @@ sealed interface NivaraDestination {
                 AppLockSetup,
                 AppLock,
                 HiddenApps,
+                Camouflage,
             )
 
         /** Resolves a navigation route back to its destination, or `null` when unknown. */
