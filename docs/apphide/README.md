@@ -302,22 +302,67 @@ concurrent hides cannot lose each other's entry, which the repository's JVM test
 with two dozen concurrent changes. There is no transaction manager, no queue and no retry policy:
 neither is needed for a set of names, and both would be more moving parts than the problem has.
 
-## What Nivara's launcher will do with this (the Stage 11 boundary)
+## What Nivara's launcher does with this (the Stage 11 boundary)
 
-When Nivara's own launcher arrives, it consumes the repository contract:
+Nivara now has its own launcher, and it consumes the repository contract exactly as this document
+required — no more and no less:
 
-* it depends on `HiddenApplicationRepository` and reads `hiddenApplications()` — it never parses the
-  file, never receives its path, and never learns the format;
-* it treats `Unreadable` and `Unavailable` as their own outcomes. A launcher that showed everything
-  because the record could not be read would expose exactly the applications the user asked it to
-  keep back;
-* it filters on `visibilityOf(packageName)` and changes nothing on the device: an application it does
-  not show is still installed, launchable by other means, and untouched;
-* it keeps no hidden list of its own.
+* it depends on `HiddenApplicationRepository` and reads `hiddenApplications()`; it never parses the
+  file, never receives its path and never learns the format. The repository verifier refuses a
+  launcher source that names the codec, the file or the storage helper;
+* it handles `Unreadable` and `Unavailable` as their own outcomes, and produces **no application list
+  at all** while either one holds. A launcher that showed everything because the record could not be
+  read would expose exactly the applications the user asked it to keep back — at the moment they are
+  most likely to be looking. The rule lives in `domain/launcher/LauncherCatalogue.kt`, a pure function
+  over the two repository answers, so the fail-closed decision is tested without a device;
+* it filters on `visibilityOf(packageName)`, by exact package name, and changes nothing on the device:
+  an application the drawer leaves out is still installed, still listed by Android, still launchable
+  by other means, and untouched;
+* it keeps no hidden list of its own: the drawer is a rendering of the last read, re-read on
+  creation, on resume and after returning from Nivara's settings.
 
-Stage 11 may only relax these rules by changing this document first. The format itself — the magic,
-the version, the entries and the checksum — is an implementation detail of `data/apphide` and is not
-part of any contract.
+### Temporary reveal
+
+The one thing the launcher adds is a way to see what is hidden, and it is deliberately narrow:
+
+* the reveal is **presentation state only**. It never calls the repository, never writes anything, and
+  the stored set is identical before, during and after it;
+* it requires a valid session from the existing `SessionManager`. Without one, the control routes to
+  the existing credential screen and nothing is revealed;
+* it is memory-only: it is cleared when the gate closes — by expiry, by Quick Lock, by a failed
+  authentication — and it does not survive the process. A recreated launcher comes back
+  unauthenticated with no reveal to clear;
+* ending a reveal is never an unhide: the applications go back to being withheld because that is what
+  the stored set says, not because anything was rewritten;
+* while hidden applications are on screen, the launcher's window is protected by the project's single
+  screenshot-protection implementation.
+
+### Session semantics
+
+Nothing about the session changes because Nivara's launcher is involved. The launcher never
+establishes, extends or ends a session; it asks the gate for its current answer at the moment it needs
+one. Resuming the launcher — including coming back from an application it opened — re-reads the device
+and the hidden set and re-evaluates the gate; it does not refresh the session, so Stage 5's rule that
+a session begins with an authentication and nothing else still holds. Quick Lock keeps working from
+anywhere: the gate closes, the reveal ends with it, and the drawer is filtered again.
+
+### App Lock independence
+
+The launcher has no dependency on the protected set at all — the verifier refuses even a reference to
+`ProtectedApplication` from the launcher sources. An application that is protected and hidden is
+withheld until an authenticated reveal, and once shown, opening it raises the existing App Lock
+surface, which authenticates on its own terms. Hiding something never unprotects it, protecting
+something never hides it, and the launcher never claims that its own session is the App Lock
+surface's authentication.
+
+### What the launcher does and does not hide
+
+It hides, from **Nivara's own drawer**, the applications the user asked it to keep out of sight. It
+does not hide anything from Android: every application in the stored set stays in Android's launcher,
+in Settings, in the package manager and in anything privileged enough to look. The home surface says so
+in as many words, and
+[`docs/launcher/README.md`](../launcher/README.md) records the whole launcher contract — the Home
+activity, discovery, launching, the reveal policy, lifecycle and the runtime verification status.
 
 ## Security and privacy
 

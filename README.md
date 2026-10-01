@@ -14,9 +14,10 @@ The repository contains the **foundation release**, the **cryptographic core**, 
 credential enrolment**, **biometric unlock as a secondary path**, the **session layer**, the
 **App Lock layer** — launcher discovery, the two Android capabilities it needs, foreground
 detection, the protection surface that presents the requirement and routes authentication into the
-session, and the settings screen that chooses which applications are protected — and the
-**hidden-app layer**: the record of which applications Nivara keeps out of sight, and the screen
-that manages it.
+session, and the settings screen that chooses which applications are protected — the
+**hidden-app layer**: the record of which applications Nivara keeps out of sight, the screen that
+manages it, and the **launcher**: Nivara as the device's Home application, with an app drawer that
+leaves hidden applications out and can show them again for as long as Nivara is unlocked.
 
 What works today:
 
@@ -44,6 +45,11 @@ What works today:
   asked to keep out of sight, search and two orderings, and hide/unhide through the one repository
   that stores that decision — a separate record from App Lock, requiring a valid session to change
   and none to read, and honest that Android's own launcher is not affected by it;
+- a launcher: Nivara can be selected as the device's Home application, and its app drawer draws
+  the applications the device can launch minus the ones marked hidden, with search, two orderings,
+  applications opened through the platform's own launcher facilities, and a normal route into
+  Nivara's settings — the drawer failing closed, and drawing nothing at all, when the hidden set
+  cannot be read;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
@@ -52,16 +58,17 @@ Biometric unlock never replaces the primary credential and never unlocks anythin
 the session is not one either: it is an authorization state held only while the process lives, and
 it holds no credential, no key and nothing on disk. Detection decides and publishes; the surface
 that presents a requirement is separate from it, holds no credential of its own and can do exactly
-one thing with an authentication result — hand it to the session gate. There is still no
-custom launcher, no vault and no recovery flow — those are the stages that follow, and they consume
-the layers described in [`docs/crypto/README.md`](docs/crypto/README.md),
+one thing with an authentication result — hand it to the session gate. There is still no vault, no
+recovery flow and no camouflage — those are the stages that follow, and they consume the layers
+described in [`docs/crypto/README.md`](docs/crypto/README.md),
 [`docs/credential/README.md`](docs/credential/README.md),
 [`docs/biometric/README.md`](docs/biometric/README.md),
 [`docs/session/README.md`](docs/session/README.md),
-[`docs/applock/README.md`](docs/applock/README.md) and
-[`docs/apphide/README.md`](docs/apphide/README.md). Hiding an application today means Nivara's own
-launcher will keep it out of sight when that launcher arrives; Android's launcher still shows every
-application, and the screen says so.
+[`docs/applock/README.md`](docs/applock/README.md),
+[`docs/apphide/README.md`](docs/apphide/README.md) and
+[`docs/launcher/README.md`](docs/launcher/README.md). Hiding an application means Nivara's own drawer
+leaves it out; Android's launcher still shows every application, and both the screens and the
+documentation say so.
 
 ## Planned capabilities
 
@@ -70,9 +77,11 @@ project is clear; each one is implemented in its own release and is not present 
 
 - Authentication and biometric unlock — delivered
 - App locking — delivered
-- Recording which applications are hidden — delivered; hiding them in Nivara's own launcher follows
-  with the launcher itself
-- An optional home-screen (launcher) experience
+- Recording which applications are hidden — delivered
+- An optional home-screen (launcher) experience — delivered, as a launcher Android can be asked to
+  use; choosing it is the user's decision in Android's own Home settings
+- App identity camouflage and a recovery entry point — not started; nothing about Nivara pretends to
+  be another application
 - An encrypted file vault, including media, albums and a recycle bin
 - Recovery and session management
 - Security settings, themes and the final visual design
@@ -104,7 +113,8 @@ app/src/main/java/com/nivara/app/
 │   ├── app/                    Installed-application model, package-name rule, ordering, search
 │   ├── permissions/            Usage Access and overlay capabilities, setup aggregate
 │   ├── applock/                Protected set, detection, decision rule, overlay contract
-│   └── apphide/                Hidden set, its repository contract and its failure cases
+│   ├── apphide/                Hidden set, its repository contract and its failure cases
+│   └── launcher/               What a launcher may draw, and the fail-closed rule for it
 ├── data/                       Platform-backed implementations of those contracts
 │   ├── app/                    Launcher-entry discovery through the package manager
 │   ├── applock/                Usage-event detector, protected set store, monitor, service
@@ -128,6 +138,7 @@ app/src/main/java/com/nivara/app/
     │   ├── management/         Choosing which applications are protected
     │   └── overlay/            The protection window, its lifecycle and its content
     ├── apphide/                Choosing which applications Nivara keeps out of sight
+    ├── launcher/               The Home activity, the home surface and the app drawer
     └── session/                Session text shared by the screens that show it
 ```
 
@@ -235,6 +246,15 @@ combination of stored set and discovery, a search result that is never confused 
 device, a stale row that writes nothing, a change that is read back from the repository, and the
 session policy that lets the list be read by anyone and a change be made only while the gate is
 open.
+
+The launcher is covered the same way: the rule that decides what may be drawn, in every
+combination of hidden set and reveal, including the two fail-closed outcomes and the four empty
+states; the same rule against the production hidden and protected stores on real files; and the
+launcher's state machine — what is withheld, what a reveal does and does not change, expiry and Quick
+Lock ending one, a screen that never opens or extends a session, launching by exact package name, and
+a stale row that writes nothing. The instrumented suites for the Home contract and the launcher's
+composition are compiled but not executed: no device or emulator is available, so nothing about Home
+selection, launcher resolution, icon rendering or lifecycle is claimed as verified.
 
 Instrumented tests cover what only a device can prove: Android Keystore key generation,
 non-exportability, invalidation detection and use through a cipher, and that the biometric key
@@ -392,6 +412,26 @@ it arrives. The format, the failure cases and the boundary are documented in
 | Relationship to App Lock | Independent: an application can be protected, hidden, both or neither, and neither screen touches the other's record |
 | An application that is gone | Keeps its entry and is hidden again if it returns; the screen counts it rather than deleting it |
 | Honesty | Android's launcher still shows these applications. This governs Nivara's own launcher, and the screen states that in as many words |
+
+## The launcher
+
+Nivara can be the device's Home application. The drawer is built from the same launcher-application
+catalogue App Lock uses, with the applications marked hidden left out, and an explicit control that
+shows them again for as long as Nivara is unlocked. Selecting Nivara as Home is a decision the user
+makes in Android's own settings; nothing in Nivara adds itself as a preferred activity or changes any
+system setting. The full contract is in [`docs/launcher/README.md`](docs/launcher/README.md).
+
+| Concern | Behaviour |
+| --- | --- |
+| Home contract | `ACTION_MAIN` + `CATEGORY_HOME` + `CATEGORY_DEFAULT`, exported, and no other action or entry point |
+| Discovery | The existing `ApplicationRepository`; no second scanner and no new package visibility |
+| Filtering | The domain's launcher rule: the discovered catalogue minus the hidden set, by exact package name |
+| When the hidden set cannot be read | Nothing is drawn at all — never the full catalogue |
+| Showing hidden applications | An ordinary labelled control; needs a valid session from the existing gate |
+| The reveal itself | In memory, session-bound, cleared by expiry and by Quick Lock, and gone after a process recreation |
+| Stored state | Never written by the launcher; hiding and revealing change the device in no way |
+| App Lock | Untouched and independent: a hidden application that is protected is still protected when opened |
+| Android's own launcher | Unchanged. Hiding means Nivara's drawer leaves an application out, nothing more |
 
 ## Repository checks
 

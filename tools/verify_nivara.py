@@ -461,7 +461,8 @@ for path in sorted((ROOT / "app/src/main/java/com/nivara/app/domain/security").g
 # The App Lock domain packages stay as free of the platform as the security domain does: no
 # Context, no PackageManager, no Intent, no UsageStatsManager, no Uri and no Settings. Those belong
 # to the data layer that implements the contracts.
-for domain_package in ("domain/app", "domain/permissions", "domain/applock", "domain/apphide"):
+for domain_package in ("domain/app", "domain/permissions", "domain/applock", "domain/apphide",
+                       "domain/launcher"):
     domain_dir = ROOT / f"app/src/main/java/com/nivara/app/{domain_package}"
     if not domain_dir.is_dir():
         err(f"{domain_package} is missing")
@@ -743,6 +744,199 @@ for path in sorted((ROOT / "app/src/main/java/com/nivara/app/data/apphide").glob
         if forbidden in text:
             err(f"{rel}: {forbidden} — {reason}")
 
+# ---------------------------------------------------------------- the launcher
+# Nivara can be the device's Home application, and the Home contract is the one place the project
+# needs an exported component. The rules below describe that surface exactly, from the manifest
+# rather than from a filename, and then constrain what the launcher may do behind it.
+launcher_sources = sorted((ROOT / "app/src/main/java/com/nivara/app/ui/launcher").rglob("*.kt"))
+if not launcher_sources:
+    err("no launcher sources were found under ui/launcher")
+
+home_activities = []
+for activity in manifest_root.iter("activity"):
+    filters = list(activity.findall("intent-filter"))
+    categories = {attr(category, "name") for filter_ in filters for category in filter_.iter("category")}
+    actions = {attr(action, "name") for filter_ in filters for action in filter_.iter("action")}
+    data_elements = [element for filter_ in filters for element in filter_.iter("data")]
+    if "android.intent.category.HOME" in categories:
+        home_activities.append((activity, actions, categories, data_elements))
+
+# Exactly one Home activity. Two would mean two different home surfaces, and whichever Android
+# picked would be the one the user sees.
+if len(home_activities) != 1:
+    err(f"{len(home_activities)} activities declare the Home category; the launcher must have "
+        f"exactly one")
+else:
+    activity, actions, categories, data_elements = home_activities[0]
+    name = attr(activity, "android:name")
+    if attr(activity, "android:exported") != "true":
+        err(f"the Home activity '{name}' must declare android:exported=\"true\": Android cannot "
+            f"start a Home application it is not allowed to start")
+    expected_actions = {"android.intent.action.MAIN"}
+    expected_categories = {"android.intent.category.HOME", "android.intent.category.DEFAULT"}
+    if actions != expected_actions:
+        err(f"the Home activity '{name}' declares {sorted(actions - expected_actions)} beyond "
+            f"ACTION_MAIN: the exported surface is the Home intent and nothing else")
+    if categories != expected_categories:
+        err(f"the Home activity '{name}' declares categories "
+            f"{sorted(categories ^ expected_categories)} outside HOME + DEFAULT")
+    if data_elements:
+        err(f"the Home activity '{name}' declares a data element: a Home intent carries no URI")
+    if attr(activity, "android:permission") is not None:
+        err(f"the Home activity '{name}' declares a permission; the Home contract has none")
+
+    # The manifest names a class, and that class has to exist.
+    if name and name.startswith("."):
+        candidate = ROOT / "app/src/main/java/com/nivara/app" / (name.lstrip(".").replace(".", "/") + ".kt")
+        if not candidate.exists():
+            err(f"the Home activity '{name}' has no source file at "
+                f"{candidate.relative_to(ROOT)}")
+
+    notes.append(f"launcher: one Home activity ({name}), exported for the Home intent only")
+
+# Every other exported component still has to be a launcher entry of the application itself. A
+# component exported for a custom action would be a way into Nivara that no feature asked for.
+for activity in manifest_root.iter("activity"):
+    if attr(activity, "android:exported") != "true":
+        continue
+    filters = list(activity.findall("intent-filter"))
+    categories = {attr(category, "name") for filter_ in filters for category in filter_.iter("category")}
+    actions = {attr(action, "name") for filter_ in filters for action in filter_.iter("action")}
+    if "android.intent.category.HOME" in categories:
+        continue
+    if actions != {"android.intent.action.MAIN"} or "android.intent.category.LAUNCHER" not in categories:
+        err(f"exported activity '{attr(activity, 'android:name')}' is neither the Home activity nor "
+            f"the application's own launcher entry (actions {sorted(actions)}, categories "
+            f"{sorted(categories)})")
+
+# Providers and receivers would be new ways in; there are none, and if one appears it must be
+# private like the App Lock service.
+for tag in ("provider", "receiver"):
+    for element in manifest_root.iter(tag):
+        if attr(element, "android:exported") != "false":
+            err(f"manifest {tag} '{attr(element, 'android:name')}' must declare "
+                f"android:exported=\"false\"")
+
+# Disabling another application's components is not hiding and has no place anywhere in the project.
+for path in main_kt:
+    text = strip_comments(path.read_text())
+    for forbidden, reason in (
+        ("setApplicationEnabledSetting", "Nivara never changes an application's enabled state"),
+        ("setComponentEnabledSetting", "Nivara never disables another application's components"),
+        ("killBackgroundProcesses", "Nivara never kills another application's process"),
+        ("addPreferredActivity", "Nivara never selects a Home application: the user does"),
+        ("clearPackagePreferredActivities", "Nivara never changes a launcher preference"),
+        ("replacePreferredActivity", "Nivara never selects a Home application: the user does"),
+    ):
+        if forbidden in text:
+            err(f"{path.relative_to(ROOT)}: {forbidden} — {reason}")
+
+# The launcher draws what the domain's rule produced and owns no state of its own: no hidden list, no
+# session, no persistence, and no second discovery scanner.
+for path in launcher_sources:
+    rel = path.relative_to(ROOT)
+    text = strip_comments(path.read_text())
+    for forbidden, reason in (
+        ("AtomicFiles", "the launcher goes through the hidden-application repository, never storage"),
+        ("HiddenApplicationCodec", "the launcher never parses the stored hidden set"),
+        ("FileHiddenApplicationRepository", "the launcher reads the contract, not the implementation"),
+        ("HIDDEN_APPLICATIONS_FILE", "the launcher does not know where the hidden set is kept"),
+        ("APP_HIDE_DIRECTORY", "the launcher does not know where the hidden set is kept"),
+        ("ProtectedApplication", "hiding and protecting are separate dimensions"),
+        ("SharedPreferences", "the launcher persists nothing, least of all a reveal"),
+        ("DataStore", "the launcher persists nothing, least of all a reveal"),
+        ("RoomDatabase", "the launcher persists nothing, least of all a reveal"),
+        ("openFileOutput", "the launcher persists nothing, least of all a reveal"),
+        ("FileOutputStream", "the launcher persists nothing, least of all a reveal"),
+        ("SavedStateHandle", "a reveal must not survive the process that granted it"),
+        ("rememberSaveable", "a reveal must not survive the process that granted it"),
+        ("CATEGORY_HOME", "the launcher draws a home surface; it does not start another Home intent"),
+        ("queryIntentActivities", "discovery happens once, in the application repository"),
+        ("getInstalledApplications", "discovery happens once, in the application repository"),
+        ("getInstalledPackages", "discovery happens once, in the application repository"),
+        ("PackageManager", "the launcher draws what discovery produced; it does not query the platform"),
+        ("UsageStatsManager", "the launcher reads no usage history"),
+        ("AccessibilityService", "the launcher reads no screen"),
+        ("DevicePolicyManager", "the launcher is not device administration"),
+        ("java.security", "the launcher does no cryptography"),
+        ("javax.crypto", "the launcher does no cryptography"),
+        ("MessageDigest", "the launcher has no use for a hash"),
+        ("KeyDerivationService", "key derivation belongs to the credential layer"),
+        ("EncryptionService", "encryption belongs to the security layer"),
+        ("Log.", "the launcher must not log: package names must never reach a log"),
+        ("println(", "the launcher must not print: package names must never be logged"),
+        ("HttpURLConnection", "the launcher transmits nothing"),
+        ("okhttp", "the launcher transmits nothing"),
+    ):
+        if forbidden in text:
+            err(f"{rel}: {forbidden} — {reason}")
+
+# The launcher's session policy is the existing gate's, and nothing else. A file that reads the
+# session must ask the gate for its authoritative answer, and no file may declare a session-like or
+# authentication-like type of its own.
+for path in launcher_sources + sorted((ROOT / "app/src/main/java/com/nivara/app/domain/launcher").glob("*.kt")):
+    rel = path.relative_to(ROOT)
+    text = strip_comments(path.read_text())
+    for match in re.finditer(
+        r"^(?:internal |private |public )*(?:sealed |data |enum |abstract |open )*"
+        r"(?:class|interface|object)\s+([A-Za-z_]\w*)",
+        text,
+        re.MULTILINE,
+    ):
+        name = match.group(1)
+        if re.search(r"Session|Unlock|Password|Passcode|Biometric|Authenticat|Reveal[A-Za-z]*Store", name):
+            err(f"{rel}: the launcher declares '{name}'; the session and its unlocked state belong "
+                f"to the existing SessionManager")
+    if "SessionManager" in text and "currentState()" not in text:
+        err(f"{rel}: the launcher reads the session without the gate's authoritative currentState()")
+
+# The hidden-application repository must be what the launcher depends on: the contract is the
+# boundary Stage 11 was built against, and without it there is no fail-closed answer to read.
+launcher_view_model = ROOT / "app/src/main/java/com/nivara/app/ui/launcher/LauncherViewModel.kt"
+if not launcher_view_model.exists():
+    err("the launcher view model is missing")
+else:
+    text = launcher_view_model.read_text()
+    # Typed dependencies, not mentions: a name that only appears as a container property or an
+    # argument would still leave the launcher without the contract it is supposed to depend on.
+    for pattern, reason in (
+        (r":\s*HiddenApplicationRepository\b",
+         "the launcher must depend on the hidden-application contract"),
+        (r":\s*ApplicationRepository\b",
+         "the launcher draws the catalogue discovery already produced"),
+        (r":\s*ApplicationLauncher\b",
+         "opening an application goes through the application-launcher contract"),
+    ):
+        if not re.search(pattern, text):
+            err(f"{launcher_view_model.relative_to(ROOT)}: {reason}")
+    if "launcherCatalogue(" not in text:
+        err(f"{launcher_view_model.relative_to(ROOT)}: the drawer's filtering rule belongs to the "
+            f"domain layer")
+
+launcher_rule = ROOT / "app/src/main/java/com/nivara/app/domain/launcher/LauncherCatalogue.kt"
+if not launcher_rule.exists():
+    err("the domain's launcher catalogue rule is missing")
+else:
+    text = strip_comments(launcher_rule.read_text())
+    if not re.search(r"^fun launcherCatalogue\(", text, re.MULTILINE):
+        err(f"{launcher_rule.relative_to(ROOT)}: the domain must declare the launcher catalogue rule "
+            f"(fun launcherCatalogue)")
+    for required in ("HiddenApplicationsRead.Unreadable", "HiddenApplicationsRead.Unavailable"):
+        if required not in text:
+            err(f"{launcher_rule.relative_to(ROOT)}: the rule must handle {required} as its own "
+                f"outcome; an unreadable hidden set must never become a full catalogue")
+
+# Hidden applications are on screen only while a reveal is; that window is protected by the
+# project's single screenshot-protection implementation, as the credential and management screens
+# are.
+launcher_screens = sorted((ROOT / "app/src/main/java/com/nivara/app/ui/launcher").rglob("*Screen.kt"))
+if not launcher_screens:
+    err("no launcher screen was found")
+for path in launcher_screens:
+    if "SecureScreenEffect()" not in path.read_text():
+        err(f"{path.relative_to(ROOT)}: the launcher screen must apply SecureScreenEffect() while a "
+            f"reveal is on screen")
+
 # Discovery is rebuilt on demand and kept in memory: no cache, no file and no database may appear
 # behind it.
 app_discovery_dir = ROOT / "app/src/main/java/com/nivara/app/data/app"
@@ -816,7 +1010,7 @@ for name in declared_destinations:
 
 # documentation that the code refers to must exist
 for doc in ("docs/crypto/envelope-format.md", "docs/crypto/README.md", "docs/apphide/README.md",
-            "tools/crypto_reference.py"):
+            "docs/launcher/README.md", "tools/crypto_reference.py"):
     if not (ROOT / doc).exists():
         err(f"documentation or tooling referenced by the code is missing: {doc}")
 
