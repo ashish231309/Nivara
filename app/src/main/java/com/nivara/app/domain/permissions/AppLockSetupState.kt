@@ -1,6 +1,7 @@
 package com.nivara.app.domain.permissions
 
 import com.nivara.app.core.common.NivaraResult
+import com.nivara.app.core.common.fold
 import com.nivara.app.domain.app.ApplicationDiscoveryState
 import com.nivara.app.domain.app.InstalledApplication
 
@@ -59,10 +60,12 @@ data class AppLockSetupState(
             discovery: NivaraResult<List<InstalledApplication>>,
             usageAccess: UsageAccessStatus,
         ): AppLockSetupState = AppLockSetupState(
-            discovery = when (discovery) {
-                is NivaraResult.Success -> ApplicationDiscoveryState.Available(discovery.value)
-                is NivaraResult.Failure -> ApplicationDiscoveryState.Unavailable
-            },
+            // `fold` keeps the generic payload behind the result type's own helpers, so no
+            // unchecked cast is written here.
+            discovery = discovery.fold(
+                onSuccess = { applications -> ApplicationDiscoveryState.Available(applications) },
+                onFailure = { ApplicationDiscoveryState.Unavailable },
+            ),
             usageAccess = usageAccess,
         )
     }

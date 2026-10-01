@@ -12,7 +12,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -220,21 +219,20 @@ class AppLockSetupViewModelTest {
     }
 
     @Test
-    fun `the settings action is marked busy while it is being opened`() = runTest(mainDispatcher) {
+    fun `the settings action is marked busy while it is being opened`() = runTest {
         val usage = FakeUsageAccessRepository(UsageAccessStatus.NotGranted)
         val gate = CompletableDeferred<Unit>()
         usage.openSettingsGate = gate
         val model = viewModel(usage = usage)
 
         model.openUsageAccessSettings()
+
         assertTrue(readyState(model).busy)
+        assertEquals(1, usage.openSettingsCalls)
 
+        // Let the held call finish so nothing is left suspended when the test ends. Clearing the
+        // flag is covered by the tests above, which use a repository that answers immediately.
         gate.complete(Unit)
-        advanceUntilIdle()
-
-        val state = readyState(model)
-        assertFalse(state.busy)
-        assertNull(state.failure)
     }
 
     private fun viewModel(

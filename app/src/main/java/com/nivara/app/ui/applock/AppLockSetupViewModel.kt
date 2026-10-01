@@ -113,7 +113,7 @@ class AppLockSetupViewModel(
         }
     }
 
-    private fun readState(
+    private suspend fun readState(
         clearFailure: Boolean,
         previous: AppLockSetupUiState.Ready?,
     ): AppLockSetupUiState.Ready {
