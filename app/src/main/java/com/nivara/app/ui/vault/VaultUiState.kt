@@ -1,6 +1,8 @@
 package com.nivara.app.ui.vault
 
+import com.nivara.app.domain.vault.VaultAlbumId
 import com.nivara.app.domain.vault.VaultImportProgress
+import com.nivara.app.domain.vault.VaultOrdering
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraMessage
@@ -31,8 +33,23 @@ sealed interface VaultUiState {
      * The vault's state, and the controls that are meaningful for it.
      *
      * @param vault what is at the selected root, in the domain's own words.
-     * @param sessionAuthenticated whether Nivara currently has a valid session. Creating a vault is
-     *   a durable configuration change and is refused while this is `false`.
+     * @param index the list of files the vault holds, filtered by [searchQuery] and ordered by
+     *   [ordering] — the same authenticated metadata, arranged the way the screen is currently
+     *   showing it.
+     * @param organization the albums, resolved against the same index.
+     * @param section which collection the screen is showing: every file, or the albums.
+     * @param searchQuery what is typed in the search box, as typed. The screen draws it back; the
+     *   filter itself is applied to [index] and to the open album.
+     * @param search what the query currently means, so "no file matches" is never drawn for a list
+     *   that could not be read.
+     * @param ordering the chosen field and direction, and the only thing that decides how two items
+     *   compare.
+     * @param openAlbum the album being shown, when one is open.
+     * @param renamingAlbumId the album whose title is being edited, when one is.
+     * @param confirmingAlbumDeleteId the album whose deletion is being confirmed, when one is.
+     * @param editingAlbumItems whether the open album is showing its add/remove surface.
+     * @param sessionAuthenticated whether Nivara currently has a valid session. Creating a vault and
+     *   every album change are durable configuration changes and are refused while this is `false`.
      * @param busy `true` while a change is being applied; every control is disabled meanwhile.
      * @param unlockRequired `true` when the user asked for a change and has no session. The screen
      *   answers this by sending the user to the existing credential screen.
@@ -42,6 +59,16 @@ sealed interface VaultUiState {
     data class Ready(
         val vault: VaultState,
         val index: VaultIndexUiState = VaultIndexUiState.Loading,
+        val organization: VaultOrganizationUiState = VaultOrganizationUiState.Loading,
+        val section: VaultSection = VaultSection.AllItems,
+        val searchQuery: String = "",
+        val search: VaultSearchUiState = VaultSearchUiState.NotAsked,
+        val searchSummary: VaultSearchSummary? = null,
+        val ordering: VaultOrdering = VaultOrdering(),
+        val openAlbum: VaultAlbumDetailUi? = null,
+        val renamingAlbumId: VaultAlbumId? = null,
+        val confirmingAlbumDeleteId: VaultAlbumId? = null,
+        val editingAlbumItems: Boolean = false,
         val sessionAuthenticated: Boolean,
         val busy: Boolean = false,
         val importing: Boolean = false,

@@ -20,6 +20,7 @@ import com.nivara.app.domain.vault.VaultRepository
 import com.nivara.app.domain.vault.VaultSourceReference
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
+import com.nivara.app.testing.FakeVaultOrganizationRepository
 import com.nivara.app.testing.testSessionManager
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -288,6 +289,7 @@ class VaultImportTest {
     ): VaultViewModel = VaultViewModel(
         vaultRepository = repository,
         indexRepository = index,
+        organizationRepository = FakeVaultOrganizationRepository(),
         locationStore = FakeVaultLocationStore(),
         sessionManager = session,
     )

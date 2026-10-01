@@ -108,4 +108,19 @@ internal object VaultStructure {
      * object or a file Nivara did not put there.
      */
     val INDEX_SLOT_NAMES: List<String> = listOf("index.0.nvi", "index.1.nvi")
+
+    /**
+     * The two organisation-record slots — the vault's albums.
+     *
+     * A third pair, written exactly like the other two and for exactly the same reason: a new album
+     * generation goes into the slot that is not the current one, so the record a reader would pick is
+     * never the record being written. They live in the metadata area with the rest because they *are*
+     * metadata — a small authenticated record about the vault — and the content area's listing must
+     * keep meaning "objects, and nothing else".
+     *
+     * The marker inside them is `NVAO` rather than the index's `NVIN`, and they are sealed under a
+     * purpose of their own, so an album record and an index record can never be mistaken for each
+     * other even if one were moved onto the other's name.
+     */
+    val ORGANIZATION_SLOT_NAMES: List<String> = listOf("albums.0.nva", "albums.1.nva")
 }

@@ -816,3 +816,310 @@ large files, and TalkBack traversal of the viewer. The instrumented suite covers
 composition — each state, its words and its controls — and is **compiled but not executed** in
 continuous integration, because no device or emulator is attached. Claims about decoding, playback and
 rendering remain claims about code that compiles until a device runs it.
+
+# Stage 16: albums, search and the order of the list
+
+## Purpose
+
+A vault that only appends is a place files go to; this stage is what makes it a place somebody can
+find things in. Files are grouped into **albums**, the list is **searched** by the facts Nivara already
+holds about each file, and it can be **ordered** four ways.
+
+All three are *organisation*. None of them touches an encrypted object, the index's facts, the viewer
+or the key hierarchy: an album is a list of identifiers in a small authenticated record of its own, and
+searching and sorting are derived from metadata that was already read. Organising a vault can
+therefore not lose a file, change what a file is, or make one unreadable.
+
+## What an album is
+
+* A **title** the user typed, validated and bounded.
+* A **stable identifier**: 128 random bits, lower-case hexadecimal, created once and never reused. The
+  album is that identifier. A title is a label and may be changed at any time; two albums may share a
+  title and remain two albums.
+* A **creation time**, kept because an album list has to break ties somehow and nothing else names when
+  an album appeared.
+* **Membership**: an ordered, duplicate-free list of item identifiers.
+
+An album holds *nothing else*. There is no copy of a name, a type, a size, an import time, a digest or
+a content location in it: every fact about a file shown inside an album is read from the index at the
+moment it is drawn. A list that copied those facts would be a second index, and the first rename would
+leave the two disagreeing.
+
+Albums are not folders. Nothing is moved, renamed or rewritten when a file joins one, and an identifier
+that names nothing in the index is still a legal member.
+
+## Creating, renaming and deleting
+
+| Action | Requires | Effect |
+| --- | --- | --- |
+| Create album | A vault that opens, a readable album record (or none), the session | A new album with a fresh identifier and no members |
+| Rename album | The same | The title changes; the identifier, the creation time and every member stay |
+| Delete album | The same | **The album goes, and nothing else** |
+| Add a member | The same | The item's identifier is appended if it is not already there |
+| Remove a member | The same | The identifier is taken out of that album only |
+
+Deleting an album deletes a list. The files it named keep their encrypted objects, their place in the
+index, and their membership in every other album they were in. There is no operation in the album
+contract that can delete, move, rename, re-encrypt or even read a stored file — the only deletion in
+the album record's repository is the removal of the record slot it has just superseded.
+
+Adding an item that is already in the album, and removing one that is not, each change nothing and are
+reported as success: the state the caller asked for already holds, and a new generation that says the
+same thing is a write that can only fail.
+
+An album that loses its last member stays. Empty albums are allowed and deliberate — an album is
+something a person made, and Nivara does not quietly tidy away things people made.
+
+An item may be in no album, one album, or several. Belonging to an album says nothing about the item,
+so nothing prevents a second membership.
+
+## The album record (version 1)
+
+Albums are kept in their own small authenticated record beside the index, in the same metadata area:
+
+```
+nivara.meta/
+  albums.0.nva      ← one generation of the album record
+  albums.1.nva      ← the other
+```
+
+```
+clear header
+  offset 0    "NVAO"           4 bytes   what these bytes are
+  offset 4    version          1 byte
+  offset 5    reserved         1 byte    must be zero
+  offset 6    generation       8 bytes   big-endian
+  offset 14   sealed payload             an authenticated envelope
+```
+
+The payload is the same shape — marker, version, reserved, generation, album count, then the albums —
+and each album is its identifier (16 bytes), its title (2-byte length + UTF-8), its creation time
+(8 bytes) and its members (2-byte count, then 16 bytes each).
+
+The marker is **not** the index's, and the payload is sealed for a **purpose of its own**
+(`EncryptionContext.VaultOrganization`). Either check would be enough, because both are authenticated;
+both are kept because they answer different questions — one says what the bytes are before anyone holds
+a key, the other says what they were sealed for before anything is written over them.
+
+The decoder is bounded and strict. Every count is checked against a declared limit *before* anything is
+allocated from it, every length is checked before it is read, an album title must be valid text of a
+bounded size, identifiers must be exactly sixteen bytes, a record naming the same album or the same
+member twice is refused, a payload whose generation disagrees with its own header is refused, text that
+is not valid UTF-8 is refused rather than replaced, and trailing bytes are refused rather than ignored.
+`null` never means "no albums": a record with no albums is a valid record with a count of zero, and an
+absent record is a separate state from every unreadable one.
+
+## Which key, and which purpose
+
+The album record is sealed with **the vault's own key**, borrowed exactly as the index borrows it, and
+no key of its own exists anywhere. Reading or changing albums is therefore impossible in a vault that
+cannot be opened, and a build that cannot open the vault cannot see, repair or replace its albums
+either. The purpose is authenticated, so an album envelope moved onto an index slot (or the reverse)
+fails before anything is decrypted.
+
+## The order that makes a change true
+
+Every change runs under one lock, and follows exactly this order:
+
+```
+authorized → the vault opens → read the current record (never rebuild it)
+   → apply the change in memory → validate the whole result
+   → seal it as the next generation, for this purpose
+   → write it into the slot that is not authoritative
+   → read it back: authenticate, decode, compare with what was intended
+   → only then prune the superseded slot
+```
+
+An interruption anywhere leaves the previous generation untouched: the new record goes into the other
+slot, and the older one is removed only after its replacement has been read back and verified. A write
+that fails is deleted, and a read-back that disagrees is deleted too, because a record Nivara cannot
+verify is not one it may leave for the next reader to trust. A change is accepted only when it is
+committed, and it is reported as committed only when it has been verified; a record that cannot be read
+is never written over.
+
+## Bounds
+
+| Bound | Value | Why |
+| --- | --- | --- |
+| Albums per vault | 2 000 | The count is written in two bytes and the record has a size limit |
+| Members per album | 5 000 | Keeps one album's encoding bounded before it is allocated |
+| Memberships in total | 50 000 | Albums share items, so a per-album limit alone would not bound the record |
+| Album title | 80 characters, 320 encoded bytes | A title is a label, not a payload |
+| Record | 4 MiB | The largest album record Nivara will read |
+
+## Search: which fields, and what it never does
+
+A query is normalised once — Unicode-composed (NFC), case-folded, whitespace-collapsed — and then
+matched against **authenticated metadata only**:
+
+* the file's **name**,
+* its **declared type** (the MIME type the index recorded, when it is a usable one),
+* the **kind** Nivara classifies that type as, including the words the list shows for it
+  (*image*, *picture*, *photo*; *video*, *movie*; *audio*, *sound*, *music*; *document*, *doc*;
+  *file*).
+
+On the albums surface, the same box searches **album titles**. Membership is deliberately not searched:
+a search result must depend on the files themselves and not on how somebody organised them.
+
+Search never decrypts, never opens a file, never touches storage and never reads the vault again — it
+filters the metadata the screen already has. It is case-insensitive, Unicode-safe, deterministic, and
+has no fuzzy matching, ranking, weighting, distance, popularity or history behind it. Asking twice
+answers the same way, and the order of the results is the order of the list, filtered.
+
+The states are kept apart, because the difference is the point:
+
+| State | Meaning |
+| --- | --- |
+| Empty box | Nothing is being asked; the ordinary list is shown |
+| Matches | The readable list holds files (or albums) answering the query |
+| No matches | The list was read, and nothing in it answers the query |
+| Cannot search | The list — or the album record — cannot be read, so the query was never asked |
+
+"No file matches" is only ever said about a list that was actually read. "Cannot search" is never drawn
+as an empty result, and an empty result is never drawn as a failure.
+
+## Ordering
+
+| Field | Comparison | Tie-break |
+| --- | --- | --- |
+| Name | Case-insensitive, then the name as written | Identifier |
+| Size | Bytes | Identifier |
+| Imported | Arrival time | Identifier |
+| Type | Kind (pictures, video, audio, documents, other), then the name | Identifier |
+
+Every order ends in the item's identifier, so it is *total*: two files that look identical — the same
+name, size and second of arrival — still come out in the same sequence every time, and the list never
+reshuffles itself. Direction is ascending or descending and applies to the whole comparison.
+
+The default is what the vault has always shown: **newest import first**. Ordering is a display
+decision, computed in memory from the metadata that was read; it never consults usage, popularity,
+recency-of-viewing or anything else Nivara does not keep.
+
+Albums are ordered by title, case-insensitively, with the album identifier as the tie-break. There is
+no drag-and-drop reordering and no album ordering to store.
+
+## Stale references, missing content and the unindexed
+
+The index and the album record are two different things and can disagree:
+
+* A file the index names whose encrypted object is not in the content area is still listed, and the
+  list says how many such entries it holds.
+* A reference an album holds that the index no longer names is **kept** and shown as *no longer in the
+  vault*. Nothing removes it on its own: only an explicit "remove from album" does, and that removes
+  the reference and nothing else.
+* An index that cannot be read is not an album list without members. The album is drawn with its counts
+  as the record holds them, and the screen says that what its members *are* cannot be shown right now.
+* An album record that cannot be read is not a vault without albums. Nothing is created, renamed or
+  deleted from that state, and the record is left exactly as it was found.
+* Encrypted objects that no index entry names are reported by the list, are never treated as files, and
+  are never deleted by anything in this stage.
+
+## The screen
+
+The vault screen keeps its own state card and gains three things above the list:
+
+* **All files / Albums** — which collection is shown. Selecting a file opens it through the same viewer
+  as before, whichever collection it was found in; there is exactly one way into a file.
+* A **search box**, and the sentence that says what it found.
+* **Order**: four fields and a direction, and the default the vault already had.
+
+Albums are listed with their title, when they were made and what they hold. Creating one is a title and
+an action; renaming happens in place; deleting asks first and says, in as many words, that the files
+are not deleted. An open album shows its items in the same rows as the vault's own list, its stale
+references with the one action that can remove them, and an *add or remove files* surface that offers
+the files the index knows about — never a storage rescan. A file already in the album is marked as such
+and cannot be added twice.
+
+Nothing about the vault's readiness or failure states is hidden by any of this: a vault that cannot be
+opened, a list that cannot be read and an album record that cannot be read are each drawn as
+themselves, and none of the organising controls is offered over a state that cannot support it.
+
+## The session, and what a change requires
+
+Every album change requires the **existing** session. There is no album password, no second prompt, no
+separate screen and no new timeout: the screen asks the session manager that already exists, and the
+repository asks the same question again at the moment the record would change, so a session that ends
+while somebody is typing cannot produce a change.
+
+A change asked for without a session is refused the way every other change in the vault is refused — the
+user is sent to the credential screen that already exists — and a session that closes mid-change fails
+the change with the previous record untouched. Nothing in the album path establishes, refreshes or
+extends a session.
+
+Reading is unaffected: looking at the albums, searching and sorting require no session, because they
+are not changes.
+
+## Failure states
+
+| State | What it means | What is offered |
+| --- | --- | --- |
+| No record yet | Nobody has created an album in this vault | Creating, and nothing else |
+| Readable | The albums are there | Everything |
+| Unreadable | The record exists and cannot be opened — damaged, or a key that is unavailable | Nothing; the record is left alone |
+| A newer format | A newer Nivara wrote it | Nothing; it is never written over |
+| Unavailable | The storage could not be reached | Nothing |
+| Access denied | The platform refused access to the folder | Nothing; the folder can be chosen again |
+| Vault not ready | The vault itself cannot be opened | Nothing; the vault's own state says why |
+
+Every refused change carries a typed reason and its own sentence: a name that cannot be stored, a title
+that has not changed, an album that is full, a record that is full, an album that is not there, a
+missing key, a refused write, a record that did not read back as it was written. None of them is worded
+as though the albums were gone.
+
+## Permissions and platform boundaries
+
+No new permission is requested for any of this. Albums, search and sorting use the folder the user
+already chose, the session that already exists and the encryption that is already there. The domain's
+organisation contracts — the album, its identifier, its ordering rules, its search and its repository —
+know nothing about Android, storage, keys or Compose: no `Context`, no `Uri`, no bitmap, no platform
+type of any kind. The screen draws states and reports taps, and holds no persistence, no key and no way
+to read a file.
+
+## Security and privacy boundaries
+
+* **No second key, and no second cipher.** The album record is sealed with the vault key through the
+  existing encryption service, under a purpose of its own.
+* **No plaintext metadata.** Album titles and membership exist on storage only inside an authenticated
+  envelope, and nowhere else.
+* **No content, ever.** Search, ordering and albums read the index and nothing else. No decryption
+  happens for a search, a sort, a membership change or an album title. There are no thumbnails, no
+  previews and no caches anywhere in this stage.
+* **No independent item database.** Albums hold identifiers and are resolved against the vault's own
+  index; nothing stores a second copy of a file's facts.
+* **No usage history.** Nothing records what was searched, opened, sorted or looked at, and no order or
+  result is influenced by anything but the metadata of the files themselves.
+* **No sharing or export.** No file can leave the vault from this screen, and there is no way to hand a
+  file to another application from it.
+
+## Scope
+
+Delivered: the album model and identifier, the album record's codec and repository, the two-slot
+generational write with a read-back before pruning, the ordering rules, the search rules and their
+states, the albums surface inside the vault screen (list, create, rename, delete with confirmation,
+open, add and remove members), the search box and the sort controls, the verifier rules and the test
+suites.
+
+Deliberately **not** in this stage: trash, restore and permanent deletion (Stage 17); recovery after
+reinstalling, backup and cloud sync; sharing, exporting or opening a file elsewhere; favourites, tags,
+usage history, recently-opened lists and anything else that would have to be recorded to be shown;
+content-based search, OCR and text extraction; thumbnails, previews and persistent caches; background
+work or a media service; and new permissions, a second password or a second session.
+
+## Runtime verification status
+
+The album model and its membership rules, the ordering rules (every field, both directions, the
+tie-break and its determinism), the search rules (case, Unicode, whitespace, type, kind, album titles
+and every state), the record's codec (round trips, malformed records, duplicates, truncated and
+overlong records, trailing bytes and unsupported versions), the repository (creation, renaming,
+deletion, membership, two-slot generations, read-back verification, refused and dropped writes,
+authorization before and during a change, and every unreadable state), and the screen's state machine
+and wording are verified by local JVM suites — 199 tests across seven suites — together with the static
+checks, which run on every change. The verifier's Stage 16 rules are themselves negative-tested: each
+one is broken on purpose and seen to fail, and the repository is restored byte for byte afterwards.
+
+What is **not** verified by those suites, and is therefore not claimed anywhere: the writing and reading
+of a real album record through the Storage Access Framework on a device, the behaviour of the album
+surface on a real screen, TalkBack traversal of the new controls, and how a very large album list
+behaves while it is being drawn. The instrumented suite covers the albums surface's composition — each
+state, its words and its controls — and is **compiled but not executed** in continuous integration,
+because no device or emulator is attached.

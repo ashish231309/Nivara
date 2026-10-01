@@ -42,6 +42,17 @@ enum class EncryptionContext(val tag: Int) {
      * envelope into the vault record (or the reverse) fails before anything is decrypted.
      */
     VaultIndex(tag = 0x07),
+
+    /**
+     * The record that holds a vault's albums.
+     *
+     * A third purpose for the vault's metadata, and a third place a ciphertext can belong to: the
+     * list of what the vault holds, the vault's own record and the way its owner has organised those
+     * files are three different things with three different lifetimes, and a ciphertext made for one
+     * must never be accepted for another. Since the purpose is authenticated, moving an album record
+     * onto an index slot — or the reverse — fails before anything is decrypted.
+     */
+    VaultOrganization(tag = 0x08),
     ;
 
     companion object {

@@ -12,7 +12,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.nivara.app.MainActivity
 import com.nivara.app.R
 import com.nivara.app.domain.security.SecureRandomGenerator
+import com.nivara.app.domain.vault.VaultAlbumId
 import com.nivara.app.domain.vault.VaultIdentity
+import com.nivara.app.domain.vault.VaultItemId
+import com.nivara.app.domain.vault.VaultSortField
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraMessage
@@ -233,6 +236,23 @@ private fun content(
     onRetry: () -> Unit = {},
     onUnlock: () -> Unit = {},
     onMessageShown: () -> Unit = {},
+    onSectionSelected: (VaultSection) -> Unit = {},
+    onSearchQueryChanged: (String) -> Unit = {},
+    onSearchCleared: () -> Unit = {},
+    onSortFieldSelected: (VaultSortField) -> Unit = {},
+    onSortDirectionToggled: () -> Unit = {},
+    onAlbumOpened: (VaultAlbumId) -> Unit = {},
+    onAlbumClosed: () -> Unit = {},
+    onAlbumCreated: (String) -> Unit = {},
+    onAlbumRenameStarted: (VaultAlbumId) -> Unit = {},
+    onAlbumRenameCancelled: () -> Unit = {},
+    onAlbumRenameConfirmed: (VaultAlbumId, String) -> Unit = { _, _ -> },
+    onAlbumDeleteRequested: (VaultAlbumId) -> Unit = {},
+    onAlbumDeleteCancelled: () -> Unit = {},
+    onAlbumDeleteConfirmed: (VaultAlbumId) -> Unit = {},
+    onAlbumItemsEditingChanged: (Boolean) -> Unit = {},
+    onAlbumItemAdded: (VaultItemId) -> Unit = {},
+    onAlbumItemRemoved: (VaultItemId) -> Unit = {},
 ) {
     NivaraTheme {
         VaultScreen(
@@ -245,6 +265,23 @@ private fun content(
             onRetry = onRetry,
             onUnlock = onUnlock,
             onMessageShown = onMessageShown,
+            onSectionSelected = onSectionSelected,
+            onSearchQueryChanged = onSearchQueryChanged,
+            onSearchCleared = onSearchCleared,
+            onSortFieldSelected = onSortFieldSelected,
+            onSortDirectionToggled = onSortDirectionToggled,
+            onAlbumOpened = onAlbumOpened,
+            onAlbumClosed = onAlbumClosed,
+            onAlbumCreated = onAlbumCreated,
+            onAlbumRenameStarted = onAlbumRenameStarted,
+            onAlbumRenameCancelled = onAlbumRenameCancelled,
+            onAlbumRenameConfirmed = onAlbumRenameConfirmed,
+            onAlbumDeleteRequested = onAlbumDeleteRequested,
+            onAlbumDeleteCancelled = onAlbumDeleteCancelled,
+            onAlbumDeleteConfirmed = onAlbumDeleteConfirmed,
+            onAlbumItemsEditingChanged = onAlbumItemsEditingChanged,
+            onAlbumItemAdded = onAlbumItemAdded,
+            onAlbumItemRemoved = onAlbumItemRemoved,
         )
     }
 }

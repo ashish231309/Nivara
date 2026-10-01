@@ -6,6 +6,10 @@ import com.nivara.app.domain.vault.VaultItem
 import com.nivara.app.domain.vault.VaultContentClassification
 import com.nivara.app.domain.vault.VaultContentKind
 import com.nivara.app.domain.vault.VaultItemId
+import com.nivara.app.domain.vault.VaultOrdering
+import com.nivara.app.domain.vault.VaultSearch
+import com.nivara.app.domain.vault.VaultSearchQuery
+import com.nivara.app.domain.vault.inOrder
 
 /**
  * What the vault screen knows about the list of files in the vault.
@@ -100,14 +104,32 @@ data class VaultItemUi(
  */
 internal data class VaultIndexNotice(val textRes: Int, val count: Int)
 
-/** Turns what the repository read into what the screen draws, without inventing anything. */
-internal fun VaultIndexState.toUiState(): VaultIndexUiState = when (this) {
+/**
+ * Turns what the repository read into what the screen draws, without inventing anything.
+ *
+ * The default order — newest first — is the order the vault has always shown, and the default query
+ * asks nothing.
+ */
+internal fun VaultIndexState.toUiState(): VaultIndexUiState =
+    toUiState(ordering = VaultOrdering(), query = VaultSearchQuery.NONE)
+
+/**
+ * The same mapping, with the list filtered by [query] and ordered by [ordering].
+ *
+ * The filter and the order are applied to the authenticated items before they become screen rows, so
+ * there is one place that decides what the list contains and in what order — and no second copy of
+ * the metadata is kept to sort or search.
+ */
+internal fun VaultIndexState.toUiState(
+    ordering: VaultOrdering,
+    query: VaultSearchQuery,
+): VaultIndexUiState = when (this) {
     VaultIndexState.Missing -> VaultIndexUiState.Empty
 
     is VaultIndexState.Ready -> VaultIndexUiState.Indexed(
-        items = items
-            .sortedByDescending { item -> item.importedAtEpochMillis }
-            .map { item -> item.toUi() },
+        items = VaultSearch.filter(items, query)
+            .inOrder(ordering)
+            .map { item -> item.toItemUi() },
         missingContent = missingContent.size,
         unindexedObjects = unindexedObjects,
         unfinishedObjects = unfinishedObjects,
@@ -120,7 +142,8 @@ internal fun VaultIndexState.toUiState(): VaultIndexUiState = when (this) {
     is VaultIndexState.VaultNotReady -> VaultIndexUiState.VaultNotReady
 }
 
-private fun VaultItem.toUi(): VaultItemUi = VaultItemUi(
+/** One item as a row of any list: the vault's own, a search result or an album's. */
+internal fun VaultItem.toItemUi(): VaultItemUi = VaultItemUi(
     id = id,
     name = name,
     // Classified once, here, from the authenticated type: the list, the viewer and the engine all

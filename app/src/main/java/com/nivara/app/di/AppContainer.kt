@@ -22,6 +22,7 @@ import com.nivara.app.data.permissions.AndroidUsageAccessRepository
 import com.nivara.app.data.session.InMemorySessionManager
 import com.nivara.app.data.vault.FileVaultLocationStore
 import com.nivara.app.data.vault.NivaraVaultIndexRepository
+import com.nivara.app.data.vault.NivaraVaultOrganizationRepository
 import com.nivara.app.data.vault.NivaraVaultRepository
 import com.nivara.app.data.vault.SafDocumentSourceOpener
 import com.nivara.app.data.vault.SafVaultContentStorage
@@ -61,6 +62,7 @@ import com.nivara.app.domain.security.SessionTimeoutPolicy
 import com.nivara.app.domain.security.SecureRandomGenerator
 import com.nivara.app.domain.vault.VaultContentReader
 import com.nivara.app.domain.vault.VaultIndexRepository
+import com.nivara.app.domain.vault.VaultOrganizationRepository
 import com.nivara.app.domain.vault.VaultLocationStore
 import com.nivara.app.domain.vault.VaultRepository
 import com.nivara.app.ui.applications.ApplicationIconLoader
@@ -259,6 +261,16 @@ interface AppContainer {
      * document picker and the vault's key stay behind it. See docs/vault/README.md.
      */
     val vaultIndexRepository: VaultIndexRepository
+
+    /**
+     * The vault's albums: the way its owner has organised the files it holds.
+     *
+     * A second repository over the same vault, not a second vault: it borrows the same key, reads and
+     * writes one small authenticated record of its own, and refers to items by the identifiers the
+     * index gives them. It never touches content, so organising a vault cannot move, rename, decrypt
+     * or delete a single file. See docs/vault/README.md.
+     */
+    val vaultOrganizationRepository: VaultOrganizationRepository
 
     /**
      * The vault's content, opened for reading.
@@ -529,16 +541,32 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val vaultIndexRepository: VaultIndexRepository get() = nivaraVaultIndex
 
     /**
-     * The engines that show an imported file.
+     * The album record, written and read by the same rules the index follows: the same vault root,
+     * the same key borrow, the same two-slot generational write with a read-back before anything is
+     * pruned — and a purpose of its own, so an album record and an index record can never be accepted
+     * for each other.
+     */
+    private val nivaraVaultOrganization: NivaraVaultOrganizationRepository by lazy {
+        NivaraVaultOrganizationRepository(
+            vaultRepository = nivaraVaultStorage,
+            keyAccess = nivaraVaultStorage,
+            metadataStorageFactory = { location ->
+                SafVaultRootStorage(context = applicationContext, location = location)
+            },
+            encryptionService = encryptionService,
+            random = secureRandomGenerator,
+        )
+    }
+
+    override val vaultOrganizationRepository: VaultOrganizationRepository get() = nivaraVaultOrganization
+
+    /**
+     * The vault's content, as a viewer's engines read it.
      *
-     * Each is built from the vault's index repository — the one object that holds the key borrow and
-     * reads the encrypted objects — so a viewer reads through the single decryption path the project
-     * has. No engine holds a key of its own, touches storage directly or knows a cipher.
-     *
-     * The image engine is shared because a decode is a call: it opens a borrow, reads inside it, and
-     * keeps only the decoded bitmap the viewer releases. The other two are factories because an
-     * engine *holds* a borrow for as long as a viewer is open: one is created per viewer, and that
-     * viewer releases it.
+     * This is the index repository seen as its reading contract: the one object that holds the key
+     * borrow and reads the encrypted objects, so a viewer reads through the single decryption path the
+     * project has. The engines themselves are built per viewer, by that viewer, from this — no engine
+     * holds a key of its own, touches storage directly or knows a cipher.
      */
     override val vaultContentReader: VaultContentReader get() = nivaraVaultIndex
 

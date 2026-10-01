@@ -32,7 +32,10 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.domain.vault.VaultAlbumId
 import com.nivara.app.domain.vault.VaultImportProgress
+import com.nivara.app.domain.vault.VaultItemId
+import com.nivara.app.domain.vault.VaultSortField
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraLoadingState
@@ -101,12 +104,31 @@ fun VaultRoute(
             uiState = uiState,
             onChooseRoot = { picker.launch(null) },
             onImport = { documentPicker.launch(arrayOf("*/*")) },
+            // One way into a file, whichever collection it was found in: the vault's own list, a
+            // search result and an album's items all hand the same row to the same viewer.
             onOpenItem = { item -> viewerViewModel.open(item) },
             onInitialize = viewModel::initialize,
             onReplaceUnreadable = viewModel::replaceUnreadable,
             onRetry = viewModel::refresh,
             onUnlock = onUnlock,
             onMessageShown = viewModel::onMessageShown,
+            onSectionSelected = viewModel::onSectionSelected,
+            onSearchQueryChanged = viewModel::onSearchQueryChanged,
+            onSearchCleared = viewModel::onSearchCleared,
+            onSortFieldSelected = viewModel::onSortFieldSelected,
+            onSortDirectionToggled = viewModel::onSortDirectionToggled,
+            onAlbumOpened = viewModel::onAlbumOpened,
+            onAlbumClosed = viewModel::onAlbumClosed,
+            onAlbumCreated = viewModel::onCreateAlbum,
+            onAlbumRenameStarted = viewModel::onRenameAlbumStarted,
+            onAlbumRenameCancelled = viewModel::onRenameAlbumCancelled,
+            onAlbumRenameConfirmed = viewModel::onRenameAlbumConfirmed,
+            onAlbumDeleteRequested = viewModel::onDeleteAlbumRequested,
+            onAlbumDeleteCancelled = viewModel::onDeleteAlbumCancelled,
+            onAlbumDeleteConfirmed = viewModel::onDeleteAlbumConfirmed,
+            onAlbumItemsEditingChanged = viewModel::onAlbumItemsEditingChanged,
+            onAlbumItemAdded = viewModel::onAddItemToAlbum,
+            onAlbumItemRemoved = viewModel::onRemoveItemFromAlbum,
             modifier = modifier,
         )
     } else {
@@ -163,6 +185,23 @@ fun VaultScreen(
     onRetry: () -> Unit,
     onUnlock: () -> Unit,
     onMessageShown: () -> Unit,
+    onSectionSelected: (VaultSection) -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onSearchCleared: () -> Unit,
+    onSortFieldSelected: (VaultSortField) -> Unit,
+    onSortDirectionToggled: () -> Unit,
+    onAlbumOpened: (VaultAlbumId) -> Unit,
+    onAlbumClosed: () -> Unit,
+    onAlbumCreated: (String) -> Unit,
+    onAlbumRenameStarted: (VaultAlbumId) -> Unit,
+    onAlbumRenameCancelled: () -> Unit,
+    onAlbumRenameConfirmed: (VaultAlbumId, String) -> Unit,
+    onAlbumDeleteRequested: (VaultAlbumId) -> Unit,
+    onAlbumDeleteCancelled: () -> Unit,
+    onAlbumDeleteConfirmed: (VaultAlbumId) -> Unit,
+    onAlbumItemsEditingChanged: (Boolean) -> Unit,
+    onAlbumItemAdded: (VaultItemId) -> Unit,
+    onAlbumItemRemoved: (VaultItemId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -178,6 +217,23 @@ fun VaultScreen(
             onRetry = onRetry,
             onUnlock = onUnlock,
             onMessageShown = onMessageShown,
+            onSectionSelected = onSectionSelected,
+            onSearchQueryChanged = onSearchQueryChanged,
+            onSearchCleared = onSearchCleared,
+            onSortFieldSelected = onSortFieldSelected,
+            onSortDirectionToggled = onSortDirectionToggled,
+            onAlbumOpened = onAlbumOpened,
+            onAlbumClosed = onAlbumClosed,
+            onAlbumCreated = onAlbumCreated,
+            onAlbumRenameStarted = onAlbumRenameStarted,
+            onAlbumRenameCancelled = onAlbumRenameCancelled,
+            onAlbumRenameConfirmed = onAlbumRenameConfirmed,
+            onAlbumDeleteRequested = onAlbumDeleteRequested,
+            onAlbumDeleteCancelled = onAlbumDeleteCancelled,
+            onAlbumDeleteConfirmed = onAlbumDeleteConfirmed,
+            onAlbumItemsEditingChanged = onAlbumItemsEditingChanged,
+            onAlbumItemAdded = onAlbumItemAdded,
+            onAlbumItemRemoved = onAlbumItemRemoved,
             modifier = modifier,
         )
     }
@@ -194,6 +250,23 @@ private fun VaultContent(
     onRetry: () -> Unit,
     onUnlock: () -> Unit,
     onMessageShown: () -> Unit,
+    onSectionSelected: (VaultSection) -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onSearchCleared: () -> Unit,
+    onSortFieldSelected: (VaultSortField) -> Unit,
+    onSortDirectionToggled: () -> Unit,
+    onAlbumOpened: (VaultAlbumId) -> Unit,
+    onAlbumClosed: () -> Unit,
+    onAlbumCreated: (String) -> Unit,
+    onAlbumRenameStarted: (VaultAlbumId) -> Unit,
+    onAlbumRenameCancelled: () -> Unit,
+    onAlbumRenameConfirmed: (VaultAlbumId, String) -> Unit,
+    onAlbumDeleteRequested: (VaultAlbumId) -> Unit,
+    onAlbumDeleteCancelled: () -> Unit,
+    onAlbumDeleteConfirmed: (VaultAlbumId) -> Unit,
+    onAlbumItemsEditingChanged: (Boolean) -> Unit,
+    onAlbumItemAdded: (VaultItemId) -> Unit,
+    onAlbumItemRemoved: (VaultItemId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -276,11 +349,60 @@ private fun VaultContent(
             )
         }
 
-        // The list of files, and the one action that adds to it. The action is offered only where it
-        // can succeed: a vault that opens, a list that can be read, no other change running, and an
-        // open gate — importing is a durable change to the vault like any other.
+        // Everything below draws the vault's authenticated metadata, and nothing below it is offered
+        // at all until the vault itself opens — an album list, a search box and a sort control offered
+        // over an unreadable vault would suggest there is something to arrange.
         if (state.vault is VaultState.Ready) {
-            VaultIndexCard(index = state.index, onOpenItem = onOpenItem)
+            VaultBrowseControls(
+                section = state.section,
+                searchQuery = state.searchQuery,
+                ordering = state.ordering,
+                busy = state.busy,
+                onSectionSelected = onSectionSelected,
+                onSearchQueryChanged = onSearchQueryChanged,
+                onSearchCleared = onSearchCleared,
+                onSortFieldSelected = onSortFieldSelected,
+                onSortDirectionToggled = onSortDirectionToggled,
+            )
+
+            VaultSearchResultCard(
+                section = state.section,
+                search = state.search,
+                searchQuery = state.searchQuery,
+                matchCount = state.searchSummary?.matches,
+                totalCount = state.searchSummary?.total,
+            )
+
+            when (state.section) {
+                VaultSection.AllItems -> VaultIndexCard(
+                    index = state.index,
+                    onOpenItem = onOpenItem,
+                )
+
+                VaultSection.Albums -> VaultAlbumsCard(
+                    organization = state.organization,
+                    openAlbum = state.openAlbum,
+                    index = state.index,
+                    renamingAlbumId = state.renamingAlbumId,
+                    confirmingDeleteId = state.confirmingAlbumDeleteId,
+                    editingItems = state.editingAlbumItems,
+                    busy = state.busy,
+                    searchActive = state.search.isActive,
+                    onCreate = onAlbumCreated,
+                    onOpen = onAlbumOpened,
+                    onClose = onAlbumClosed,
+                    onRenameStarted = onAlbumRenameStarted,
+                    onRenameCancelled = onAlbumRenameCancelled,
+                    onRenameConfirmed = onAlbumRenameConfirmed,
+                    onDeleteRequested = onAlbumDeleteRequested,
+                    onDeleteCancelled = onAlbumDeleteCancelled,
+                    onDeleteConfirmed = onAlbumDeleteConfirmed,
+                    onEditingChanged = onAlbumItemsEditingChanged,
+                    onAddItem = onAlbumItemAdded,
+                    onRemoveItem = onAlbumItemRemoved,
+                    onOpenItem = onOpenItem,
+                )
+            }
         }
 
         if (state.importing) {
@@ -404,9 +526,13 @@ private fun VaultIndexCard(
  *
  * The whole row opens the file. A type Nivara has no viewer for is not marked as broken here — it is
  * a file like any other in the list, and opening it says plainly that this version cannot show it.
+ *
+ * There is one of these, shared by the vault's list, the search results and an album's items, because
+ * all three are the same rows of the same authenticated metadata — and because a file must look the
+ * same, and open the same way, wherever it is found.
  */
 @Composable
-private fun VaultItemRow(
+internal fun VaultItemRow(
     item: VaultItemUi,
     onOpen: (VaultItemUi) -> Unit,
     modifier: Modifier = Modifier,
@@ -544,6 +670,23 @@ private fun VaultNotConfiguredPreview() {
             onRetry = {},
             onUnlock = {},
             onMessageShown = {},
+            onSectionSelected = {},
+            onSearchQueryChanged = {},
+            onSearchCleared = {},
+            onSortFieldSelected = {},
+            onSortDirectionToggled = {},
+            onAlbumOpened = {},
+            onAlbumClosed = {},
+            onAlbumCreated = {},
+            onAlbumRenameStarted = {},
+            onAlbumRenameCancelled = {},
+            onAlbumRenameConfirmed = { _, _ -> },
+            onAlbumDeleteRequested = {},
+            onAlbumDeleteCancelled = {},
+            onAlbumDeleteConfirmed = {},
+            onAlbumItemsEditingChanged = {},
+            onAlbumItemAdded = {},
+            onAlbumItemRemoved = {},
         )
     }
 }
@@ -567,6 +710,23 @@ private fun VaultReadyPreview() {
             onRetry = {},
             onUnlock = {},
             onMessageShown = {},
+            onSectionSelected = {},
+            onSearchQueryChanged = {},
+            onSearchCleared = {},
+            onSortFieldSelected = {},
+            onSortDirectionToggled = {},
+            onAlbumOpened = {},
+            onAlbumClosed = {},
+            onAlbumCreated = {},
+            onAlbumRenameStarted = {},
+            onAlbumRenameCancelled = {},
+            onAlbumRenameConfirmed = { _, _ -> },
+            onAlbumDeleteRequested = {},
+            onAlbumDeleteCancelled = {},
+            onAlbumDeleteConfirmed = {},
+            onAlbumItemsEditingChanged = {},
+            onAlbumItemAdded = {},
+            onAlbumItemRemoved = {},
         )
     }
 }
@@ -585,6 +745,23 @@ private fun VaultUnreadablePreview() {
             onRetry = {},
             onUnlock = {},
             onMessageShown = {},
+            onSectionSelected = {},
+            onSearchQueryChanged = {},
+            onSearchCleared = {},
+            onSortFieldSelected = {},
+            onSortDirectionToggled = {},
+            onAlbumOpened = {},
+            onAlbumClosed = {},
+            onAlbumCreated = {},
+            onAlbumRenameStarted = {},
+            onAlbumRenameCancelled = {},
+            onAlbumRenameConfirmed = { _, _ -> },
+            onAlbumDeleteRequested = {},
+            onAlbumDeleteCancelled = {},
+            onAlbumDeleteConfirmed = {},
+            onAlbumItemsEditingChanged = {},
+            onAlbumItemAdded = {},
+            onAlbumItemRemoved = {},
         )
     }
 }

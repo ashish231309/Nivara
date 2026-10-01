@@ -146,7 +146,7 @@ for path in kt_files:
             err(f"{rel}: unbalanced '{open_ch}{close_ch}' "
                 f"({stripped.count(open_ch)} opening vs {stripped.count(close_ch)} closing)")
 
-    for m2 in re.finditer(r"^(?:internal |private |public )*(?:sealed |data |enum |abstract |open |annotation )*"
+    for m2 in re.finditer(r"^(?:internal |private |public )*(?:sealed |data |enum |abstract |open |annotation |value )*"
                           r"(?:fun\s+)?(?:class|interface|object)\s+([A-Za-z_]\w*)", text, re.MULTILINE):
         declared_symbols.add(m2.group(1))
     for m2 in re.finditer(r"^(?:internal |private )?(?:inline |suspend )?fun\s+(?:<[^>]*>\s*)?(?:[\w.<>?,*\s]*?\.)?([A-Za-z_]\w*)\s*\(", text, re.MULTILINE):
@@ -2082,21 +2082,24 @@ if viewer_view_model_code:
         if token not in viewer_view_model_code:
             err(f"the viewer view model is missing {why} ('{token}')")
 
-# Nothing that belongs to a later stage: no albums, no search, no trash, no restore, no export and no
-# recovery appear in the vault's own sources.
-for path in vault_domain_sources + vault_data_sources + vault_ui_sources + viewer_sources:
+# Nothing that belongs to a later stage, or to a feature the vault does not have at all: organising a
+# vault is albums, ordering and search, and it is not deletion, recovery, backup, export or a record of
+# what somebody looked at.
+vault_sources = vault_domain_sources + vault_data_sources + vault_ui_sources + viewer_sources
+for path in vault_sources:
     code = strip_comments(path.read_text())
     for pattern, why in (
-        (r"\bAlbum\w*", "albums"),
         (r"\bTrash\w*", "trash"),
         (r"\bRestore\w*", "restore"),
-        (r"\bSearchQuery\b|\bSearchRepository\b|\bSearchScreen\b", "search"),
         (r"\bRecovery\w*|\bReinstall\w*", "recovery"),
         (r"\bBackup\w*|\bCloudSync\w*", "backup"),
-        (r"\bExport\w*|\bShareAction\b", "export"),
+        (r"\bExport\w*|\bShareAction\b|\bShareSheet\b", "export"),
+        (r"\bFavorite\w*|\bFavourite\w*", "favourites"),
+        (r"\bAnalytics\w*|\bTelemetry\w*", "analytics"),
+        (r"\bRecentlyOpened\w*|\bUsageHistory\w*|\bLastOpened\w*", "usage history"),
     ):
         if re.search(pattern, code):
-            err(f"{path.relative_to(ROOT)}: the vault must not contain {why} yet ('{pattern}')")
+            err(f"{path.relative_to(ROOT)}: the vault must not contain {why} ('{pattern}')")
 
 # The viewing suites: classification, the content handle, the engines, the viewer's state machine and
 # its wording, and the screen itself where a device can run it.
@@ -2134,6 +2137,292 @@ for path in permission_scan:
 
 notes.append(f"vault viewing review: {len(viewer_data_sources)} engine and {len(viewer_ui_sources)} "
              f"viewer sources; {viewer_tests} viewer tests")
+
+# ---------------------------------------------------------------- vault organisation (stage 16)
+#
+# Albums, ordering and search are *organisation*: a second small authenticated record beside the index,
+# holding nothing but references, written through the same vault key and the same encryption service
+# under a purpose of its own, and a set of derivations a screen performs over metadata it already read.
+# The rules below are the ones that would be expensive to notice late: a second key or cipher, a write
+# that can lose the albums it replaces, an unreadable record drawn as an empty one, a search that reads
+# content, an order that is not total, and a deletion that can reach a file.
+org_domain_files = ["VaultAlbumId.kt", "VaultAlbum.kt", "VaultOrganizationRepository.kt",
+                    "VaultOrdering.kt", "VaultSearch.kt"]
+org_data_files = ["VaultOrganizationCodec.kt", "NivaraVaultOrganizationRepository.kt"]
+org_ui_files = ["VaultOrganizationUiState.kt", "VaultSearchUiState.kt", "VaultAlbumsSection.kt",
+                "VaultBrowseControls.kt"]
+for name in org_domain_files:
+    if not (vault_domain_dir / name).exists():
+        err(f"the vault organisation layer is missing domain/vault/{name}")
+for name in org_data_files:
+    if not (vault_data_dir / name).exists():
+        err(f"the vault organisation layer is missing data/vault/{name}")
+for name in org_ui_files:
+    if not (vault_ui_dir / name).exists():
+        err(f"the vault organisation layer is missing ui/vault/{name}")
+
+org_domain_sources = [vault_domain_dir / name for name in org_domain_files]
+org_data_sources = [vault_data_dir / name for name in org_data_files]
+org_ui_sources = [vault_ui_dir / name for name in org_ui_files]
+org_sources = org_domain_sources + org_data_sources + org_ui_sources
+
+album_source = vault_domain_dir / "VaultAlbum.kt"
+album_code = strip_comments(album_source.read_text()) if album_source.exists() else ""
+album_id_code = strip_comments((vault_domain_dir / "VaultAlbumId.kt").read_text()) \
+    if (vault_domain_dir / "VaultAlbumId.kt").exists() else ""
+ordering_code = strip_comments((vault_domain_dir / "VaultOrdering.kt").read_text()) \
+    if (vault_domain_dir / "VaultOrdering.kt").exists() else ""
+search_code = strip_comments((vault_domain_dir / "VaultSearch.kt").read_text()) \
+    if (vault_domain_dir / "VaultSearch.kt").exists() else ""
+org_repository_code = strip_comments((vault_data_dir / "NivaraVaultOrganizationRepository.kt").read_text()) \
+    if (vault_data_dir / "NivaraVaultOrganizationRepository.kt").exists() else ""
+org_codec_code = strip_comments((vault_data_dir / "VaultOrganizationCodec.kt").read_text()) \
+    if (vault_data_dir / "VaultOrganizationCodec.kt").exists() else ""
+org_interface_code = strip_comments((vault_domain_dir / "VaultOrganizationRepository.kt").read_text()) \
+    if (vault_domain_dir / "VaultOrganizationRepository.kt").exists() else ""
+
+# --- an album is a list of references, and it owns nothing else --------------------------------
+if album_code:
+    if "val itemIds: List<VaultItemId>" not in album_code:
+        err("an album must hold item identifiers, and nothing else about an item")
+    for copy_of_the_index in ("mimeType", "contentDigest", "sizeBytes", "importedAtEpochMillis",
+                              "objectName", "contentPath", "contentStorage", "EncryptionService"):
+        if copy_of_the_index in album_code:
+            err(f"an album must not copy the index's facts ('{copy_of_the_index}')")
+    if not re.search(r"fun\s+(?:VaultAlbum\.|List<VaultAlbum>\.)?resolveAgainst\(", album_code) \
+            or "staleItemIds" not in album_code:
+        err("resolving an album must keep and report the references the index no longer names")
+    if "require(itemIds.distinct().size == itemIds.size)" not in album_code:
+        err("an album must refuse to name the same item twice")
+    if "val MAXIMUM_ALBUMS" not in album_code or "val MAXIMUM_MEMBERS_PER_ALBUM" not in album_code \
+            or "val MAXIMUM_TOTAL_MEMBERSHIPS" not in album_code or "val MAXIMUM_RECORD_BYTES" not in album_code:
+        err("the organisation record's bounds must be declared in one place")
+if album_id_code:
+    if "data class VaultAlbumId(val value: String)" not in album_id_code:
+        err("an album must be identified by its own type, created from randomness and never from its name")
+    if "VaultAlbumId.create(random" not in album_id_code and "fun create(" not in album_id_code:
+        err("an album identifier must be created from the existing random generator")
+    if "require(VaultAlbumId.isWellFormed(value))" not in album_id_code:
+        err("an album identifier must be validated when it is read from storage")
+
+# --- the record is the index's sibling, sealed for a purpose of its own -------------------------
+organization_context = ROOT / "app/src/main/java/com/nivara/app/domain/security/EncryptionContext.kt"
+context_code = strip_comments(organization_context.read_text())
+if not re.search(r"VaultOrganization\(tag = 0x[0-9a-fA-F]+\)", context_code):
+    err("the album record must have a purpose of its own in EncryptionContext")
+if len(re.findall(r"tag = 0x", context_code)) < 8:
+    err("EncryptionContext may not have lost a purpose: tags are part of the on-disk format")
+if org_repository_code:
+    for contract in ("EncryptionService", "EncryptionContext.VaultOrganization", "EncryptionKey",
+                     "SecureRandomGenerator", "VaultKeyAccess"):
+        if contract not in org_repository_code:
+            err(f"the album record must be written through the existing {contract} contract")
+    if "keyAccess.withVaultKey" not in org_repository_code:
+        err("the album record must be opened with the vault's own key, borrowed the existing way")
+    for second_primitive in ("javax.crypto", "Cipher.getInstance", "MessageDigest", "SecretKeySpec",
+                             "AtomicFile", "Random()"):
+        if second_primitive in org_repository_code:
+            err(f"the album record must not bring a second primitive ('{second_primitive}')")
+
+# --- two slots, one generation, verified before anything is pruned ------------------------------
+storage_code = strip_comments((vault_data_dir / "VaultRootStorage.kt").read_text())
+if "ORGANIZATION_SLOT_NAMES" not in storage_code:
+    err("the album slots must be declared beside the index's, in the vault's own structure")
+elif len(re.findall(r'"albums\.\d+\.nva"', storage_code)) != 2:
+    err("the album record is kept in exactly two slots")
+if org_codec_code:
+    if '"NVAO"' not in org_codec_code or "\"NVIN\"" in org_codec_code:
+        err("the album record must carry its own marker, distinct from the index's")
+    for rule, why in (
+        ("REPORT", "a name that is not valid UTF-8 must be refused rather than replaced"),
+        ("offset != bytes.size", "trailing bytes must be refused rather than ignored"),
+        ("seenAlbums.add(", "a record naming one album twice must be refused"),
+        ("seen.add(", "a record naming one item twice must be refused"),
+        ("generation != expectedGeneration", "a payload that disagrees with its own header must be refused"),
+        ("VaultOrganizationLimits.MAXIMUM_ALBUMS", "the album count must be bounded before allocation"),
+        ("VaultOrganizationLimits.MAXIMUM_MEMBERS_PER_ALBUM", "membership must be bounded before allocation"),
+        ("VaultOrganizationLimits.MAXIMUM_TOTAL_MEMBERSHIPS", "the total membership must be bounded"),
+        ("VaultOrganizationLimits.MAXIMUM_NAME_BYTES", "a name must be bounded before it is read"),
+        ("VaultOrganizationLimits.MAXIMUM_RECORD_BYTES", "the whole record must be bounded"),
+    ):
+        if rule not in org_codec_code:
+            err(f"the album codec must check that {why} ('{rule}')")
+if org_repository_code:
+    if "targetSlot(" not in org_repository_code or "VaultOrganizationCodec.encodeRecord(" not in org_repository_code:
+        err("a change must be written into the slot that is not authoritative")
+    write_at = org_repository_code.find("writeMetadata(target")
+    read_at = org_repository_code.find("readMetadata(target)")
+    verify_at = org_repository_code.find("recordValidates(readBack")
+    prune_at = org_repository_code.find("VaultStructure.ORGANIZATION_SLOT_NAMES", write_at)
+    if write_at < 0 or read_at < 0 or verify_at < 0 or prune_at < 0:
+        err("a change must be written, read back and verified before anything is pruned")
+    elif not write_at < read_at < verify_at < prune_at:
+        err("the superseded slot may only be pruned after the new record was read back and verified")
+    if org_repository_code.count("OrganizationRead.Missing") < 1:
+        err("an absent record must be reported as absent, and as nothing else")
+    if "if (!authorize()) return NivaraResult.Failure(VaultOrganizationFailure.NotAuthorized)" not in org_repository_code:
+        err("a change must be refused without the session's authorization")
+    if org_repository_code.count("if (!authorize())") < 2:
+        err("the session must be asked again at the moment the record would change")
+    if "acceptsChanges" not in org_interface_code:
+        err("whether a record may be changed must be a rule of the domain's own state")
+    if "this is Missing || this is Ready" not in org_interface_code:
+        err("only a record that was read, or the certain knowledge that none exists, may be changed")
+
+# --- deleting an album cannot reach a file ------------------------------------------------------
+if org_repository_code:
+    for impossible in ("deleteObject(", ".nvo", "contentStorage", "deleteContent", "deleteItem(",
+                       "VaultContentStorage", "VaultContentReader"):
+        if impossible in org_repository_code:
+            err(f"a change to an album must not be able to touch content ('{impossible}')")
+    if "deleteMetadata(" not in org_repository_code:
+        err("the only thing an album change deletes is a superseded record slot")
+if org_interface_code:
+    if re.search(r"fun\s+(delete|remove)\w*\s*\([^)]*\bVaultItem\b", org_interface_code):
+        err("the album contract may not offer an operation that deletes an item")
+    if "addItem(" not in org_interface_code or "removeItem(" not in org_interface_code:
+        err("the album contract must offer membership, and only membership")
+
+# --- searching and ordering read metadata, and never a file -------------------------------------
+for path in org_domain_sources:
+    code = strip_comments(path.read_text())
+    for forbidden in ("EncryptionService", "EncryptionKey", "VaultContentReader", "VaultContentHandle",
+                      "VaultKeyAccess", "VaultSourceReference"):
+        if forbidden in code:
+            err(f"{path.relative_to(ROOT)}: organisation must not reach content or keys ('{forbidden}')")
+    for forbidden in ("android.", "androidx.", "android.content", "Context", "Uri", "Bitmap",
+                      "MediaPlayer", "PdfRenderer", "Composable"):
+        if forbidden in code:
+            err(f"{path.relative_to(ROOT)}: the domain's organisation contracts must not know the platform "
+                f"('{forbidden}')")
+if search_code:
+    if "fun filter(" not in search_code or "fun matches(" not in search_code:
+        err("searching must be a pure function of metadata and a query")
+    for ranking in ("sortedBy", "sortBy", "rank", "score", "usage", "popularity", "distance", "fuzzy",
+                    "reverse()"):
+        if re.search(rf"\b{ranking}", search_code):
+            err(f"a search must not rank, weight or guess ('{ranking}')")
+    if "Normalizer.Form.NFC" not in search_code:
+        err("a query must be normalised so the same word finds the same name on any keyboard")
+    if "lowercase()" not in search_code:
+        err("a search must be case-insensitive")
+    if "WHITESPACE_RUN" not in search_code:
+        err("a search must normalise whitespace")
+if ordering_code:
+    if "thenBy { item -> item.id.value }" not in ordering_code:
+        err("every order must end in the item's identifier, so it is total and reproducible")
+    for influence in ("shuffle", "Random", "currentTimeMillis", "System.nanoTime", "usage", "rank",
+                      "score", "openedCount"):
+        if influence in ordering_code:
+            err(f"an order must not depend on anything but the item's own fields ('{influence}')")
+    if "DEFAULT_FIELD: VaultSortField = VaultSortField.ImportedAt" not in ordering_code:
+        err("the vault's existing default order must be preserved")
+    if "DEFAULT_DIRECTION: VaultSortDirection = VaultSortDirection.Descending" not in ordering_code:
+        err("the vault has always shown the newest import first, and still must")
+    if "defaultAlbumOrder" not in ordering_code:
+        err("albums need a deterministic order of their own")
+
+# --- the screen draws what it read, and owns no persistence -------------------------------------
+for path in org_ui_sources:
+    code = strip_comments(path.read_text())
+    for forbidden in ("AtomicFile", "writeMetadata", "readMetadata", "encryptStream(", "decryptStream(",
+                      "encryptionService", "VaultKeyAccess", "SessionManager", "establish(",
+                      "lockNow()", "VaultContentReader", "VaultOrganizationRepository", "Bitmap"):
+        if forbidden in code:
+            err(f"{path.relative_to(ROOT)}: the screen must not own persistence, keys or content "
+                f"('{forbidden}')")
+albums_ui_code = strip_comments((vault_ui_dir / "VaultAlbumsSection.kt").read_text()) \
+    if (vault_ui_dir / "VaultAlbumsSection.kt").exists() else ""
+if albums_ui_code:
+    if "VaultItemRow(" not in albums_ui_code:
+        err("an album's items must be drawn with the one row the vault's list uses")
+    if "onOpenItem" not in albums_ui_code:
+        err("opening a file from an album must go through the same action as everywhere else")
+    if "vault_album_delete_warning" not in albums_ui_code:
+        err("deleting an album must say, before the confirmation, that the files are not deleted")
+    if "staleItemIds" not in albums_ui_code:
+        err("a stale reference must be drawn as one rather than hidden")
+
+# --- one viewer, and it knows nothing about albums ----------------------------------------------
+for path in viewer_sources:
+    code = strip_comments(path.read_text())
+    if re.search(r"\bAlbum\w*", code):
+        err(f"{path.relative_to(ROOT)}: the viewer must not know what an album is")
+vault_screen_code = strip_comments((vault_ui_dir / "VaultScreen.kt").read_text())
+if "onOpenItem" not in vault_screen_code:
+    err("the vault's list, a search result and an album must open a file through the same action")
+
+# --- the suites that hold these rules -----------------------------------------------------------
+org_jvm_suites = (
+    "app/src/test/java/com/nivara/app/domain/vault/VaultAlbumTest.kt",
+    "app/src/test/java/com/nivara/app/domain/vault/VaultOrderingTest.kt",
+    "app/src/test/java/com/nivara/app/domain/vault/VaultSearchTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/VaultOrganizationCodecTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/NivaraVaultOrganizationRepositoryTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/VaultOrganizationViewModelTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/VaultOrganizationPresentationTest.kt",
+)
+for suite in org_jvm_suites:
+    if not (ROOT / suite).exists():
+        err(f"the vault organisation test suite is missing: {suite}")
+    elif len(re.findall(r"@Test\b", (ROOT / suite).read_text())) < 8:
+        err(f"the vault organisation suite is too thin to be evidence: {suite}")
+instrumented_org_suite = "app/src/androidTest/java/com/nivara/app/ui/vault/VaultAlbumsScreenTest.kt"
+if not (ROOT / instrumented_org_suite).exists():
+    err(f"the vault organisation instrumented suite is missing: {instrumented_org_suite}")
+
+repository_suite = ROOT / "app/src/test/java/com/nivara/app/data/vault/NivaraVaultOrganizationRepositoryTest.kt"
+repository_suite_code = repository_suite.read_text() if repository_suite.exists() else ""
+for rule, why in (
+    ("NotAuthorized", "a change without a session must be tested"),
+    ("VerificationFailed", "a write that does not read back must be tested"),
+    ("WriteFailed", "a refused write must be tested"),
+    ("OrganizationUnreadable", "an unreadable record must be tested"),
+    ("UnsupportedVersion", "a record from a newer build must be tested"),
+    ("MetadataDamaged", "a record that does not authenticate must be tested"),
+    ("VaultOrganizationLimits.MAXIMUM_MEMBERS_PER_ALBUM", "the membership bound must be tested"),
+    ("VaultOrganizationLimits.MAXIMUM_ALBUMS", "the album bound must be tested"),
+    ("slotsHoldingRecords()", "the two-slot generation must be tested"),
+):
+    if rule not in repository_suite_code:
+        err(f"the album repository suite must cover that {why} ('{rule}')")
+
+codec_suite_code = (ROOT / "app/src/test/java/com/nivara/app/data/vault/VaultOrganizationCodecTest.kt").read_text() \
+    if (ROOT / "app/src/test/java/com/nivara/app/data/vault/VaultOrganizationCodecTest.kt").exists() else ""
+for rule, why in (
+    ("decodePayload", "the payload decoder must be exercised"),
+    ("expectedGeneration", "a generation that disagrees with its header must be tested"),
+    ("MAXIMUM_NAME_BYTES + 1", "an over-long name must be tested"),
+    ("0xC3", "malformed UTF-8 must be tested"),
+    ("bytes after the last album", "trailing bytes must be tested"),
+    ("duplicate", "duplicate identifiers and membership must be tested"),
+):
+    if rule not in codec_suite_code:
+        err(f"the album codec suite must check that {why} ('{rule}')")
+
+view_model_suite_code = (ROOT / "app/src/test/java/com/nivara/app/ui/vault/VaultOrganizationViewModelTest.kt").read_text() \
+    if (ROOT / "app/src/test/java/com/nivara/app/ui/vault/VaultOrganizationViewModelTest.kt").exists() else ""
+for rule, why in (
+    ("unlockRequired", "a change without a session must ask for the existing gate"),
+    ("CannotSearch", "an unreadable list must not be drawn as no matches"),
+    ("staleItemIds", "a stale reference must be drawn as one"),
+    ("memberItemIds", "membership must come from the record rather than the drawn list"),
+    ("readCalls", "filtering and sorting must be shown not to read the vault again"),
+):
+    if rule not in view_model_suite_code:
+        err(f"the organisation view model suite must cover that {why} ('{rule}')")
+
+org_tests = sum(len(re.findall(r"@Test\b", (ROOT / suite).read_text()))
+                for suite in org_jvm_suites if (ROOT / suite).exists())
+
+# --- the documentation says what was built, and only what was built ----------------------------
+vault_docs = (ROOT / "docs/vault/README.md").read_text()
+for topic in ("album", "Album", "order", "search"):
+    if topic not in vault_docs:
+        err(f"docs/vault/README.md does not describe {topic}")
+
+notes.append(f"vault organisation review: {len(org_domain_sources)} domain, {len(org_data_sources)} data "
+             f"and {len(org_ui_sources)} presentation sources; {org_tests} organisation tests")
 
 # ---------------------------------------------------------------- wrapper / hygiene
 wrapper_props = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()

@@ -10,15 +10,28 @@ import com.nivara.app.R
 import com.nivara.app.core.common.NivaraResult
 import com.nivara.app.core.common.isSuccess
 import com.nivara.app.domain.security.SessionManager
+import com.nivara.app.domain.vault.VaultAlbumContents
+import com.nivara.app.domain.vault.VaultAlbumId
 import com.nivara.app.domain.vault.VaultFailure
 import com.nivara.app.domain.vault.VaultImportFailure
 import com.nivara.app.domain.vault.VaultImportProgress
 import com.nivara.app.domain.vault.VaultIndexRepository
+import com.nivara.app.domain.vault.VaultIndexState
+import com.nivara.app.domain.vault.VaultItemId
 import com.nivara.app.domain.vault.VaultLocation
 import com.nivara.app.domain.vault.VaultLocationStore
+import com.nivara.app.domain.vault.VaultOrdering
+import com.nivara.app.domain.vault.VaultOrganizationRepository
+import com.nivara.app.domain.vault.VaultOrganizationState
 import com.nivara.app.domain.vault.VaultRepository
+import com.nivara.app.domain.vault.VaultSearch
+import com.nivara.app.domain.vault.VaultSearchQuery
+import com.nivara.app.domain.vault.VaultSearchResult
+import com.nivara.app.domain.vault.VaultSortField
 import com.nivara.app.domain.vault.VaultSourceReference
 import com.nivara.app.domain.vault.VaultState
+import com.nivara.app.domain.vault.inOrder
+import com.nivara.app.domain.vault.resolveAgainst
 import com.nivara.app.ui.components.NivaraMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +74,7 @@ import kotlinx.coroutines.launch
 class VaultViewModel(
     private val vaultRepository: VaultRepository,
     private val indexRepository: VaultIndexRepository,
+    private val organizationRepository: VaultOrganizationRepository,
     private val locationStore: VaultLocationStore,
     private val sessionManager: SessionManager,
 ) : ViewModel() {
@@ -71,7 +85,25 @@ class VaultViewModel(
     val uiState: StateFlow<VaultUiState> = mutableUiState.asStateFlow()
 
     private var vaultState: VaultState? = null
+
+    /**
+     * The index as the domain reported it, kept beside the drawn list.
+     *
+     * The screen's list is derived from this — filtered by the search box, ordered by the chosen sort
+     * — so a keystroke in the search box or a tap on a sort control never reads the vault again. It
+     * is also what resolves an album's references into files.
+     */
+    private var domainIndex: VaultIndexState? = null
     private var indexState: VaultIndexUiState = VaultIndexUiState.Loading
+    private var domainOrganization: VaultOrganizationState? = null
+    private var ordering: VaultOrdering = VaultOrdering()
+    private var query: VaultSearchQuery = VaultSearchQuery.NONE
+    private var queryText: String = ""
+    private var section: VaultSection = VaultSection.AllItems
+    private var openAlbumId: VaultAlbumId? = null
+    private var renamingAlbumId: VaultAlbumId? = null
+    private var confirmingDeleteId: VaultAlbumId? = null
+    private var editingAlbumItems: Boolean = false
     private var busy: Boolean = false
     private var importing: Boolean = false
     private var progress: VaultImportProgress? = null
@@ -311,6 +343,253 @@ class VaultViewModel(
         adopt(pending)
     }
 
+    // ------------------------------------------------------------------ browsing and organising
+
+    /** Switches between every file and the albums. */
+    fun onSectionSelected(section: VaultSection) {
+        if (this.section == section) return
+        this.section = section
+        // Leaving the albums closes whatever album was open: the section is the collection being
+        // shown, and an album card inside the file list would be a second screen's worth of state
+        // surviving a navigation the user made.
+        if (section == VaultSection.AllItems) {
+            openAlbumId = null
+            editingAlbumItems = false
+            renamingAlbumId = null
+            confirmingDeleteId = null
+        }
+        publish()
+    }
+
+    /**
+     * The search box changed.
+     *
+     * Nothing is read and nothing is written: the query filters metadata the screen already has. The
+     * text is kept exactly as typed so the field draws what the person is typing, while the filter
+     * uses the normalised form.
+     */
+    fun onSearchQueryChanged(text: String) {
+        queryText = text
+        query = VaultSearchQuery.of(text)
+        publish()
+    }
+
+    /** Clears the search box. */
+    fun onSearchCleared() {
+        if (queryText.isEmpty() && query.isBlank) return
+        onSearchQueryChanged("")
+    }
+
+    /** Chooses the field the list is ordered by. The direction is kept. */
+    fun onSortFieldSelected(field: VaultSortField) {
+        if (ordering.field == field) return
+        ordering = ordering.copy(field = field)
+        publish()
+    }
+
+    /** Reverses the current order. */
+    fun onSortDirectionToggled() {
+        ordering = ordering.toggled()
+        publish()
+    }
+
+    /** Opens an album: its items are resolved from the index that was already read. */
+    fun onAlbumOpened(albumId: VaultAlbumId) {
+        openAlbumId = albumId
+        editingAlbumItems = false
+        renamingAlbumId = null
+        confirmingDeleteId = null
+        publish()
+    }
+
+    /** Leaves the open album. Nothing is read and nothing is written. */
+    fun onAlbumClosed() {
+        if (openAlbumId == null) return
+        openAlbumId = null
+        editingAlbumItems = false
+        renamingAlbumId = null
+        confirmingDeleteId = null
+        publish()
+    }
+
+    /** Shows the field for renaming [albumId]. */
+    fun onRenameAlbumStarted(albumId: VaultAlbumId) {
+        renamingAlbumId = albumId
+        confirmingDeleteId = null
+        publish()
+    }
+
+    /** Abandons a rename without writing anything. */
+    fun onRenameAlbumCancelled() {
+        if (renamingAlbumId == null) return
+        renamingAlbumId = null
+        publish()
+    }
+
+    /** Asks to delete [albumId]. The confirmation is drawn by the screen; nothing is deleted yet. */
+    fun onDeleteAlbumRequested(albumId: VaultAlbumId) {
+        confirmingDeleteId = albumId
+        renamingAlbumId = null
+        publish()
+    }
+
+    /** Abandons a deletion. */
+    fun onDeleteAlbumCancelled() {
+        if (confirmingDeleteId == null) return
+        confirmingDeleteId = null
+        publish()
+    }
+
+    /** Shows or hides the open album's add/remove surface. */
+    fun onAlbumItemsEditingChanged(editing: Boolean) {
+        if (editingAlbumItems == editing) return
+        editingAlbumItems = editing
+        publish()
+    }
+
+    /**
+     * Creates an album titled [name].
+     *
+     * Everything an album change requires: a vault that can be opened, a readable album record, and
+     * the existing session. The repository asks the same question again at the moment the record
+     * would change, so a session that ends while the screen is drawing cannot produce a change.
+     */
+    fun onCreateAlbum(name: String) {
+        if (!canChangeAlbums()) return
+        changeAlbum(
+            work = { authorize -> organizationRepository.createAlbum(name = name, authorize = authorize) },
+            onDone = { R.string.vault_album_notice_created },
+        )
+    }
+
+    /** Renames the album [albumId] to [name]. */
+    fun onRenameAlbumConfirmed(albumId: VaultAlbumId, name: String) {
+        if (!canChangeAlbums()) return
+        renamingAlbumId = null
+        changeAlbum(
+            work = { authorize ->
+                organizationRepository.renameAlbum(albumId = albumId, name = name, authorize = authorize)
+            },
+            onDone = { R.string.vault_album_notice_renamed },
+        )
+    }
+
+    /**
+     * Deletes the album [albumId] — the album, and nothing else.
+     *
+     * The items it named are not touched: they stay in the vault, in the index and in every other
+     * album they are in. The confirmation the screen draws before this says so, because a person
+     * deleting a list should not have to wonder what else went with it.
+     */
+    fun onDeleteAlbumConfirmed(albumId: VaultAlbumId) {
+        if (!canChangeAlbums()) return
+        confirmingDeleteId = null
+        changeAlbum(
+            work = { authorize -> organizationRepository.deleteAlbum(albumId = albumId, authorize = authorize) },
+            onDone = { R.string.vault_album_notice_deleted },
+            closesAlbum = albumId,
+        )
+    }
+
+    /** Adds [itemId] to the open album. */
+    fun onAddItemToAlbum(itemId: VaultItemId) {
+        val albumId = openAlbumId ?: return
+        if (!canChangeAlbums()) return
+        changeAlbum(
+            work = { authorize ->
+                organizationRepository.addItem(albumId = albumId, itemId = itemId, authorize = authorize)
+            },
+            onDone = { R.string.vault_album_notice_item_added },
+        )
+    }
+
+    /** Removes [itemId] from the open album. The item itself is untouched. */
+    fun onRemoveItemFromAlbum(itemId: VaultItemId) {
+        val albumId = openAlbumId ?: return
+        if (!canChangeAlbums()) return
+        changeAlbum(
+            work = { authorize ->
+                organizationRepository.removeItem(albumId = albumId, itemId = itemId, authorize = authorize)
+            },
+            onDone = { R.string.vault_album_notice_item_removed },
+        )
+    }
+
+    /**
+     * Whether an album may be changed right now.
+     *
+     * Three things, asked at the moment of the tap rather than read from the drawn state: the vault is
+     * open, its album record can be read (or does not exist yet), and the existing gate is open. A
+     * change refused here is explained the same way every other refused change in this screen is.
+     */
+    private fun canChangeAlbums(): Boolean {
+        val current = readyState() ?: return false
+        if (current.busy || current.importing) return false
+        val vault = current.vault
+        if (vault !is VaultState.Ready || !current.organization.acceptsChanges) {
+            failure = vaultOrganizationUnavailableMessage()
+            noticeRes = null
+            publish()
+            return false
+        }
+        return hasSession()
+    }
+
+    /**
+     * Runs one album change, then reads the record back.
+     *
+     * The albums are read again from storage after every change rather than patched in memory: an
+     * album list assembled by the screen would be a second opinion about what the vault holds, and the
+     * one thing this layer must never do is claim a change that was not committed.
+     */
+    private fun changeAlbum(
+        work: suspend (authorize: () -> Boolean) -> NivaraResult<*>,
+        onDone: () -> Int,
+        closesAlbum: VaultAlbumId? = null,
+    ) {
+        busy = true
+        failure = null
+        noticeRes = null
+        publish()
+
+        viewModelScope.launch {
+            val result = try {
+                work { sessionManager.currentState().isAuthenticated }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                // The contract reports failures as results. An implementation that throws anyway is
+                // reported as a failed change, never as a changed album.
+                null
+            }
+
+            busy = false
+            when {
+                result == null -> failure = vaultAlbumChangeFailedMessage()
+
+                result is NivaraResult.Failure -> {
+                    val typed = result.error as? VaultOrganizationFailure
+                    if (typed == VaultOrganizationFailure.NotAuthorized) unlockRequired = true
+                    failure = typed?.asMessage() ?: vaultAlbumChangeFailedMessage()
+                    noticeRes = null
+                }
+
+                else -> {
+                    failure = null
+                    noticeRes = onDone()
+                }
+            }
+            if (closesAlbum != null && result != null && result.isSuccess) {
+                openAlbumId = null
+                editingAlbumItems = false
+            }
+            // The record is read again whatever happened, so a change that did not verify is drawn as
+            // the albums that are actually there.
+            readOrganization()
+            publish()
+        }
+    }
+
     /** Clears the last failure or confirmation, so a message does not outlive the moment. */
     fun onMessageShown() {
         if (failure == null && noticeRes == null) return
@@ -393,7 +672,16 @@ class VaultViewModel(
             vaultState = state
             // The list of files is a second fact, read only when the vault itself can be opened. An
             // index that cannot be read becomes its own state, never an empty list.
-            indexState = if (state is VaultState.Ready) readIndex() else VaultIndexUiState.VaultNotReady
+            if (state is VaultState.Ready) {
+                indexState = readIndex()
+                // The albums are a third fact, read from their own record. Like the index they are
+                // never rebuilt, and a record that cannot be read stays a record that cannot be read.
+                readOrganization()
+            } else {
+                domainIndex = VaultIndexState.VaultNotReady(state)
+                indexState = drawnIndex()
+                domainOrganization = VaultOrganizationState.VaultNotReady(state)
+            }
             if (!keepMessages) {
                 failure = null
                 noticeRes = null
@@ -410,19 +698,132 @@ class VaultViewModel(
      * throws instead is reported as unreachable rather than as an empty vault.
      */
     private suspend fun readIndex(): VaultIndexUiState = try {
-        indexRepository.read().toUiState()
+        domainIndex = indexRepository.read()
+        drawnIndex()
     } catch (cancellation: CancellationException) {
         throw cancellation
     } catch (error: Exception) {
-        VaultIndexUiState.Unavailable
+        domainIndex = VaultIndexState.Unavailable
+        drawnIndex()
     }
 
-    /** Rebuilds the drawn state from the last read, without touching the repository. */
+    /**
+     * The list as the screen draws it: the vault's items, filtered by the search box and ordered by
+     * the chosen sort.
+     *
+     * Derived from the index that was already read rather than by reading again, so typing in the
+     * search box and changing the sort cost nothing but this function. The counts that describe the
+     * vault rather than the visible rows — missing content, unindexed and unfinished objects — are
+     * taken from the index as a whole and are not affected by a query.
+     */
+    private fun drawnIndex(): VaultIndexUiState =
+        (domainIndex ?: return VaultIndexUiState.Loading).toUiState(ordering = ordering, query = query)
+
+    /**
+     * Reads the vault's albums.
+     *
+     * A record that cannot be read stays its own state: nothing here turns it into an empty album
+     * list, because doing so would invite a person to start organising again over the top of albums
+     * that are still on storage.
+     */
+    private suspend fun readOrganization() {
+        domainOrganization = try {
+            organizationRepository.read()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            VaultOrganizationState.Unavailable
+        }
+    }
+
+    /**
+     * The albums as the screen draws them, each resolved against the index that was read.
+     *
+     * On the albums surface the search box filters them by title — album names are metadata Nivara
+     * holds, and looking for one is the same kind of question as looking for a file. Membership is not
+     * searched: an album is a list, not a property of the files in it.
+     */
+    private fun drawnOrganization(): VaultOrganizationUiState {
+        val domain = domainOrganization ?: return VaultOrganizationUiState.Loading
+        val index = domainIndex ?: VaultIndexState.Missing
+        val visible = if (section == VaultSection.Albums) domain.matchingQuery() else domain
+        return visible.toUiState { album -> album.resolveAgainst(index) }
+    }
+
+    /** The readable albums whose title matches the current query, or this state unchanged. */
+    private fun VaultOrganizationState.matchingQuery(): VaultOrganizationState =
+        if (query.isBlank) {
+            this
+        } else {
+            when (this) {
+                is VaultOrganizationState.Ready ->
+                    VaultOrganizationState.Ready(albums = VaultSearch.filter(albums, query))
+
+                else -> this
+            }
+        }
+
+    /**
+     * The open album, when one is open and still exists in the readable record.
+     *
+     * The items are the album's own, filtered by the same search box and ordered by the same sort
+     * control as the vault's list — one collection of metadata, derived twice, rather than a second
+     * index built for albums.
+     */
+    private fun drawnOpenAlbum(): VaultAlbumDetailUi? {
+        val albumId = openAlbumId ?: return null
+        val readable = domainOrganization as? VaultOrganizationState.Ready ?: return null
+        val album = readable.album(albumId) ?: return null
+        val contents = album.resolveAgainst(domainIndex ?: VaultIndexState.Missing)
+        val drawn = when (contents) {
+            is VaultAlbumContents.Resolved -> VaultAlbumContentsUi.Resolved(
+                items = VaultSearch.filter(contents.items, query)
+                    .inOrder(ordering)
+                    .map { item -> item.toItemUi() },
+                staleItemIds = contents.staleItemIds,
+            )
+
+            is VaultAlbumContents.Unresolved ->
+                VaultAlbumContentsUi.Unresolved(index = contents.index.toUiState())
+        }
+        return VaultAlbumDetailUi(
+            album = album.toAlbumUi(contents),
+            contents = drawn,
+            memberItemIds = album.itemIds.toSet(),
+        )
+    }
+
+    /**
+     * Rebuilds the drawn state from the last read, without touching the repository.
+     *
+     * Everything derived — the filtered and sorted list, the albums, the open album — is computed here
+     * from the state that was already read, so a keystroke, a sort tap or an opened album is a pure
+     * function of what the vault already said.
+     */
     private fun publish() {
         val state = vaultState ?: return
+        indexState = drawnIndex()
+        val organization = drawnOrganization()
+        val openAlbum = drawnOpenAlbum()
+        // An album that is no longer in the record is not left open: the screen would otherwise draw a
+        // detail card for something that was deleted.
+        if (openAlbum == null) {
+            openAlbumId = null
+            editingAlbumItems = false
+        }
         mutableUiState.value = VaultUiState.Ready(
             vault = state,
             index = indexState,
+            organization = organization,
+            section = section,
+            searchQuery = queryText,
+            search = searchState(indexState, organization),
+            searchSummary = searchSummary(indexState, organization),
+            ordering = ordering,
+            openAlbum = openAlbum,
+            renamingAlbumId = renamingAlbumId,
+            confirmingAlbumDeleteId = confirmingDeleteId,
+            editingAlbumItems = editingAlbumItems && openAlbum != null,
             sessionAuthenticated = sessionManager.currentState().isAuthenticated,
             busy = busy,
             importing = importing,
@@ -431,6 +832,67 @@ class VaultViewModel(
             failure = failure,
             noticeRes = noticeRes,
         )
+    }
+
+    /**
+     * Whether the query found anything, could not be asked, or was not asked.
+     *
+     * The states are kept apart on purpose: "no file matches" is an answer about the vault, and "the
+     * list cannot be read" is not — showing the second as the first would tell a person something
+     * untrue about their own files.
+     */
+    private fun searchState(
+        index: VaultIndexUiState,
+        organization: VaultOrganizationUiState,
+    ): VaultSearchUiState = when {
+        query.isBlank -> VaultSearchUiState.NotAsked
+
+        // On the albums surface the question is about albums, and the answer is about albums: an
+        // unreadable record means the question could not be asked, which is not the same as "none".
+        section == VaultSection.Albums -> when (organization) {
+            is VaultOrganizationUiState.Albums ->
+                if (organization.albums.isEmpty()) VaultSearchUiState.NoMatches else VaultSearchUiState.Matches
+
+            VaultOrganizationUiState.Empty -> VaultSearchUiState.NoMatches
+            else -> VaultSearchUiState.CannotSearch
+        }
+
+        // The domain answers this one, so the screen cannot invent a different set of rules: a vault
+        // with no list record answers "nothing matches", and a list that cannot be read refuses to be
+        // asked at all.
+        else -> when (val asked = (domainIndex ?: VaultIndexState.Missing).search(query)) {
+            VaultSearchResult.NotAsked -> VaultSearchUiState.NotAsked
+            is VaultSearchResult.Found ->
+                if (asked.items.isEmpty()) VaultSearchUiState.NoMatches else VaultSearchUiState.Matches
+
+            is VaultSearchResult.CannotSearch -> VaultSearchUiState.CannotSearch
+        }
+    }
+
+    /**
+     * How many files answered, out of how many the vault holds.
+     *
+     * `null` whenever the query was not asked or the list could not be read, because a count drawn for
+     * a list that was never read is a number invented for the occasion.
+     */
+    private fun searchSummary(
+        index: VaultIndexUiState,
+        organization: VaultOrganizationUiState,
+    ): VaultSearchSummary? {
+        if (query.isBlank) return null
+        if (section == VaultSection.Albums) {
+            val drawn = organization as? VaultOrganizationUiState.Albums ?: return null
+            val total = (domainOrganization as? VaultOrganizationState.Ready)?.albums?.size ?: return null
+            return VaultSearchSummary(matches = drawn.albums.size, total = total)
+        }
+        val domain = domainIndex ?: return null
+        val total = when (domain) {
+            is VaultIndexState.Ready -> domain.items.size
+            VaultIndexState.Missing -> 0
+            else -> return null
+        }
+        val matches = (index as? VaultIndexUiState.Indexed)?.items?.size ?: return null
+        return VaultSearchSummary(matches = matches, total = total)
     }
 
     companion object {
@@ -459,6 +921,7 @@ class VaultViewModel(
                 VaultViewModel(
                     vaultRepository = container.vaultRepository,
                     indexRepository = container.vaultIndexRepository,
+                    organizationRepository = container.vaultOrganizationRepository,
                     locationStore = container.vaultLocationStore,
                     sessionManager = container.sessionManager,
                 )

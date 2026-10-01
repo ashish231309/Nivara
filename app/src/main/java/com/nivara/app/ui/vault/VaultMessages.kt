@@ -6,6 +6,8 @@ import com.nivara.app.domain.vault.VaultContentClassification
 import com.nivara.app.domain.vault.VaultContentKind
 import com.nivara.app.domain.vault.VaultImportFailure
 import com.nivara.app.domain.vault.VaultIndexUnreadable
+import com.nivara.app.domain.vault.VaultOrganizationFailure
+import com.nivara.app.domain.vault.VaultOrganizationUnreadable
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraMessage
@@ -181,6 +183,73 @@ private fun VaultImportFailure.messageRes(): Int = when (this) {
     VaultImportFailure.CryptographyFailed -> R.string.vault_import_error_cryptography
     VaultImportFailure.DuplicateItemId -> R.string.vault_import_error_duplicate_id
 }
+
+/**
+ * Text for the album record's own states.
+ *
+ * The headings and bodies sit beside the index's for the same reason it has them: an album record that
+ * cannot be read must be explained as *that*, and never allowed to read as "you have no albums".
+ */
+internal fun VaultOrganizationUiState.titleRes(): Int? = when (this) {
+    VaultOrganizationUiState.Loading,
+    VaultOrganizationUiState.VaultNotReady,
+    VaultOrganizationUiState.Empty,
+    is VaultOrganizationUiState.Albums,
+    -> null
+
+    is VaultOrganizationUiState.Unreadable -> R.string.vault_albums_unreadable_title
+    VaultOrganizationUiState.UnsupportedVersion -> R.string.vault_albums_unsupported_title
+    VaultOrganizationUiState.Unavailable -> R.string.vault_albums_unavailable_title
+    VaultOrganizationUiState.AccessDenied -> R.string.vault_albums_access_denied_title
+}
+
+/** The sentence under an album-record state that needs one. */
+internal fun VaultOrganizationUiState.bodyRes(): Int? = when (this) {
+    is VaultOrganizationUiState.Unreadable -> when (reason) {
+        VaultOrganizationUnreadable.MetadataDamaged -> R.string.vault_albums_unreadable_body
+        VaultOrganizationUnreadable.KeyUnavailable -> R.string.vault_albums_key_unavailable_body
+    }
+
+    VaultOrganizationUiState.UnsupportedVersion -> R.string.vault_albums_unsupported_body
+    VaultOrganizationUiState.Unavailable -> R.string.vault_albums_unavailable_body
+    VaultOrganizationUiState.AccessDenied -> R.string.vault_albums_access_denied_body
+    else -> null
+}
+
+/** Every album change that failed says why, and none of them says "the albums are gone". */
+internal fun VaultOrganizationFailure.asMessage(): NivaraMessage = NivaraMessage(textRes = messageRes())
+
+private fun VaultOrganizationFailure.messageRes(): Int = when (this) {
+    VaultOrganizationFailure.NotAuthorized -> R.string.vault_album_error_not_authorized
+    is VaultOrganizationFailure.VaultNotReady -> R.string.vault_album_error_vault_not_ready
+    // A record that cannot be opened because the key is missing says the same thing as a change that
+    // failed for that reason: the cause is one thing, and two sentences for it would be two ideas.
+    is VaultOrganizationFailure.OrganizationUnreadable -> when (reason) {
+        VaultOrganizationUnreadable.MetadataDamaged -> R.string.vault_album_error_unreadable
+        VaultOrganizationUnreadable.KeyUnavailable -> R.string.vault_album_error_key_unavailable
+    }
+    is VaultOrganizationFailure.UnsupportedVersion -> R.string.vault_album_error_unsupported
+    VaultOrganizationFailure.MetadataUnavailable -> R.string.vault_album_error_unavailable
+    VaultOrganizationFailure.AccessDenied -> R.string.vault_album_error_access_denied
+    VaultOrganizationFailure.AlbumNotFound -> R.string.vault_album_error_not_found
+    VaultOrganizationFailure.InvalidAlbumName -> R.string.vault_album_error_invalid_name
+    VaultOrganizationFailure.AlbumNameUnchanged -> R.string.vault_album_error_name_unchanged
+    VaultOrganizationFailure.AlbumFull -> R.string.vault_album_error_album_full
+    VaultOrganizationFailure.OrganizationFull -> R.string.vault_album_error_too_many
+    VaultOrganizationFailure.StorageUnavailable -> R.string.vault_album_error_storage_unavailable
+    VaultOrganizationFailure.WriteFailed -> R.string.vault_album_error_write_failed
+    VaultOrganizationFailure.VerificationFailed -> R.string.vault_album_error_not_verified
+    VaultOrganizationFailure.KeyUnavailable -> R.string.vault_album_error_key_unavailable
+    VaultOrganizationFailure.CryptographyFailed -> R.string.vault_album_error_cryptography
+}
+
+/** Shown when an album was asked for while the album record is not in a state that may be changed. */
+internal fun vaultOrganizationUnavailableMessage(): NivaraMessage =
+    NivaraMessage(textRes = R.string.vault_album_error_unavailable)
+
+/** Shown when an album change failed for a reason Nivara cannot name. */
+internal fun vaultAlbumChangeFailedMessage(): NivaraMessage =
+    NivaraMessage(textRes = R.string.vault_album_error_failed)
 
 /** Shown when the user asked to import while the gate was closed. */
 internal fun vaultImportLockedMessage(): NivaraMessage =
