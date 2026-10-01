@@ -55,11 +55,11 @@ class VaultTrashOrderingTest {
         val older = resolved(seed = 1, item = testItem(seed = 1), trashedAt = 100L)
         val newer = resolved(seed = 2, item = testItem(seed = 2), trashedAt = 200L)
         assertEquals(
-            listOf(newer.itemId, older.itemId),
+            ids(listOf(newer, older)),
             ids(ordered(listOf(older, newer), VaultTrashSortField.TrashedAt, VaultSortDirection.Descending)),
         )
         assertEquals(
-            listOf(older.itemId, newer.itemId),
+            ids(listOf(older, newer)),
             ids(ordered(listOf(newer, older), VaultTrashSortField.TrashedAt)),
         )
     }
@@ -69,7 +69,7 @@ class VaultTrashOrderingTest {
         val apple = resolved(seed = 1, item = testItem(seed = 1, name = "Apple.txt"))
         val banana = resolved(seed = 2, item = testItem(seed = 2, name = "banana.txt"))
         assertEquals(
-            listOf(apple.itemId, banana.itemId),
+            ids(listOf(apple, banana)),
             ids(ordered(listOf(banana, apple), VaultTrashSortField.Name)),
         )
     }
@@ -79,7 +79,7 @@ class VaultTrashOrderingTest {
         val small = resolved(seed = 1, item = testItem(seed = 1, sizeBytes = 10L))
         val large = resolved(seed = 2, item = testItem(seed = 2, sizeBytes = 20L))
         assertEquals(
-            listOf(small.itemId, large.itemId),
+            ids(listOf(small, large)),
             ids(ordered(listOf(large, small), VaultTrashSortField.Size)),
         )
     }
@@ -89,7 +89,7 @@ class VaultTrashOrderingTest {
         val older = resolved(seed = 1, item = testItem(seed = 1, importedAtEpochMillis = 100L))
         val newer = resolved(seed = 2, item = testItem(seed = 2, importedAtEpochMillis = 200L))
         assertEquals(
-            listOf(older.itemId, newer.itemId),
+            ids(listOf(older, newer)),
             ids(ordered(listOf(newer, older), VaultTrashSortField.ImportedAt)),
         )
     }
@@ -99,7 +99,7 @@ class VaultTrashOrderingTest {
         val picture = resolved(seed = 1, item = testItem(seed = 1, mimeType = "image/jpeg"))
         val document = resolved(seed = 2, item = testItem(seed = 2, mimeType = "text/plain"))
         assertEquals(
-            listOf(picture.itemId, document.itemId),
+            ids(listOf(picture, document)),
             ids(ordered(listOf(document, picture), VaultTrashSortField.Kind)),
         )
     }
@@ -109,7 +109,7 @@ class VaultTrashOrderingTest {
         val unknown = resolved(seed = 1, item = null)
         val known = resolved(seed = 2, item = testItem(seed = 2))
         assertEquals(
-            listOf(known.itemId, unknown.itemId),
+            ids(listOf(known, unknown)),
             ids(ordered(listOf(unknown, known), VaultTrashSortField.Name)),
         )
     }
@@ -119,7 +119,7 @@ class VaultTrashOrderingTest {
         val first = resolved(seed = 1, item = testItem(seed = 8, name = "same.txt"), trashedAt = 5L)
         val second = resolved(seed = 2, item = testItem(seed = 9, name = "same.txt"), trashedAt = 5L)
         assertEquals(
-            listOf(first.itemId, second.itemId),
+            ids(listOf(first, second)),
             ids(ordered(listOf(second, first), VaultTrashSortField.TrashedAt)),
         )
     }
@@ -142,7 +142,7 @@ class VaultTrashOrderingTest {
         val older = resolved(seed = 1, item = testItem(seed = 1), trashedAt = 10L)
         val newer = resolved(seed = 2, item = testItem(seed = 2), trashedAt = 20L)
         assertEquals(
-            listOf(newer.itemId, older.itemId),
+            ids(listOf(newer, older)),
             ids(listOf(older, newer).inTrashOrder(VaultTrashOrdering())),
         )
     }

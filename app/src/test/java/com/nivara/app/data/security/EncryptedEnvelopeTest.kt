@@ -292,7 +292,7 @@ class EncryptedEnvelopeTest {
     @Test
     fun `an undefined purpose tag is rejected`() {
         assertThrows(CryptographicFailure.UnsupportedContext::class.java) {
-            EncryptedEnvelope.decrypt(envelopeWith(7, 0x09), keyA, EncryptionContext.VaultContent)
+            EncryptedEnvelope.decrypt(envelopeWith(7, 0x0A), keyA, EncryptionContext.VaultContent)
         }
         assertThrows(CryptographicFailure.UnsupportedContext::class.java) {
             EncryptedEnvelope.decrypt(envelopeWith(7, 0x00), keyA, EncryptionContext.VaultContent)

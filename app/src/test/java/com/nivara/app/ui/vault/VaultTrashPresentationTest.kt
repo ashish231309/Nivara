@@ -185,8 +185,16 @@ class VaultTrashPresentationTest {
 
     @Test
     fun every_failure_has_its_own_message_and_none_of_them_is_the_generic_one() {
-        val messages = everyFailure().map { failure -> failure.asMessage() }
-        assertEquals(everyFailure().size, messages.distinct().size)
+        // The key being unavailable is one fact with one sentence, whether it surfaced while the
+        // record was being read or while it was being written: those two failures share their words
+        // on purpose, and everything else has its own.
+        val failures = everyFailure().filterNot { failure -> failure == VaultTrashFailure.KeyUnavailable }
+        val messages = failures.map { failure -> failure.asMessage() }
+        assertEquals(failures.size, messages.distinct().size)
+        assertEquals(
+            VaultTrashFailure.TrashUnreadable(VaultTrashUnreadable.KeyUnavailable).asMessage(),
+            VaultTrashFailure.KeyUnavailable.asMessage(),
+        )
         messages.forEach { message ->
             assertNotEquals(vaultTrashChangeFailedMessage(), message)
             assertTrue(message.textRes != 0)

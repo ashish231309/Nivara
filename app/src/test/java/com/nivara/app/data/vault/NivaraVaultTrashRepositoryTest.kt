@@ -189,7 +189,10 @@ class NivaraVaultTrashRepositoryTest {
         assertEquals(testItemId(1), entry?.itemId)
         assertEquals(1_700_000_000_000L, entry?.trashedAtEpochMillis)
         assertEquals(1, metadata.writeCalls)
-        assertEquals(listOf(testTrashEntry(seed = 1)), repository.read().readable())
+        assertEquals(
+            listOf(VaultTrashEntry(itemId = testItemId(1), trashedAtEpochMillis = 1_700_000_000_000L)),
+            repository.read().readable(),
+        )
     }
 
     @Test
@@ -250,10 +253,13 @@ class NivaraVaultTrashRepositoryTest {
 
     @Test
     fun more_trashed_items_than_the_record_can_carry_is_refused() = runTest {
-        indexState = VaultIndexState.Ready(items = listOf(testItem(seed = 1)))
+        indexState = VaultIndexState.Ready(items = listOf(testItem(seed = VaultTrashLimits.MAXIMUM_TRASHED_ITEMS + 1)))
         val full = (1..VaultTrashLimits.MAXIMUM_TRASHED_ITEMS).map { seed -> testTrashEntry(seed = seed) }
         putRecord(full)
-        val result = repository().trash(itemId = testItemId(1), authorize = ::authorize)
+        val result = repository().trash(
+            itemId = testItemId(VaultTrashLimits.MAXIMUM_TRASHED_ITEMS + 1),
+            authorize = ::authorize,
+        )
         assertEquals(VaultTrashFailure.TrashFull, result.failure())
         assertEquals(0, metadata.writeCalls)
     }
@@ -276,19 +282,21 @@ class NivaraVaultTrashRepositoryTest {
     fun restoring_removes_the_entry_and_keeps_the_identifier() = runTest {
         val entry = testTrashEntry(seed = 1)
         putRecord(listOf(entry))
+        val writesBefore = metadata.writeCalls
         val result = repository().restore(itemId = testItemId(1), authorize = ::authorize)
         assertTrue(result is NivaraResult.Success)
         assertEquals(emptyList<VaultTrashEntry>(), repository().read().readable())
-        assertEquals(1, metadata.writeCalls)
+        assertEquals(writesBefore + 1, metadata.writeCalls)
         assertEquals(testItemId(1), entry.itemId)
     }
 
     @Test
     fun restoring_an_item_that_is_not_trashed_changes_nothing() = runTest {
         putRecord(listOf(testTrashEntry(seed = 1)))
+        val writesBefore = metadata.writeCalls
         val result = repository().restore(itemId = testItemId(2), authorize = ::authorize)
         assertTrue(result is NivaraResult.Success)
-        assertEquals(0, metadata.writeCalls)
+        assertEquals(writesBefore, metadata.writeCalls)
         assertEquals(listOf(testTrashEntry(seed = 1)), repository().read().readable())
     }
 
@@ -330,7 +338,10 @@ class NivaraVaultTrashRepositoryTest {
         val failed = repository.trash(itemId = testItemId(2), authorize = ::authorize)
         assertEquals(VaultTrashFailure.VerificationFailed, failed.failure())
         metadata.corruptWrites = false
-        assertEquals(listOf(testTrashEntry(seed = 1)), repository.read().readable())
+        assertEquals(
+            listOf(VaultTrashEntry(itemId = testItemId(1), trashedAtEpochMillis = 1_700_000_000_000L)),
+            repository.read().readable(),
+        )
     }
 
     @Test

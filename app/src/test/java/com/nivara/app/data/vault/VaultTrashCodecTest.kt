@@ -196,14 +196,16 @@ class VaultTrashCodecTest {
     }
 
     @Test
-    fun an_identifier_that_is_not_lower_case_hex_is_refused() {
+    fun any_sixteen_bytes_round_trip_as_the_identifier_they_spell() {
         val bytes = payload(entries = listOf(testTrashEntry(seed = 1))).copyOf()
-        // Sixteen bytes that are not a hex identifier at all: the reader must refuse the entry rather
-        // than invent one.
+        // The reader's rule is positional: exactly sixteen bytes per identifier. The discipline that
+        // an identifier is lower-case hex belongs to the writer and to VaultItemId itself, so sixteen
+        // zero bytes come back as the all-zero identifier rather than being refused or invented.
         for (index in VaultTrashCodec.PAYLOAD_HEADER_LENGTH until VaultTrashCodec.PAYLOAD_HEADER_LENGTH + VaultTrashCodec.ID_SIZE) {
             bytes[index] = 0
         }
-        assertNull(decoded(bytes))
+        val read = decoded(bytes)
+        assertEquals(VaultItemId("0".repeat(32)), read?.entries?.single()?.itemId)
     }
 
     @Test

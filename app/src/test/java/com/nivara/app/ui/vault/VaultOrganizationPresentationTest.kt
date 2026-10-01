@@ -176,7 +176,7 @@ class VaultOrganizationPresentationTest {
 
         assertEquals(
             "an album row is its identity, its title, when it was made, and its counts",
-            setOf("id", "name", "createdAtEpochMillis", "memberCount", "staleCount", "resolved"),
+            setOf("id", "name", "createdAtEpochMillis", "memberCount", "staleCount", "trashedCount", "resolved"),
             fields.map { field -> field.name }.toSet(),
         )
         fields.forEach { field ->
