@@ -446,6 +446,7 @@ private fun HomeScreenReadyPreview() {
             onOpenBiometric = {},
             onOpenAppLock = {},
             onOpenHiddenApps = {},
+            onOpenCamouflage = {},
         )
     }
 }
@@ -474,6 +475,7 @@ private fun HomeScreenConfiguredPreview() {
             onOpenBiometric = {},
             onOpenAppLock = {},
             onOpenHiddenApps = {},
+            onOpenCamouflage = {},
         )
     }
 }
@@ -493,6 +495,7 @@ private fun HomeScreenErrorPreview() {
             onOpenBiometric = {},
             onOpenAppLock = {},
             onOpenHiddenApps = {},
+            onOpenCamouflage = {},
         )
     }
 }
