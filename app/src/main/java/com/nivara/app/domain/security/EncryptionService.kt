@@ -64,18 +64,21 @@ interface EncryptionService {
      * so a truncated, reordered, duplicated or edited stream is rejected as a whole. The format and
      * its security argument are in `docs/crypto/envelope-format.md`.
      *
-     * Neither stream is held in memory: the implementation reads a bounded chunk, encrypts it and
-     * writes it, so a file of any size costs the same amount of memory.
+     * Neither side is held in memory: the implementation reads a bounded piece, encrypts it and
+     * writes it, so a file of any size costs the same amount of memory — and the source is asked for
+     * its pieces in the caller's own coroutine, so a document the platform reads asynchronously is
+     * never turned into a blocking read.
      *
+     * @param plaintext the bytes, in the pieces the source yields.
      * @param identity the non-secret identity the ciphertext must be bound to, exactly sixteen
      *   bytes — for vault content, the item's id. A stream encrypted for one identity cannot be
-     *   read as another's, because the identity is inside the authenticated data of every piece.
+     *   read as another's, because the identity is inside the authenticated data of every record.
      * @param onProgress called with the number of plaintext bytes processed so far, for a screen
      *   that wants to show progress. It never affects what is written.
      * @return the number of plaintext bytes that were encrypted.
      */
     suspend fun encryptStream(
-        plaintext: InputStream,
+        plaintext: StreamSource,
         ciphertext: OutputStream,
         key: EncryptionKey,
         context: EncryptionContext,

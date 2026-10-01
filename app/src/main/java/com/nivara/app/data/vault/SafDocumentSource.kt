@@ -10,6 +10,7 @@ import com.nivara.app.core.common.nivaraRunCatching
 import com.nivara.app.domain.vault.VaultContentSource
 import com.nivara.app.domain.vault.VaultImportFailure
 import com.nivara.app.domain.vault.VaultSourceReference
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
 import kotlinx.coroutines.CoroutineDispatcher
@@ -132,11 +133,11 @@ internal class SafDocumentSourceOpener(
 /**
  * One open source document.
  *
- * The stream is the platform's, read into the caller's buffer, and closed once when the import ends —
- * whether it succeeded, failed or was refused. The known file sources are the only exception the
- * platform throws for a document that is gone or unreadable, and each is reported as the failure it
- * is rather than as the end of the file: a source that stops being readable must fail the import, not
- * silently shorten it.
+ * The platform's stream is read into the caller's buffer, in the caller's coroutine, and closed once
+ * when the import ends — whether it succeeded, failed or was refused. The failures the platform
+ * raises while reading are translated into the source failures they are, because a document whose
+ * grant was withdrawn, or one that became unreadable, must fail the import rather than shorten it:
+ * importing a prefix of a file would store something the user never had.
  */
 internal class SafDocumentSource(
     private val stream: InputStream,
@@ -151,7 +152,7 @@ internal class SafDocumentSource(
             stream.read(buffer)
         } catch (denied: SecurityException) {
             // A grant can be withdrawn while a document is open. That is a refusal, not the end of
-            // the file, and it must fail the import rather than import a shorter one.
+            // the file.
             throw VaultSourceException(VaultImportFailure.SourceAccessDenied)
         } catch (unreadable: IOException) {
             // Every platform failure that means "this document cannot be read any more" is a source
@@ -163,7 +164,8 @@ internal class SafDocumentSource(
     override suspend fun close() {
         withContext(dispatcher) {
             // Closing is best effort: a provider that refuses to close a stream has no bearing on
-            // whether the encrypted object was written.
+            // whether the encrypted object was written, and the import's outcome is already decided
+            // by then.
             runCatching { stream.close() }
         }
     }

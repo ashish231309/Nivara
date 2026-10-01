@@ -5,6 +5,7 @@ import com.nivara.app.domain.security.CryptographicFailure
 import com.nivara.app.domain.security.EncryptionContext
 import com.nivara.app.domain.security.EncryptionKey
 import com.nivara.app.domain.security.SecureRandomGenerator
+import com.nivara.app.domain.security.StreamSource
 import com.nivara.app.testing.material
 import com.nivara.app.testing.randomKey
 import java.io.ByteArrayInputStream
@@ -322,7 +323,7 @@ class EncryptedStreamTest {
     @Test
     fun `the identity must be exactly sixteen bytes`() = runTest {
         val result = service.encryptStream(
-            plaintext = ByteArrayInputStream("content".toByteArray()),
+            plaintext = BytesSource("content".toByteArray()),
             ciphertext = ByteArrayOutputStream(),
             key = testKey,
             context = EncryptionContext.VaultContent,
@@ -345,7 +346,7 @@ class EncryptedStreamTest {
     ): ByteArray {
         val sink = ByteArrayOutputStream()
         val result = service.encryptStream(
-            plaintext = ByteArrayInputStream(plaintext),
+            plaintext = BytesSource(plaintext),
             ciphertext = sink,
             key = key,
             context = context,

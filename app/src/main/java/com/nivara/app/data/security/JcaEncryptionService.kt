@@ -7,6 +7,7 @@ import com.nivara.app.domain.security.EncryptionContext
 import com.nivara.app.domain.security.EncryptionKey
 import com.nivara.app.domain.security.EncryptionService
 import com.nivara.app.domain.security.SecureRandomGenerator
+import com.nivara.app.domain.security.StreamSource
 import java.io.InputStream
 import java.io.OutputStream
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +66,7 @@ internal class JcaEncryptionService(
      * the next chunk is read before the current one is written.
      */
     override suspend fun encryptStream(
-        plaintext: InputStream,
+        plaintext: StreamSource,
         ciphertext: OutputStream,
         key: EncryptionKey,
         context: EncryptionContext,
@@ -178,13 +179,16 @@ internal class JcaEncryptionService(
     }
 
     /** Fills [buffer] from [source], returning how many bytes were read. */
-    private fun readChunk(source: InputStream, buffer: ByteArray): Int {
-        var read = 0
-        while (read < buffer.size) {
-            val count = source.read(buffer, read, buffer.size - read)
-            if (count <= 0) break
-            read += count
-        }
-        return read
+    /**
+     * One piece of plaintext, or nothing when the source has ended.
+     *
+     * The source decides how much it hands over, so a provider that returns less than a full buffer
+     * simply produces a shorter record — the record's own length is authenticated, so nothing about
+     * the format depends on pieces being full. What cannot be accepted is a source that stops
+     * *saying* it ended: it returns `-1`, and anything that means "unreadable" is thrown.
+     */
+    private suspend fun readChunk(source: StreamSource, buffer: ByteArray): Int {
+        val read = source.read(buffer)
+        return if (read < 0) 0 else read
     }
 }

@@ -1613,7 +1613,9 @@ index_repository_code = strip_comments(index_repository_source.read_text()) \
 # existing service. A second cipher, digest or random source anywhere in the vault would be a second
 # set of rules for the same files, and the vault's own sources are already checked for that above.
 if index_repository_code:
-    for call in ("encryptStream(", "decryptStream("):
+    # The calls must go through the injected service: a receiver that is not the service would be
+    # another implementation of the same primitive, which is exactly what this rule exists to stop.
+    for call in ("encryptionService.encryptStream(", "encryptionService.decryptStream("):
         if call not in index_repository_code:
             err(f"the import pipeline must encrypt and verify through the existing service ('{call}')")
     for contract in ("EncryptionService", "SecureRandomGenerator", "VaultItemId", "VaultContentDigest"):
@@ -1627,10 +1629,10 @@ if index_repository_code:
             err(f"the import pipeline must not build object names itself ('{leak}')")
     if "VaultContentNames.objectName(" not in index_repository_code:
         err("the import pipeline must name an object through the content port's own naming rule")
+    if not re.search(r"\bVaultItemId\.create\(", index_repository_code):
+        err("the import pipeline must allocate the item identifier from the random generator")
     # The identifier is generated, never derived from the file: a name from a provider must not be
     # able to influence which object an item is written to.
-    if "VaultItemId.create(" not in index_repository_code:
-        err("the import pipeline must allocate the item identifier from the random generator")
     if "displayName" not in index_repository_code or "sanitize(" not in index_repository_code:
         err("the import pipeline must validate the source name before storing it")
     # The order that makes an import true: the object is written, read back and verified, the index
@@ -1652,7 +1654,7 @@ if index_repository_code:
     if "NotAuthorized" not in index_repository_code:
         err("the import pipeline must refuse to work without the session's authorization")
     # A concurrent import cannot interleave with another: one lock covers the whole pipeline.
-    if "Mutex" not in index_repository_code or "withLock" not in index_repository_code:
+    if "Mutex" not in index_repository_code or not re.search(r"\.withLock\s*\{", index_repository_code):
         err("the import pipeline must serialize imports")
     # No credential, session, biometric or identity is handled here: authorization arrives as a
     # question the caller answers, which is what keeps this layer free of the gate's business.
@@ -1685,7 +1687,7 @@ if index_repository_code:
 content_storage_code = strip_comments(content_storage_source.read_text()) if content_storage_source.exists() else ""
 if content_storage_code:
     for token in ("OBJECT_SUFFIX", "PENDING_SUFFIX", "VaultItemId"):
-        if token not in content_storage_code:
+        if not re.search(rf"\b{token}\b", content_storage_code):
             err(f"the content port must name objects from the item identifier ('{token}' missing)")
 saf_content_code = strip_comments(saf_content_source.read_text()) if saf_content_source.exists() else ""
 if saf_content_code:
@@ -1700,12 +1702,15 @@ if saf_content_code:
 index_codec_code = strip_comments(index_codec_source.read_text()) if index_codec_source.exists() else ""
 if index_codec_code:
     for token in ("MAGIC", "VERSION", "MAXIMUM_INDEX_LENGTH", "MAXIMUM_ITEM_COUNT", "fileVersion"):
-        if token not in index_codec_code:
+        if not re.search(rf"\b{token}\b", index_codec_code):
             err(f"the index record must carry its format facts ('{token}' missing)")
     index_state_code = strip_comments((vault_domain_dir / "VaultIndexState.kt").read_text())
-    if "UnsupportedVersion" not in index_state_code or "fileVersion" not in index_state_code:
+    if not re.search(r"\bUnsupportedVersion\b", index_state_code) or \
+            not re.search(r"\bfileVersion\b", index_state_code):
         err("the vault must report an index it cannot read because it is newer, with the version it read")
-    if "expectedGeneration" not in index_codec_code:
+    # The sealed payload must be compared with the generation its own clear header carried: without
+    # that comparison, editing a header would promote whichever index an attacker preferred.
+    if "generation != expectedGeneration" not in index_codec_code:
         err("the index payload must be checked against the generation in its clear header")
     for forbidden, why in (
         ("EncryptionKey", "key material"),
@@ -1719,7 +1724,7 @@ if index_codec_code:
 encryption_context_source = ROOT / "app/src/main/java/com/nivara/app/domain/security/EncryptionContext.kt"
 encryption_context_code = strip_comments(encryption_context_source.read_text())
 for purpose in ("VaultContent", "VaultMetadata", "VaultIndex"):
-    if purpose not in encryption_context_code:
+    if not re.search(rf"\b{purpose}\b", encryption_context_code):
         err(f"the content path needs its own encryption purpose ('{purpose}' missing)")
 if index_repository_code:
     if "EncryptionContext.VaultIndex" not in index_repository_code:

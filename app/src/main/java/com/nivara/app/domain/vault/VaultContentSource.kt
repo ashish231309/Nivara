@@ -1,18 +1,21 @@
 package com.nivara.app.domain.vault
 
+import com.nivara.app.domain.security.StreamSource
+
 /**
  * A document the user selected, as the import needs it: a name, what the provider said about it, and
  * bytes that can be read in pieces.
  *
- * Deliberately not a `File`, a `Uri`, a `DocumentFile` or an `InputStream`: the import pipeline is
+ * Deliberately not a `File`, a `Uri`, a `DocumentFile` or a stream type: the import pipeline is
  * Android-free and testable on the JVM, and the platform shapes stay in the adapter that implements
- * this. [read] fills a caller-supplied buffer, so nothing here can be asked for a whole file and the
- * pipeline decides how much memory it is willing to use.
+ * this. The bytes arrive through [read], which fills a caller-supplied buffer — so nothing here can
+ * be asked for a whole file, and the pipeline decides how much memory it is willing to use.
  *
- * Implementations throw a typed [VaultImportFailure] from [read] when the source fails — the
- * pipeline turns that into the failure the screen shows.
+ * A source that stops being readable part way through must throw rather than end early: a shortened
+ * file that still authenticated would be worse than a failed import. Implementations report that as
+ * the [VaultImportFailure] it is.
  */
-interface VaultContentSource {
+interface VaultContentSource : StreamSource {
 
     /** What the provider calls the file. Validated before anything is written; never a path. */
     val displayName: String
@@ -23,13 +26,6 @@ interface VaultContentSource {
     /** How large the provider says the file is, or `null` when it does not say. */
     val declaredSizeBytes: Long?
 
-    /**
-     * Reads up to `buffer.size` bytes into [buffer].
-     *
-     * @return the number of bytes read, or `-1` when the source has ended.
-     */
-    suspend fun read(buffer: ByteArray): Int
-
-    /** Releases anything the source is holding. Called whether the import succeeded or failed. */
+    /** Releases anything the source is holding. Called once, whether the import succeeded or failed. */
     suspend fun close()
 }

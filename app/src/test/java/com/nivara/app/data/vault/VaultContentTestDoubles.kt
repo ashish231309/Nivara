@@ -190,7 +190,14 @@ internal class FakeVaultSourceOpener(
     }
 }
 
-/** A document in memory, read in the pieces the caller asks for. */
+/**
+ * A document in memory, read in the pieces the caller asks for.
+ *
+ * The failure switches are the ones a provider can produce: a source that stops being readable part
+ * way through, and a declared size that disagrees with the bytes. Both matter because the import's
+ * promises are about what was actually read — a shortened read must fail the import rather than
+ * produce a smaller file that authenticates.
+ */
 internal class FakeVaultContentSource(
     private val bytes: ByteArray,
     override val displayName: String,
@@ -206,7 +213,12 @@ internal class FakeVaultContentSource(
     var closed: Boolean = false
         private set
 
+    /** How many times the pipeline asked for bytes — bounded reads, not one big one. */
+    var readCalls: Int = 0
+        private set
+
     override suspend fun read(buffer: ByteArray): Int {
+        readCalls += 1
         failAfterBytes?.let { limit ->
             if (position >= limit) throw VaultSourceException(failure)
         }

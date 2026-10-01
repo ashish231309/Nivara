@@ -63,8 +63,12 @@ internal object VaultIndexCodec {
     /** The clear header of an index record: magic, version, reserved, generation. */
     const val HEADER_LENGTH: Int = 4 + 1 + 1 + GENERATION_SIZE
 
+    /** Bytes of [MAGIC]. Kept beside it so the payload's header can be a constant expression. */
+    const val MAGIC_LENGTH: Int = 4
+
     /** The payload's own header, before the items. */
-    const val PAYLOAD_HEADER_LENGTH: Int = MAGIC.size + 1 + 1 + GENERATION_SIZE + GENERATION_SIZE + COUNT_SIZE
+    const val PAYLOAD_HEADER_LENGTH: Int =
+        MAGIC_LENGTH + 1 + 1 + GENERATION_SIZE + GENERATION_SIZE + COUNT_SIZE
 
     /** The most items one index record can name, fixed by the two-byte count. */
     const val MAXIMUM_ITEM_COUNT: Int = 65_535

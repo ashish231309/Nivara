@@ -317,16 +317,22 @@ internal class NivaraVaultIndexRepository(
 
         val opened = sourceOpener.open(reference)
         val source = opened.valueOrNull() ?: return NivaraResult.Failure(opened.importFailureOf())
+        // The bound wraps the source, not the loop: every read the encryption service makes goes
+        // through it, so a provider that under-reports its size cannot make Nivara read past what it
+        // is willing to hold.
+        val limited = LimitedSource(source, VaultImportFailure.MAXIMUM_SOURCE_BYTES)
         return try {
             importSource(
                 location = location,
                 key = key,
                 source = source,
+                limited = limited,
                 existing = existing,
                 authorize = authorize,
                 onProgress = onProgress,
             )
         } finally {
+            // Closed once, whatever happened. A source is read for exactly one import.
             source.close()
         }
     }
@@ -336,6 +342,7 @@ internal class NivaraVaultIndexRepository(
         location: VaultLocation,
         key: EncryptionKey,
         source: VaultContentSource,
+        limited: VaultContentSource,
         existing: IndexRead.Present,
         authorize: () -> Boolean,
         onProgress: (VaultImportProgress) -> Unit,
@@ -354,11 +361,6 @@ internal class NivaraVaultIndexRepository(
         val itemId = newItemId(existing.items)
             ?: return NivaraResult.Failure(VaultImportFailure.DuplicateItemId)
         val contentStorage = contentStorageFactory(location)
-
-        // A source that gives more than the bound allows is stopped here rather than filling the
-        // vault: the provider's declared size is not a promise, so the count is enforced while
-        // reading too.
-        val limited = LimitedSource(source, VaultImportFailure.MAXIMUM_SOURCE_BYTES)
 
         var plaintextBytes = 0L
         val write = contentStorage.writeObject(itemId) { output ->
@@ -598,7 +600,8 @@ internal class NivaraVaultIndexRepository(
  *
  * A wrapper rather than a check somewhere in the loop: every read the encryption service makes goes
  * through it, so the bound cannot be forgotten by a caller and a provider that misreports its size
- * stops the import instead of filling the vault.
+ * stops the import instead of filling the vault. The declared size never decides how much is read —
+ * it is a claim, and this is the fact.
  */
 private class LimitedSource(
     private val delegate: VaultContentSource,
@@ -621,39 +624,4 @@ private class LimitedSource(
     }
 
     override suspend fun close() = delegate.close()
-}
-
-/**
- * The ciphertext sink, reporting a refused write as the failure it is.
- *
- * Writing to the platform's own stream is the one place where a failure means "the destination would
- * not take this byte" rather than anything cryptographic. Saying so keeps the import's failure
- * accurate — a full or removed destination is not a failed authentication — and it keeps a raw
- * platform exception from travelling upwards as an unnamed error.
- */
-private class WriteFailureReportingSink(private val delegate: OutputStream) : OutputStream() {
-
-    override fun write(byte: Int) {
-        try {
-            delegate.write(byte)
-        } catch (refused: IOException) {
-            throw VaultImportException(VaultImportFailure.WriteFailed)
-        }
-    }
-
-    override fun write(buffer: ByteArray, offset: Int, length: Int) {
-        try {
-            delegate.write(buffer, offset, length)
-        } catch (refused: IOException) {
-            throw VaultImportException(VaultImportFailure.WriteFailed)
-        }
-    }
-
-    override fun flush() {
-        try {
-            delegate.flush()
-        } catch (refused: IOException) {
-            throw VaultImportException(VaultImportFailure.WriteFailed)
-        }
-    }
 }
