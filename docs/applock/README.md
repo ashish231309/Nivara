@@ -554,7 +554,11 @@ There is exactly one window, owned by one component, and its state is an explici
 * If Android removes the window itself (for example the user revoked the permission), the surface
   reports the requirement as one that could not be presented and the presenter publishes
   `Unpresentable` with `OverlayUnavailability.Failed`. It does not re-attach in a loop: the
-  requirement stays visible as a failure and the next occasion tries again.
+  requirement stays reported as a failure, and the next occasion — leaving the application and
+  coming back — is what tries again. The same holds when the window manager refuses the very first
+  attach. A requirement that could not be shown *for want of the capability* is the one case that is
+  re-checked on every wake-up, because granting it in Android's settings is possible without leaving
+  the application.
 * Leaving the surface — the explicit "leave this application" action or the Back gesture — sends the
   user to the device's home screen with `ACTION_MAIN`/`CATEGORY_HOME`. The protected application is
   not opened or bypassed by the surface, and no application-launching intent is used. The surface is
@@ -613,7 +617,17 @@ still current:
   success obtained for one application cannot open the gate for a different situation.
 * A→B races cannot unlock B: B's request has a different identity, and A's late result no longer
   matches.
-* Only one attempt can run per request at a time, so a second tap cannot start two verifications.
+* The identity alone is not enough, and the code does not pretend otherwise. Reconciliation is
+  deliberately serialised behind a running attempt — one decision at a time — so a user who moved on
+  mid-attempt would still be described by the old request at the moment the result arrives. The
+  result is therefore also checked against detection's own current answer, which is not serialised
+  behind anything: if detection now says a different application needs authentication, the attempt's
+  answer is dropped however the published state reads. If detection cannot answer at all, nothing
+  says the user moved and the requirement is still the one on screen, so the attempt stands; if
+  protection has been stopped, the occasion is over and the answer opens nothing.
+* Admission to an attempt is taken synchronously, before any work is scheduled, so a second tap while
+  an attempt is running is refused there and then rather than queued behind the first and started
+  when it finishes. The input of a refused attempt is cleared without reaching the credential layer.
 
 The identity lives in memory only, is never persisted and is never written anywhere.
 

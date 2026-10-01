@@ -336,6 +336,33 @@ class AppLockOverlayPresenterTest {
         assertTrue("the current requirement must survive an old failure", presenter.state.value is AppLockOverlayState.Required)
     }
 
+    @Test
+    fun `a window the platform refused is not re-attempted on every wake-up`() = runTest {
+        val monitor = FakeMonitor()
+        val presenter = presenter(scope = backgroundScope, monitor = monitor)
+
+        presenter.start()
+        requireProtection(monitor)
+        runCurrent()
+        val request = (presenter.state.value as AppLockOverlayState.Required).request
+
+        presenter.onSurfaceFailed(request.id)
+        runCurrent()
+
+        // Detection speaks again about the same occasion. The capability is granted, so the old
+        // retry rule would have returned the requirement to Required and had the window owner try to
+        // attach again on every wake-up: exactly the re-attachment loop this design refuses.
+        monitor.reannounce()
+        runCurrent()
+
+        assertEquals(
+            "the refusal must stand until the next occasion",
+            OverlayUnavailability.Failed,
+            (presenter.state.value as AppLockOverlayState.Unpresentable).reason,
+        )
+        assertEquals(request, (presenter.state.value as AppLockOverlayState.Unpresentable).request)
+    }
+
     // ------------------------------------------------------------------ primary credential
 
     @Test

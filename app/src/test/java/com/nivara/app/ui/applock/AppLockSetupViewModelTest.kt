@@ -252,7 +252,12 @@ class AppLockSetupViewModelTest {
 
     @Test
     fun `the overlay capability is loaded into the ready state`() = runTest {
-        val model = viewModel(overlay = FakeOverlayCapabilityRepository(OverlayCapability.NotGranted))
+        val model = viewModel(
+            // Usage Access is granted, so the overlay permission is the one thing missing and the
+            // summary has to name it.
+            usage = FakeUsageAccessRepository(UsageAccessStatus.Granted),
+            overlay = FakeOverlayCapabilityRepository(OverlayCapability.NotGranted),
+        )
 
         val state = readyState(model)
 

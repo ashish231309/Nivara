@@ -100,6 +100,16 @@ class AppLockOverlayPresenter(
     private var nextRequestId: Long = 0L
 
     /**
+     * The request whose attempt is in flight, or `null` when none is.
+     *
+     * Admission happens synchronously, before any coroutine is launched: a second tap while an
+     * attempt is running is refused there and then rather than queued behind the first one. Queuing
+     * would let the second attempt start the moment the first finishes — two verifications for one
+     * tap each, and a phase that never protected anything.
+     */
+    private var attemptInFlight: Long? = null
+
+    /**
      * Starts following detection and the session.
      *
      * Idempotent: a second call while the presenter is running changes nothing.
@@ -149,32 +159,48 @@ class AppLockOverlayPresenter(
      */
     fun submitCredential(requestId: Long, input: CredentialInput) {
         val runGeneration = synchronized(lifecycleLock) { generation }
+        if (!admitAttempt(requestId)) {
+            // An attempt is already running. The input belongs to the credential layer the moment it
+            // is handed over, and one that is refused here has touched nothing, so it is cleared
+            // here rather than left in memory.
+            input.clear()
+            return
+        }
         scope.launch {
-            reconcileLock.withLock {
-                val current = startableAttemptFor(requestId)
-                if (current == null) {
-                    input.clear()
-                    return@withLock
+            try {
+                reconcileLock.withLock {
+                    val current = currentRequiredFor(requestId)
+                    if (current == null) {
+                        // The occasion ended between the tap and this coroutine running.
+                        input.clear()
+                        return@withLock
+                    }
+                    publish(runGeneration, current.copy(phase = AppLockPhase.Authenticating, lastAttempt = null))
+
+                    val outcome = credentialManager.verify(input)
+
+                    // The result may be used only while this request is still the current one *and*
+                    // detection still says the same application needs authentication. The second
+                    // check is not redundant: reconciliation is serialised behind this attempt, so a
+                    // user who moves on mid-attempt would otherwise be seen here as somebody who has
+                    // not moved at all.
+                    val latest = currentRequiredFor(requestId)
+                    if (latest == null || !attemptStillAppliesTo(latest.request)) return@withLock
+                    sessionManager.establish(outcome)
+                    publish(
+                        runGeneration,
+                        if (outcome is AuthenticationOutcome.Succeeded) {
+                            AppLockOverlayState.Idle
+                        } else {
+                            latest.copy(
+                                phase = AppLockPhase.AwaitingCredential,
+                                lastAttempt = ProtectionAttemptOutcome.Credential(outcome),
+                            )
+                        },
+                    )
                 }
-                publish(runGeneration, current.copy(phase = AppLockPhase.Authenticating, lastAttempt = null))
-
-                val outcome = credentialManager.verify(input)
-
-                // The request may have been superseded while the credential was being derived. A
-                // result for a request that is no longer current opens nothing.
-                val latest = currentRequiredFor(requestId) ?: return@withLock
-                sessionManager.establish(outcome)
-                publish(
-                    runGeneration,
-                    if (outcome is AuthenticationOutcome.Succeeded) {
-                        AppLockOverlayState.Idle
-                    } else {
-                        latest.copy(
-                            phase = AppLockPhase.AwaitingCredential,
-                            lastAttempt = ProtectionAttemptOutcome.Credential(outcome),
-                        )
-                    },
-                )
+            } finally {
+                releaseAttempt(requestId)
             }
         }
     }
@@ -189,26 +215,32 @@ class AppLockOverlayPresenter(
      */
     fun authenticateWithBiometric(requestId: Long) {
         val runGeneration = synchronized(lifecycleLock) { generation }
+        if (!admitAttempt(requestId)) return
         scope.launch {
-            reconcileLock.withLock {
-                val current = startableAttemptFor(requestId) ?: return@withLock
-                publish(runGeneration, current.copy(phase = AppLockPhase.Authenticating, lastAttempt = null))
+            try {
+                reconcileLock.withLock {
+                    val current = currentRequiredFor(requestId) ?: return@withLock
+                    publish(runGeneration, current.copy(phase = AppLockPhase.Authenticating, lastAttempt = null))
 
-                val outcome = biometrics.authenticate()
+                    val outcome = biometrics.authenticate()
 
-                val latest = currentRequiredFor(requestId) ?: return@withLock
-                sessionManager.establish(outcome)
-                publish(
-                    runGeneration,
-                    if (outcome is BiometricAuthenticationOutcome.Succeeded) {
-                        AppLockOverlayState.Idle
-                    } else {
-                        latest.copy(
-                            phase = AppLockPhase.AwaitingCredential,
-                            lastAttempt = ProtectionAttemptOutcome.Biometric(outcome),
-                        )
-                    },
-                )
+                    val latest = currentRequiredFor(requestId)
+                    if (latest == null || !attemptStillAppliesTo(latest.request)) return@withLock
+                    sessionManager.establish(outcome)
+                    publish(
+                        runGeneration,
+                        if (outcome is BiometricAuthenticationOutcome.Succeeded) {
+                            AppLockOverlayState.Idle
+                        } else {
+                            latest.copy(
+                                phase = AppLockPhase.AwaitingCredential,
+                                lastAttempt = ProtectionAttemptOutcome.Biometric(outcome),
+                            )
+                        },
+                    )
+                }
+            } finally {
+                releaseAttempt(requestId)
             }
         }
     }
@@ -289,11 +321,17 @@ class AppLockOverlayPresenter(
         val existing = current.pendingRequest()
 
         if (existing != null && existing.application == application) {
-            // The same occasion. Only one thing can change: a requirement that could not be shown
-            // may have become showable, because the user granted the capability in Android's
-            // settings. Asking again costs one capability read and keeps a granted permission from
-            // requiring a restart.
+            // The same occasion. Only one thing can change here: a requirement that could not be
+            // shown for want of the capability may have become showable, because the user granted it
+            // in Android's settings without leaving the application. Asking again costs one
+            // capability read and saves a restart.
+            //
+            // A window the platform refused is deliberately not re-attempted on every wake-up. That
+            // would be the re-attachment loop this design refuses, and the occasions that do retry
+            // are the honest ones: the user leaving the application and coming back, or granting a
+            // capability that was missing.
             if (current is AppLockOverlayState.Unpresentable &&
+                current.reason != OverlayUnavailability.Failed &&
                 overlayCapability.status() == OverlayCapability.Granted
             ) {
                 publish(runGeneration, requiredState(existing, currentCredential(), currentBiometric()))
@@ -323,16 +361,41 @@ class AppLockOverlayPresenter(
         return if (current.request.id == requestId) current else null
     }
 
-    /**
-     * The state of [requestId] if an attempt may start for it.
-     *
-     * `null` covers both "this request is no longer current" and "an attempt is already running":
-     * one attempt at a time, so a second tap cannot run two verifications for the same request.
-     */
-    private fun startableAttemptFor(requestId: Long): AppLockOverlayState.Required? {
-        val current = currentRequiredFor(requestId) ?: return null
-        return if (current.phase == AppLockPhase.Authenticating) null else current
+    /** Takes the single attempt slot for [requestId], or reports that it is already taken. */
+    private fun admitAttempt(requestId: Long): Boolean = synchronized(lifecycleLock) {
+        if (attemptInFlight != null) return false
+        attemptInFlight = requestId
+        true
     }
+
+    /** Releases the slot if [requestId] still holds it. */
+    private fun releaseAttempt(requestId: Long) {
+        synchronized(lifecycleLock) {
+            if (attemptInFlight == requestId) attemptInFlight = null
+        }
+    }
+
+    /**
+     * `true` while detection still says [request] is the application that needs authentication.
+     *
+     * A result is used only for the situation it was started in, and the published request alone
+     * cannot prove that situation still exists: reconciliation waits behind the attempt, so a user
+     * who moved to another protected application while authenticating would still be described by
+     * the old request here. Detection's own answer is not serialised behind anything, which is
+     * exactly why it is the one consulted.
+     *
+     * When detection cannot answer at all ([AppLockState.Unavailable]) nothing says the user moved,
+     * and the requirement is still the one on screen, so the attempt stands. When protection has
+     * been stopped the occasion is over, and an answer to it opens nothing.
+     */
+    private fun attemptStillAppliesTo(request: ProtectionRequest): Boolean =
+        when (val monitored = monitor.state.value) {
+            is AppLockState.Monitoring ->
+                (monitored.decision as? ProtectionDecision.AuthenticationRequired)?.application ==
+                    request.application
+            is AppLockState.Unavailable -> true
+            AppLockState.Stopped -> false
+        }
 
     private fun requiredState(
         request: ProtectionRequest,
