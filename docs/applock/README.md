@@ -1,10 +1,11 @@
-# App Lock: discovery, preparation and detection
+# App Lock: discovery, preparation, detection and management
 
 This document records the platform decisions behind App Lock: what Nivara asks the system, what it
-declares in the manifest, what it decides, and what it deliberately does not do yet. It is the
-durable reference for the stages that follow, not a description of the UI.
+declares in the manifest, what it decides, what the user can configure, and what it deliberately
+does not do yet. It is the durable reference for the stages that follow, not a walkthrough of the
+screens.
 
-It covers three stages, in order:
+It covers four stages, in order:
 
 * **[Stage 6: discovery, permission setup and preparation](#stage-6-discovery-permission-setup-and-preparation)** —
   which applications exist, whether Usage Access is granted, and where the user changes that.
@@ -13,10 +14,13 @@ It covers three stages, in order:
 * **[Stage 8: the protection surface and authentication flow](#stage-8-the-protection-surface-and-authentication-flow)** —
   how a requirement is presented above another application, why that needs a declared permission,
   and how the authentication it asks for reaches the existing session.
+* **[Stage 9: choosing which applications are protected](#stage-9-choosing-which-applications-are-protected)** —
+  the settings screen: the applications the device has, what the stored set says about each of
+  them, search, ordering, and the rules under which the set may be changed.
 
-Stages 6 and 7 draw nothing. The surface that presents a requirement is this document's last
-chapter, and it is the only place Nivara asks Android for a way to appear above another
-application.
+Stages 6 and 7 draw nothing. The surface that presents a requirement is neither the first nor the
+last chapter to touch the screen, and it remains the only place Nivara asks Android for a way to
+appear above another application.
 
 # Stage 6: discovery, permission setup and preparation
 
@@ -670,3 +674,184 @@ documentation and by compiling against it — not by running it:
   not verified and not claimed.** The service that owns the surface remains stop-and-forget
   (`START_NOT_STICKY`); if the process is gone, nothing is drawing, and no mechanism available to
   Nivara changes that.
+
+# Stage 9: choosing which applications are protected
+
+## Scope of this stage
+
+App Lock already discovers applications, decides what needs authenticating, and presents the
+requirement. What was missing is the user's half: seeing the applications the device has, seeing
+which of them are protected, and changing that. This stage adds one screen — reachable from home,
+one tap from where App Lock's state is described — and nothing else. App hiding, a vault, scheduled
+locking, camouflage, usage statistics and OEM power workarounds are not part of it and are not
+described here.
+
+The screen shows:
+
+* what App Lock currently needs, and whether protection is running (the same aggregate and the same
+  component the preparation screen reports);
+* every application the device can launch, with the protection the stored set gives it;
+* a search field, a section control (all applications or only protected ones) and an ordering
+  control;
+* one action per row: protect, or stop protecting.
+
+It shows no usage information, no timings and no history, because none is collected.
+
+## The list comes from the existing discovery
+
+Rows are built from `ApplicationRepository`, the same launcher query Stage 6 introduced, with the
+same `<queries>` declaration and the same package-name identity rule. A label is what a row prints;
+a package name is what it acts on. A search matches what the domain's `ApplicationSearch` contract
+already says it matches — the label, or the package name — and nothing else.
+
+An application that disappears between discovery and drawing is not a crash and not a silent
+deletion: the row is rebuilt from the next read, and a change aimed at a package that is no longer
+in the catalogue is refused with a sentence saying so. Protection already stored for an application
+the device no longer has is **kept**, not pruned, and the count of those names is shown rather than
+left as a quiet disagreement between the list and the stored set.
+
+## One owner for the protected set
+
+The set of protected applications is stored in exactly one place: the repository Stage 7 introduced,
+which the detection service reads. This stage adds no `SettingsRepository`, no second protected-set
+file, no cache of ticked rows and no parallel state in the view model. The screen's list is a
+rendering of the last read; every change goes to the repository, and every change is followed by a
+fresh read, so the row shows what is stored rather than what was asked for. A repository that
+accepted a write and still reports the application as unprotected is drawn as unprotected.
+
+The repository keeps responsibility for the protected set only. Search, ordering, sections, the
+icon, the session and the readiness answers live above it, and none of them is a second source of
+truth for what is protected.
+
+## What a row is allowed to claim
+
+A row answers "is this application protected right now?", which is not the same question as "is
+this package name in the stored set?". The state is derived from two independent answers every time
+the list is built — the stored set, and whether the capabilities that present a requirement are in
+place:
+
+* **not protected** — the application is not in the stored set;
+* **protected** — it is in the stored set, and the capabilities are granted;
+* **protected, but unavailable** — it is in the stored set and a capability is missing, so it
+  cannot actually be protected at the moment;
+* **unknown** — the stored set could not be read, so the row claims neither.
+
+The third value exists because the alternative is a tick that lies: a user who protected an
+application and then revoked the overlay grant has done everything Nivara asked and is still not
+protected. The fourth exists because an unreadable configuration is not an empty one — the failure
+the storage layer is deliberately built to fail closed against. When the set cannot be read, the
+list draws no protection claim at all, the count of protected applications is not invented, the
+protected section cannot be listed, and a change is refused; nothing about the file is overwritten
+because the screen could not read it.
+
+Every state is written out in words next to its control as well as reflected in the control's
+label, so no state depends on colour.
+
+## Search
+
+Searching is `ApplicationSearch`, unchanged from Stage 6: the query is trimmed and matched
+case-insensitively against the label and the package name, an empty query returns everything, and a
+query that matches nothing is its own answer — not an empty device. Filtering happens in the view
+model over the last read; it performs no repository call, writes nothing, uses no network and never
+touches the stored protected set. The query is a filter, not a source of truth, and a refresh keeps
+it.
+
+## Ordering
+
+Two orderings are offered: the domain's default comparator (label, case-insensitively, with the
+package name breaking ties) and its exact reverse. Both come from `ApplicationOrdering`; there is no
+second comparison rule and no per-screen sorting logic. Identical labels keep a fixed sequence in
+both directions because the whole comparator — including the tie-breaker — is reversed, so the same
+device always produces the same list.
+
+There is deliberately no "recently used", "suggested" or frequency-based order. Nivara keeps no
+usage history, and a ranking would require either collecting one or inventing one. Sorting is a
+rendering decision: it never writes to the repository and never changes what is protected.
+
+## Readiness and prerequisites
+
+The screen reports the same readiness the preparation screen does, and reports it without collapsing
+it into one flag:
+
+* **which capabilities are missing**, named individually, from the same aggregate
+  (`AppLockSetupState`) and the same `UsageAccessRepository`/`OverlayCapabilityRepository` answers
+  Stage 6 and Stage 8 introduced. The screen checks no permission itself, and opens no settings
+  screen itself: the preparation screen is one tap away and remains the place where a grant is
+  explained and requested.
+* **whether protection is running**, read from the component that owns protection
+  (`AppLockMonitor`), in its own three values — stopped, running, running without a decision.
+* **what is stored**, as a count, or as an explicit statement that it could not be read.
+
+A capability that could not be *read* counts as missing, never as granted. Missing capabilities
+never turn a protected application into an unprotected one, and never turn a stored configuration
+into an empty one.
+
+## Changing the set requires a session
+
+Opening the list needs no authentication. It shows the same applications the device's launcher
+already shows to anyone holding the phone, and requiring a password to look at it would add
+friction without adding protection.
+
+Changing it does. Unprotecting an application is the one action that can undo App Lock for that
+application, and anyone holding an unlocked phone could otherwise remove the application from the
+set and then open it. Every change therefore goes through the existing `SessionManager`: the action
+is refused while the gate is closed, and the screen offers the existing credential or biometric flow
+— the already-built screens — as the way to open it.
+
+This is the whole policy, and it is deliberately not more than this:
+
+* **no App Lock password.** There is one credential in Nivara, and one place that verifies it.
+* **no second session.** The screen never creates, extends or holds one. It asks the gate whether it
+  is open, and the gate is the same object Quick Lock and the surface already use.
+* **no session extension from looking around.** Searching, scrolling, sorting and switching sections
+  never touch the session's expiry. The gate closes on its own terms; the screen's controls follow
+  it, including while it is open.
+* **no per-application unlock state.** Whether an application may be opened is decided by detection
+  from the foreground application and the session, exactly as before this stage.
+
+A write is rejected while one is already in flight, so two rapid taps cannot produce two writes, and
+a refusal is reported in words rather than in a control that appears to have worked.
+
+## Refresh behaviour
+
+The screen reads when it is created, whenever it is resumed — which is how a return from Android's
+own settings is noticed — and after every change. It does not poll, does not restart the detection
+service after a change, and does not ask the service to refresh: the service reads the same
+repository, so the next observation already sees the new set. A failed refresh keeps the list that
+was already drawn; a failure of the first read is the screen's retryable error state, and neither
+one touches stored protection.
+
+## Icons
+
+A row draws the application's icon when the device can produce one, through the platform's own
+facilities only: the application record and its icon resource, scaled to the size the row needs.
+The loader lives in the data layer, never throws, and returns nothing for a package that has
+disappeared or an icon that cannot be read; the row then draws a neutral placeholder. Nothing about
+an icon is persisted or copied, no image library was added, and the icon is never an identity: the
+label is what identifies the row, the icon carries no content description of its own, and the action
+acts on the package name.
+
+## Accessibility
+
+The list is usable with touch and with a screen reader: the section and ordering controls are an
+exclusive group whose options announce their state, the search field carries a label, each row's
+protection state is text rather than a colour, and each row's action describes what it will do to
+which application ("Protect Camera", "Stop protecting Camera") rather than only naming a verb. A row
+whose state cannot be read says so and offers no action, so nothing can be confirmed that Nivara
+cannot confirm.
+
+## What is not verified here (Stage 9)
+
+The same boundary as every earlier stage applies, and this chapter is honest about it:
+
+* **No device or emulator was available.** Nothing in this stage ran on Android. The claims about
+  icons, lists and settings are claims about the platform's documented behaviour, asserted by
+  compilation.
+* **The instrumented tests are compiled, not executed.** The suites that need a device are built by
+  CI (`assembleDebugAndroidTest`); a build is not a run.
+* **Icons were never rendered.** `applicationInfo`, `loadIcon` and the density conversion are
+  compiled, and the missing-icon path is the only path a JVM test can exercise.
+* **No permission was granted or revoked**, and no return from Android's settings screen was
+  observed; the refresh-on-resume path is covered by JVM tests with fake repositories.
+* **Navigation, layout and talkback behaviour were not seen.** The composition of the screen runs
+  only when the application is launched on a device.

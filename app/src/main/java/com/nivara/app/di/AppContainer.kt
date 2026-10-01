@@ -7,8 +7,9 @@ import com.nivara.app.data.credential.NivaraCredentialManager
 import com.nivara.app.data.credential.PersistedAttemptTracker
 import com.nivara.app.data.biometric.AndroidBiometricAuthenticator
 import com.nivara.app.data.biometric.BiometricTokenStore
-import com.nivara.app.data.credential.SystemTimeProvider
+import com.nivara.app.data.app.AndroidApplicationIconLoader
 import com.nivara.app.data.app.AndroidApplicationRepository
+import com.nivara.app.data.credential.SystemTimeProvider
 import com.nivara.app.data.applock.AndroidAppLockProtectionRunner
 import com.nivara.app.data.applock.AndroidForegroundApplicationDetector
 import com.nivara.app.data.applock.FileProtectedApplicationRepository
@@ -46,6 +47,7 @@ import com.nivara.app.domain.security.RecoveryKeyEnvelopeService
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.security.SessionTimeoutPolicy
 import com.nivara.app.domain.security.SecureRandomGenerator
+import com.nivara.app.ui.applock.management.ApplicationIconLoader
 import com.nivara.app.ui.applock.overlay.AppLockSurfaceController
 import com.nivara.app.ui.applock.overlay.WindowManagerOverlaySurface
 import java.io.File
@@ -166,6 +168,16 @@ interface AppContainer {
      * presentation layer: the domain defines when a surface is needed, the UI knows how to draw one.
      */
     val appLockOverlayHost: AppLockOverlayHost
+
+    /**
+     * Supplies the image a management row draws for an application.
+     *
+     * An icon is presentation: the platform produces it, the screen draws it, and nothing about
+     * protection depends on it. The container chooses the platform implementation; the presentation
+     * layer only asks for a bitmap, which is why the contract lives with the screen that uses it
+     * and this property is the only place the two meet.
+     */
+    val applicationIconLoader: ApplicationIconLoader
 
     /**
      * Turns protection on and off for the device.
@@ -303,6 +315,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val appLockProtectionRunner: AppLockProtectionRunner by lazy {
         AndroidAppLockProtectionRunner(applicationContext)
+    }
+
+    override val applicationIconLoader: ApplicationIconLoader by lazy {
+        AndroidApplicationIconLoader(applicationContext)
     }
 
     override val appLockMonitor: AppLockMonitor by lazy {

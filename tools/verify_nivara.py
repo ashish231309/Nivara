@@ -536,13 +536,30 @@ for path in sorted((ROOT / "app/src/main/java/com/nivara/app/ui").rglob("*.kt"))
         if forbidden in text:
             err(f"{path.relative_to(ROOT)}: platform capability used from the UI layer ({forbidden})")
 
-# The preparation screen is a sensitive screen: it must use the one screenshot-protection
-# implementation, and that implementation must stay the only one.
+# App Lock screens list the device's applications, which Android treats as personal data, so each
+# of them applies the project's single screenshot-protection implementation. The check is written
+# over the screens rather than over one filename, so a screen added later has to opt in the same way.
 setup_screen = ROOT / "app/src/main/java/com/nivara/app/ui/applock/AppLockSetupScreen.kt"
 if not setup_screen.exists():
     err("the App Lock preparation screen is missing")
-elif "SecureScreenEffect()" not in setup_screen.read_text():
-    err("the App Lock preparation screen does not apply SecureScreenEffect()")
+applock_screens = sorted((ROOT / "app/src/main/java/com/nivara/app/ui/applock").rglob("*Screen.kt"))
+if not applock_screens:
+    err("no App Lock screen was found")
+for path in applock_screens:
+    if "SecureScreenEffect()" not in path.read_text():
+        err(f"{path.relative_to(ROOT)}: an App Lock screen must apply SecureScreenEffect()")
+
+# The protected set has exactly one owner, and it is under data/applock. The App Lock UI reads and
+# writes it through the repository contract, so nothing here may reach for the storage helper, the
+# codec or a store of its own: a second store would be a second answer to "what is protected?".
+for path in sorted((ROOT / "app/src/main/java/com/nivara/app/ui/applock").rglob("*.kt")):
+    text = strip_comments(path.read_text())
+    for forbidden in ("AtomicFiles", "ProtectedApplicationCodec", "FileProtectedApplicationRepository",
+                      "SharedPreferences", "DataStore", "RoomDatabase", "openFileOutput",
+                      "FileOutputStream"):
+        if forbidden in text:
+            err(f"{path.relative_to(ROOT)}: {forbidden} — the App Lock UI goes through the "
+                f"protected-application repository, never storage of its own")
 # Screenshot protection has exactly two sanctioned implementations, and no third: the composable
 # effect that flags the activity window, and the window configuration of the App Lock protection
 # surface, which is not an activity and therefore cannot use the effect.
@@ -649,6 +666,20 @@ else:
 
 notes.append(f"security review: {len(security_sources)} security sources, {len(contracts)} contracts wired")
 notes.append(f"app lock review: {len(applock_contracts)} contracts wired ({', '.join(applock_contracts)})")
+
+# Every declared destination must be registered in the navigation graph: a destination with no
+# composable is a route nobody can reach, and nothing at runtime says so until it is navigated to.
+destination_source = (ROOT / "app/src/main/java/com/nivara/app/ui/navigation/NivaraDestination.kt").read_text()
+graph_source = (ROOT / "app/src/main/java/com/nivara/app/ui/navigation/NivaraNavHost.kt").read_text()
+declared_destinations = re.findall(r"data object (\w+)\s*:\s*NivaraDestination", destination_source)
+if not declared_destinations:
+    err("no navigation destinations were found to check against the graph")
+for name in declared_destinations:
+    # Being referred to is not being registered: a destination is reachable when the graph has a
+    # composable for its route, so that is what is required. (Replacing only the composable line
+    # would otherwise leave a navigation call elsewhere in the file satisfying a looser check.)
+    if f"composable(route = NivaraDestination.{name}.route)" not in graph_source:
+        err(f"destination '{name}' is declared but has no composable in the navigation graph")
 
 # documentation that the code refers to must exist
 for doc in ("docs/crypto/envelope-format.md", "docs/crypto/README.md", "tools/crypto_reference.py"):

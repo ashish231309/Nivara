@@ -107,8 +107,13 @@ private fun PackageManager.launcherActivities(): List<ResolveInfo> {
     }
 }
 
-/** The application record for [packageName]. Throws `NameNotFoundException` if it is gone. */
-private fun PackageManager.applicationInfo(packageName: String): ApplicationInfo =
+/**
+ * The application record for [packageName]. Throws `NameNotFoundException` if it is gone.
+ *
+ * Shared with the icon loader in this package: both need the same record and the same API-33 flag
+ * handling, and one helper is better than two that could drift apart.
+ */
+internal fun PackageManager.applicationInfo(packageName: String): ApplicationInfo =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         getApplicationInfo(packageName, PackageManager.ApplicationInfoFlags.of(0L))
     } else {

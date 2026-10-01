@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.nivara.app.ui.about.AboutRoute
 import com.nivara.app.ui.applock.AppLockSetupRoute
+import com.nivara.app.ui.applock.management.AppLockManagementRoute
 import com.nivara.app.ui.biometric.BiometricRoute
 import com.nivara.app.ui.credential.CredentialChangeRoute
 import com.nivara.app.ui.credential.CredentialSetupRoute
@@ -37,7 +38,7 @@ fun NivaraNavHost(
                 onOpenCredentialVerify = { navController.navigateTo(NivaraDestination.CredentialVerify) },
                 onOpenCredentialChange = { navController.navigateTo(NivaraDestination.CredentialChange) },
                 onOpenBiometric = { navController.navigateTo(NivaraDestination.Biometric) },
-                onOpenAppLockSetup = { navController.navigateTo(NivaraDestination.AppLockSetup) },
+                onOpenAppLock = { navController.navigateTo(NivaraDestination.AppLock) },
             )
         }
         composable(route = NivaraDestination.About.route) {
@@ -61,6 +62,15 @@ fun NivaraNavHost(
         }
         composable(route = NivaraDestination.AppLockSetup.route) {
             AppLockSetupRoute()
+        }
+        composable(route = NivaraDestination.AppLock.route) {
+            AppLockManagementRoute(
+                // Preparation is where a missing capability is explained and changed, and the
+                // credential screen is the one place a session is opened. Neither is reimplemented
+                // here: both are the existing screens.
+                onOpenPreparation = { navController.navigateTo(NivaraDestination.AppLockSetup) },
+                onUnlock = { navController.navigateTo(NivaraDestination.CredentialVerify) },
+            )
         }
     }
 }

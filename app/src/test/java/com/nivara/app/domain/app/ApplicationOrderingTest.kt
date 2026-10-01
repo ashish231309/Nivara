@@ -87,6 +87,66 @@ class ApplicationOrderingTest {
     }
 
     @Test
+    fun `the reverse direction mirrors the default one`() {
+        val applications = listOf(
+            InstalledApplication("com.example.camera", "Camera"),
+            InstalledApplication("com.example.notes", "Notes"),
+            InstalledApplication("com.example.alarm", "Alarm"),
+        )
+
+        assertEquals(
+            applications.inDefaultApplicationOrder().reversed(),
+            applications.inReverseApplicationOrder(),
+        )
+    }
+
+    @Test
+    fun `the reverse direction also orders identical labels by package name`() {
+        val applications = listOf(
+            InstalledApplication("com.zeta.notes", "Notes"),
+            InstalledApplication("com.alpha.notes", "Notes"),
+        )
+
+        // The comparator is reversed whole, so the tie-breaker reverses with it: identical labels
+        // still come out in a fixed sequence, which is what keeps the order total.
+        assertEquals(
+            listOf("com.zeta.notes", "com.alpha.notes"),
+            applications.inReverseApplicationOrder().map { it.packageName },
+        )
+    }
+
+    @Test
+    fun `labels are compared case-insensitively in the reverse direction too`() {
+        val applications = listOf(
+            InstalledApplication("com.example.zebra", "Zebra"),
+            InstalledApplication("com.example.apple", "apple"),
+            InstalledApplication("com.example.banana", "banana"),
+        )
+
+        assertEquals(
+            listOf("Zebra", "banana", "apple"),
+            applications.inReverseApplicationOrder().map { it.label },
+        )
+    }
+
+    @Test
+    fun `reverse sorting leaves the receiver untouched`() {
+        val applications = listOf(
+            InstalledApplication("com.example.notes", "Notes"),
+            InstalledApplication("com.example.alarm", "Alarm"),
+        )
+
+        applications.inReverseApplicationOrder()
+
+        assertEquals(listOf("Notes", "Alarm"), applications.map { it.label })
+    }
+
+    @Test
+    fun `an empty list stays empty in the reverse direction`() {
+        assertTrue(emptyList<InstalledApplication>().inReverseApplicationOrder().isEmpty())
+    }
+
+    @Test
     fun `the comparator agrees with the list helper`() {
         val applications = listOf(
             InstalledApplication("com.example.b", "same"),

@@ -56,12 +56,23 @@ sealed interface NivaraDestination {
     }
 
     /**
-     * App Lock preparation: what Nivara can see on the device, and the Usage Access capability it
-     * needs before apps can be locked. The App Lock screen itself is a later destination.
+     * App Lock preparation: what Nivara can see on the device, which capabilities it holds, and
+     * whether protection is running.
      */
     data object AppLockSetup : NivaraDestination {
         override val route: String = "applock-setup"
         override val titleRes: Int = R.string.applock_setup_title
+    }
+
+    /**
+     * App Lock itself: the applications that are protected, and the controls that change that.
+     *
+     * Preparation is a prerequisite screen rather than the feature, so the entry point the home
+     * screen offers leads here; preparation is reached from this screen when something is missing.
+     */
+    data object AppLock : NivaraDestination {
+        override val route: String = "applock"
+        override val titleRes: Int = R.string.applock_manage_title
     }
 
     companion object {
@@ -71,7 +82,7 @@ sealed interface NivaraDestination {
          * Add the new entry here together with its `composable` block in `NivaraNavHost`.
          */
         val entries: List<NivaraDestination> =
-            listOf(Home, About, CredentialSetup, CredentialVerify, CredentialChange, Biometric, AppLockSetup)
+            listOf(Home, About, CredentialSetup, CredentialVerify, CredentialChange, Biometric, AppLockSetup, AppLock)
 
         /** Resolves a navigation route back to its destination, or `null` when unknown. */
         fun fromRoute(route: String?): NivaraDestination? = entries.firstOrNull { it.route == route }

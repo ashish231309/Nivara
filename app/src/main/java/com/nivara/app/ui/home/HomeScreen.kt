@@ -45,7 +45,7 @@ fun HomeRoute(
     onOpenCredentialVerify: () -> Unit,
     onOpenCredentialChange: () -> Unit,
     onOpenBiometric: () -> Unit,
-    onOpenAppLockSetup: () -> Unit,
+    onOpenAppLock: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
@@ -60,7 +60,7 @@ fun HomeRoute(
         onOpenCredentialVerify = onOpenCredentialVerify,
         onOpenCredentialChange = onOpenCredentialChange,
         onOpenBiometric = onOpenBiometric,
-        onOpenAppLockSetup = onOpenAppLockSetup,
+        onOpenAppLock = onOpenAppLock,
         modifier = modifier,
     )
 }
@@ -78,7 +78,7 @@ fun HomeScreen(
     onOpenCredentialVerify: () -> Unit,
     onOpenCredentialChange: () -> Unit,
     onOpenBiometric: () -> Unit,
-    onOpenAppLockSetup: () -> Unit,
+    onOpenAppLock: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -96,7 +96,7 @@ fun HomeScreen(
             onOpenCredentialVerify = onOpenCredentialVerify,
             onOpenCredentialChange = onOpenCredentialChange,
             onOpenBiometric = onOpenBiometric,
-            onOpenAppLockSetup = onOpenAppLockSetup,
+            onOpenAppLock = onOpenAppLock,
             modifier = modifier,
         )
     }
@@ -115,7 +115,7 @@ private fun HomeContent(
     onOpenCredentialVerify: () -> Unit,
     onOpenCredentialChange: () -> Unit,
     onOpenBiometric: () -> Unit,
-    onOpenAppLockSetup: () -> Unit,
+    onOpenAppLock: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -162,7 +162,7 @@ private fun HomeContent(
             onOpenBiometric = onOpenBiometric,
         )
 
-        AppLockCard(onOpenAppLockSetup = onOpenAppLockSetup)
+        AppLockCard(onOpenAppLock = onOpenAppLock)
 
         Button(onClick = onOpenAbout) {
             Text(text = stringResource(id = R.string.home_about_action))
@@ -314,14 +314,16 @@ private fun SessionCard(
 }
 
 /**
- * The way into App Lock preparation.
+ * The way into App Lock.
  *
- * It reports nothing about App Lock's state — the preparation screen owns that — and it promises
- * nothing: the entry point says what the screen checks, not that locking works yet.
+ * The card states what the feature does, and it leads to the screen where the protected
+ * applications are chosen rather than to a promise that locking works: protection is only as good
+ * as the capabilities the user has granted, and the screen behind this card says which of them are
+ * in place.
  */
 @Composable
 private fun AppLockCard(
-    onOpenAppLockSetup: () -> Unit,
+    onOpenAppLock: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -329,7 +331,7 @@ private fun AppLockCard(
             title = stringResource(id = R.string.home_applock_title),
             body = stringResource(id = R.string.home_applock_summary),
         )
-        OutlinedButton(onClick = onOpenAppLockSetup, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = onOpenAppLock, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(id = R.string.home_applock_action))
         }
     }
@@ -376,7 +378,7 @@ private fun HomeScreenReadyPreview() {
             onOpenCredentialVerify = {},
             onOpenCredentialChange = {},
             onOpenBiometric = {},
-            onOpenAppLockSetup = {},
+            onOpenAppLock = {},
         )
     }
 }
@@ -403,7 +405,7 @@ private fun HomeScreenConfiguredPreview() {
             onOpenCredentialVerify = {},
             onOpenCredentialChange = {},
             onOpenBiometric = {},
-            onOpenAppLockSetup = {},
+            onOpenAppLock = {},
         )
     }
 }
@@ -421,7 +423,7 @@ private fun HomeScreenErrorPreview() {
             onOpenCredentialVerify = {},
             onOpenCredentialChange = {},
             onOpenBiometric = {},
-            onOpenAppLockSetup = {},
+            onOpenAppLock = {},
         )
     }
 }

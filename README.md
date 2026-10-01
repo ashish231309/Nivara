@@ -13,8 +13,8 @@ frameworks, and no dependencies that are not justified by code that exists.
 The repository contains the **foundation release**, the **cryptographic core**, **primary
 credential enrolment**, **biometric unlock as a secondary path**, the **session layer** and the
 **App Lock layer** — launcher discovery, the two Android capabilities it needs, foreground
-detection, and the protection surface that presents the requirement and routes authentication into
-the session.
+detection, the protection surface that presents the requirement and routes authentication into the
+session, and the settings screen that chooses which applications are protected.
 
 What works today:
 
@@ -34,6 +34,10 @@ What works today:
 - the App Lock protection surface: one secure window above the protected application, its
   authentication routed through the existing credential and biometric layers into the existing
   session, with the requirement bound to the application it was raised for;
+- the App Lock settings screen: the applications the device can launch with the protection the
+  stored set gives each of them, search and two orderings, and protect/unprotect through the same
+  repository detection reads — a change requiring a valid session, reading the list requiring
+  none;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
@@ -42,8 +46,8 @@ Biometric unlock never replaces the primary credential and never unlocks anythin
 the session is not one either: it is an authorization state held only while the process lives, and
 it holds no credential, no key and nothing on disk. Detection decides and publishes; the surface
 that presents a requirement is separate from it, holds no credential of its own and can do exactly
-one thing with an authentication result — hand it to the session gate. There is still no App Lock
-settings screen, no app hiding, no vault and no recovery flow — those are the stages that follow,
+one thing with an authentication result — hand it to the session gate. There is still no app
+hiding, no vault and no recovery flow — those are the stages that follow,
 and they consume the layers
 described in [`docs/crypto/README.md`](docs/crypto/README.md),
 [`docs/credential/README.md`](docs/credential/README.md),
@@ -108,6 +112,7 @@ app/src/main/java/com/nivara/app/
     ├── credential/             Enrolment, verification and change screens
     ├── biometric/              Biometric settings, state and view model
     ├── applock/                App Lock preparation screen, state and view model
+    │   ├── management/         Choosing which applications are protected
     │   └── overlay/            The protection window, its lifecycle and its content
     └── session/                Session text shared by the screens that show it
 ```
@@ -198,6 +203,13 @@ Lock raising a fresh requirement. The window's platform half — `WindowManager`
 overlay, the Back key and the home intent — is asserted by instrumented tests that are compiled but
 only run when a device is attached, and is declared unverified until then.
 
+The App Lock settings layer is covered the same way: the two orderings and their tie-breaker, the
+search rule, what a row may claim for an application in every combination of stored set and missing
+capability, and the screen's state machine — a discovery failure that never deletes protection, a
+stored set that cannot be read and is therefore never reported as empty, a change that is written
+through the repository and read back from it, a stale row that writes nothing, and the session
+policy that lets the list be read by anyone and a change be made only while the gate is open.
+
 Instrumented tests cover what only a device can prove: Android Keystore key generation,
 non-exportability, invalidation detection and use through a cipher, and that the biometric key
 refuses to produce output until Android has authorised a single operation. They are never simulated
@@ -216,6 +228,13 @@ Security behaviour is built into the project's defaults rather than added at the
   than `QUERY_ALL_PACKAGES`, and every permission has to be justified; the reasons are recorded in
   [`docs/applock/README.md`](docs/applock/README.md) and checked by the repository verifier, which
   refuses any permission added without them.
+- **One owner for the protected set, and one way in.** Which applications are protected lives in
+  exactly one place — the repository the detection service reads — and the settings screen reads and
+  writes through it rather than keeping a list of its own: no second store, no cached tick box, and
+  no separate App Lock password. Reading the list needs no session, because the device's launcher
+  already shows those applications to anyone holding the phone; changing the set needs a valid
+  session from the existing gate, opened through the existing credential or biometric flows, because
+  unprotecting an application is the one action that can undo App Lock for it.
 - **Detection without privileges it does not need.** The App Lock service is a plain, unexported
   started service: no foreground service, no notification and no accessibility service, and no
   battery-exemption request. Detector code holds no overlay window of its own — the very same

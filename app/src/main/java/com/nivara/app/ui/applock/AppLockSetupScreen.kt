@@ -33,7 +33,7 @@ import com.nivara.app.ui.components.NivaraMessageText
 import com.nivara.app.ui.credential.SecureScreenEffect
 import com.nivara.app.ui.theme.NivaraTheme
 
-/** How many applications the preparation screen previews. The App Lock list is a later stage. */
+/** How many applications the preparation screen previews. The App Lock screen has the full list. */
 private const val PREVIEW_LIMIT = 5
 
 /**

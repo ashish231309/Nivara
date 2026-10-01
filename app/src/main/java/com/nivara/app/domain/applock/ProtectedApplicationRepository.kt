@@ -16,8 +16,8 @@ import com.nivara.app.core.common.NivaraResult
  * unreadable, and its contract comment states the consequence.
  *
  * Adding and removing take one application at a time. Choosing many at once, searching and sorting
- * belong to the settings screen that will use this same contract; nothing here is a bulk operation
- * or a policy.
+ * belong to the settings screen that uses this same contract; nothing here is a bulk operation or a
+ * policy.
  */
 interface ProtectedApplicationRepository {
 

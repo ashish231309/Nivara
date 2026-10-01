@@ -14,8 +14,8 @@
     <string name="home_foundation_summary">This build contains the application shell only. Security modules are added in the releases that follow.</string>
     <string name="home_about_action">About Nivara</string>
     <string name="home_applock_title">App Lock</string>
-    <string name="home_applock_summary">Check what App Lock needs: the applications Nivara can see, and Android\'s Usage Access grant.</string>
-    <string name="home_applock_action">App Lock preparation</string>
+    <string name="home_applock_summary">Choose which applications need your credential, and check what App Lock still needs.</string>
+    <string name="home_applock_action">Choose protected applications</string>
 
     <!-- About -->
     <string name="about_title">About</string>
@@ -251,5 +251,45 @@
     <string name="applock_setup_protection_start_action">Turn on protection</string>
     <string name="applock_setup_protection_stop_action">Turn off protection</string>
     <string name="applock_setup_protection_failed">The device did not accept the change. Protection is not running.</string>
-    <string name="applock_setup_protection_note">Protection runs while Nivara is open and for as long as Android keeps its background service alive; Android stops background services on its own terms, and Nivara does not claim otherwise. Choosing which applications to protect comes next.</string>
+    <string name="applock_setup_protection_note">Protection runs while Nivara is open and for as long as Android keeps its background service alive; Android stops background services on its own terms, and Nivara does not claim otherwise.</string>
+<!-- App Lock management: choosing which applications are protected. -->
+    <string name="applock_manage_title">App Lock</string>
+    <string name="applock_manage_summary">Choose which applications need your credential before they open. Nivara watches for them while protection is running and shows its App Lock surface above the one you opened.</string>
+    <string name="applock_manage_ready">Nivara has everything App Lock needs.</string>
+    <string name="applock_manage_missing">App Lock still needs:</string>
+    <string name="applock_manage_missing_item">\u2022 %1$s</string>
+    <string name="applock_manage_counts">%1$d of %2$d discovered applications are set to be protected.</string>
+    <string name="applock_manage_not_installed">%1$d protected application(s) are not installed right now. They stay protected, and are covered again if they come back.</string>
+    <string name="applock_manage_protected_set_unreadable">Nivara cannot read which applications are protected, so no application\'s state is shown below. Nothing has been changed or removed.</string>
+    <string name="applock_manage_open_preparation">Open App Lock preparation</string>
+    <string name="applock_manage_locked">Unlock Nivara to change which applications are protected. You can look at the list without unlocking.</string>
+    <string name="applock_manage_unlock_action">Unlock Nivara</string>
+    <string name="applock_manage_search_label">Search applications</string>
+    <string name="applock_manage_section_label">Show</string>
+    <string name="applock_manage_section_all">All applications</string>
+    <string name="applock_manage_section_protected">Protected applications</string>
+    <string name="applock_manage_sort_label">Sort</string>
+    <string name="applock_manage_sort_name_ascending">Name A\u2013Z</string>
+    <string name="applock_manage_sort_name_descending">Name Z\u2013A</string>
+    <string name="applock_manage_state_protected">Protected</string>
+    <string name="applock_manage_state_not_protected">Not protected</string>
+    <string name="applock_manage_state_unavailable">Protected — Nivara cannot show the App Lock surface yet</string>
+    <string name="applock_manage_state_unknown">Protection state unavailable</string>
+    <string name="applock_manage_action_protect">Protect</string>
+    <string name="applock_manage_action_unprotect">Unprotect</string>
+    <string name="applock_manage_action_indeterminate">Unavailable</string>
+    <string name="applock_manage_action_protect_description">Protect %1$s</string>
+    <string name="applock_manage_action_unprotect_description">Stop protecting %1$s</string>
+    <string name="applock_manage_action_indeterminate_description">Protection state unavailable for %1$s</string>
+    <string name="applock_manage_empty_device">No launchable applications were found on this device.</string>
+    <string name="applock_manage_empty_search">No applications match your search.</string>
+    <string name="applock_manage_empty_protected">No applications are protected yet.</string>
+    <string name="applock_manage_empty_unreadable">Which applications are protected could not be read, so they cannot be listed.</string>
+    <string name="applock_manage_error_change_not_stored">Nivara could not store that change. Nothing was altered, and the list below shows the stored state.</string>
+    <string name="applock_manage_error_not_installed">That application is not installed any more. Nothing was changed, and the list has been refreshed.</string>
+    <string name="applock_manage_error_locked">Unlock Nivara before changing which applications are protected.</string>
+    <string name="applock_manage_error_discovery">Nivara could not read the device\'s applications this time. The list below is the last one it read; nothing about protection was changed.</string>
+    <string name="applock_manage_error_protected_set">Nivara could not read which applications are protected. Nothing was changed or removed.</string>
+    <string name="applock_manage_notice_changed">Protection saved. The list shows what is stored.</string>
 </resources>
+
