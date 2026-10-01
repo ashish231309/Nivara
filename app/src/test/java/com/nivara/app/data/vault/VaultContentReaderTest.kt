@@ -395,31 +395,38 @@ class VaultContentReaderTest {
     }
 
     @Test
-    fun `a content failure is a typed failure and never a thrown platform exception`() = runTest {
+    fun `a read that cannot be served raises the vault's own typed failure`() = runTest {
         val item = importFile("content".toByteArray(), name = "a.txt", mimeType = "text/plain")
         content.documents.remove(VaultContentNames.objectName(item.id))
 
-        val outcome = repository().withContent(item.id, item.sizeBytes, { true }) { handle ->
-            handle.read(ByteArray(4), 0, 4)
-            NivaraResult.Success(Unit)
+        // A handle is a cursor over bytes, so a piece that cannot be served raises rather than
+        // returning a result: the failure is the vault's own type — which is what the engines catch
+        // and map to a screen — and never a platform exception from storage.
+        val failure = try {
+            repository().withContent(item.id, item.sizeBytes, { true }) { handle ->
+                handle.read(ByteArray(4), 0, 4)
+                NivaraResult.Success(Unit)
+            }
+            null
+        } catch (typed: VaultContentException) {
+            typed.failure
         }
 
-        // The failure travels out of the block rather than crashing the caller: a viewer maps it to a
-        // screen, and a repository that let it escape would take the whole screen with it.
-        assertEquals(VaultContentFailure.ContentMissing, outcome.contentFailure())
+        assertEquals(VaultContentFailure.ContentMissing, failure)
     }
 
     @Test
     fun `reading the same item twice in a row works, and each read is independent`() = runTest {
         val bytes = "read me twice".toByteArray()
         val item = importFile(bytes, name = "twice.txt", mimeType = "text/plain")
+        val afterImport = keyAccess.borrows
 
         val first = readAll(item).valueOrFail()
         val second = readAll(item).valueOrFail()
 
         assertArrayEquals(bytes, first)
         assertArrayEquals(bytes, second)
-        assertEquals(2, keyAccess.borrows)
+        assertEquals("each read borrows the key for itself", afterImport + 2, keyAccess.borrows)
     }
 
     @Test

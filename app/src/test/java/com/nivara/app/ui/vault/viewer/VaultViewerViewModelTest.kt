@@ -56,6 +56,9 @@ class VaultViewerViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(mainDispatcher)
+        // The vault's own screens only read when the gate is open, so that is where every test starts
+        // from. The tests about the gate close it deliberately, through that gate's own lock.
+        counting.delegate.establish(AuthenticationOutcome.Succeeded)
     }
 
     @After
@@ -404,6 +407,7 @@ class VaultViewerViewModelTest {
 
     @Test
     fun `nothing is read when the gate is closed`() {
+        counting.delegate.lockNow()
         val viewer = viewModel()
         val clip = video()
 
@@ -419,6 +423,7 @@ class VaultViewerViewModelTest {
 
     @Test
     fun `a failed authentication does not open the item`() {
+        counting.delegate.lockNow()
         val viewer = viewModel()
         counting.delegate.establish(AuthenticationOutcome.Failed(blockedForMillis = 0L))
 
@@ -430,6 +435,7 @@ class VaultViewerViewModelTest {
 
     @Test
     fun `an item locked at open is opened again once the existing gate is open`() {
+        counting.delegate.lockNow()
         val viewer = viewModel()
         val clip = video()
         viewer.open(clip)
@@ -445,6 +451,7 @@ class VaultViewerViewModelTest {
 
     @Test
     fun `coming back to the screen reopens an item that was locked`() {
+        counting.delegate.lockNow()
         val viewer = viewModel()
         viewer.open(video())
 

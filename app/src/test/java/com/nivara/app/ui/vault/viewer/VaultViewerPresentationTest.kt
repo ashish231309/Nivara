@@ -101,8 +101,9 @@ class VaultViewerPresentationTest {
 
     @Test
     fun `every state that explains itself has something to say underneath`() {
+        // Opening is progress rather than an explanation: the screen draws its one line and the
+        // explanation card is never reached for it.
         for (state in listOf(
-            VaultViewerUiState.Opening(item()),
             VaultViewerUiState.Unsupported(item()),
             VaultViewerUiState.Missing(item()),
             VaultViewerUiState.Unreadable(item()),

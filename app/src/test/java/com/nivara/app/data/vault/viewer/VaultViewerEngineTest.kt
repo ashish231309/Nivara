@@ -20,6 +20,7 @@ import com.nivara.app.domain.vault.VaultItem
 import com.nivara.app.domain.vault.VaultItemId
 import com.nivara.app.domain.vault.VaultSourceReference
 import com.nivara.app.testing.valueOrFail
+import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -197,6 +198,24 @@ class VaultViewerEngineTest {
             com.nivara.app.domain.vault.VaultFailure.VaultUnreadable(
                 com.nivara.app.domain.vault.VaultUnreadableReason.KeyUnavailable,
             ).asContentFailure(),
+        )
+    }
+
+    @Test
+    fun `a typed failure a platform decoder wrapped is still named for what it is`() {
+        val wrapped = IOException(
+            "the encrypted object could not be read",
+            VaultContentException(VaultContentFailure.Corrupt),
+        )
+
+        assertEquals(
+            "bytes that did not authenticate are corruption, not storage",
+            VaultContentFailure.Corrupt,
+            wrapped.asViewerContentFailure(),
+        )
+        assertEquals(
+            VaultContentFailure.Unreadable,
+            IOException("no typed reason").asViewerContentFailure(),
         )
     }
 

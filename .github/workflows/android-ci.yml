@@ -99,6 +99,31 @@ jobs:
           message = "\n".join(line[:400] for line in digest)
           message = message.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
           print(f"::error title=Gradle failure::{message}")
+
+          # A failing test's message is in the unit-test report rather than in the log, so the first
+          # few are read back out of it: a red run should be diagnosable from its annotations.
+          import glob
+          import xml.etree.ElementTree as ET
+
+          details = []
+          for path in sorted(glob.glob("app/build/test-results/**/*.xml", recursive=True)):
+              try:
+                  root = ET.parse(path).getroot()
+              except ET.ParseError:
+                  continue
+              for case in root.iter("testcase"):
+                  node = case.find("failure")
+                  if node is None:
+                      node = case.find("error")
+                  if node is None:
+                      continue
+                  text = " ".join((node.get("message") or node.text or "").split())
+                  details.append(
+                      f"{case.get('classname', '').split('.')[-1]} > {case.get('name')}: {text[:240]}"
+                  )
+          if details:
+              escaped = [line.replace("%", "%25").replace("\r", "") for line in details[:12]]
+              print("::error title=Failing tests::" + "%0A".join(escaped))
           PY
 
       - name: Upload debug APK

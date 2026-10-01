@@ -3,6 +3,7 @@ package com.nivara.app.data.vault.viewer
 import com.nivara.app.core.common.NivaraResult
 import com.nivara.app.domain.vault.VaultContentException
 import com.nivara.app.domain.vault.VaultContentFailure
+import java.io.IOException
 
 /**
  * Why a viewer could not show an item.
@@ -56,6 +57,10 @@ internal fun Exception?.asViewerContentFailure(): VaultContentFailure = when (th
     is VaultViewerException -> (failure as? VaultViewerFailure.Content)?.failure
         ?: VaultContentFailure.Unreadable
 
+    // A platform decoder reads through the vault's own input adapter, which can only tell it that the
+    // object could not be read; the typed reason is kept as the cause, so bytes that failed to
+    // authenticate are still reported as corruption rather than as a storage problem.
+    is IOException -> (cause as? VaultContentException)?.failure ?: VaultContentFailure.Unreadable
     else -> VaultContentFailure.Unreadable
 }
 
