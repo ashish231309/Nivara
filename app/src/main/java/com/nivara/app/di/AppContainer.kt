@@ -12,6 +12,7 @@ import com.nivara.app.data.app.AndroidApplicationRepository
 import com.nivara.app.data.credential.SystemTimeProvider
 import com.nivara.app.data.applock.AndroidAppLockProtectionRunner
 import com.nivara.app.data.applock.AndroidForegroundApplicationDetector
+import com.nivara.app.data.apphide.FileHiddenApplicationRepository
 import com.nivara.app.data.applock.FileProtectedApplicationRepository
 import com.nivara.app.data.applock.NivaraAppLockMonitor
 import com.nivara.app.data.permissions.AndroidOverlayCapabilityRepository
@@ -24,6 +25,7 @@ import com.nivara.app.domain.applock.AppLockOverlayPresenter
 import com.nivara.app.domain.applock.AppLockProtectionRunner
 import com.nivara.app.domain.applock.ForegroundApplicationDetector
 import com.nivara.app.domain.applock.ProtectedApplicationRepository
+import com.nivara.app.domain.apphide.HiddenApplicationRepository
 import com.nivara.app.domain.applock.ProtectionDecisionEngine
 import com.nivara.app.domain.permissions.OverlayCapabilityRepository
 import com.nivara.app.domain.permissions.UsageAccessRepository
@@ -126,6 +128,16 @@ interface AppContainer {
      * Configuration only: it says what to protect, never whether Nivara is unlocked.
      */
     val protectedApplicationRepository: ProtectedApplicationRepository
+
+    /**
+     * Which applications the user asked Nivara to keep out of sight.
+     *
+     * The one owner of hidden-application state, exposed here so the management screen and — in a
+     * later stage — Nivara's own launcher read the same answer instead of keeping one each. It is
+     * configuration only: it says what to hide, never whether Nivara is unlocked, and it changes
+     * nothing on the device.
+     */
+    val hiddenApplicationRepository: HiddenApplicationRepository
 
     /**
      * Reports the application currently in the foreground.
@@ -279,6 +291,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
         FileProtectedApplicationRepository(File(appLockDirectory, PROTECTED_APPLICATIONS_FILE))
     }
 
+    override val hiddenApplicationRepository: HiddenApplicationRepository by lazy {
+        FileHiddenApplicationRepository(File(appHideDirectory, HIDDEN_APPLICATIONS_FILE))
+    }
+
     override val foregroundApplicationDetector: ForegroundApplicationDetector by lazy {
         AndroidForegroundApplicationDetector(
             context = applicationContext,
@@ -351,6 +367,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
      */
     private val appLockDirectory: File by lazy { File(applicationContext.filesDir, APP_LOCK_DIRECTORY) }
 
+    /**
+     * Directory holding the hidden-application set.
+     *
+     * Created on first write, inside the application's private storage, and excluded from backup
+     * with the rest of the application's data. It holds package names and nothing else — no session
+     * state, no unlock flag, no authentication material and no record of use.
+     */
+    private val appHideDirectory: File by lazy { File(applicationContext.filesDir, APP_HIDE_DIRECTORY) }
+
     /** One wall clock for every throttling rule in the application. */
     private val timeProvider: TimeProvider by lazy { SystemTimeProvider() }
 
@@ -362,5 +387,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         const val BIOMETRIC_ATTEMPT_FILE = "biometric-attempts.nva"
         const val APP_LOCK_DIRECTORY = "applock"
         const val PROTECTED_APPLICATIONS_FILE = "protected-applications.nvl"
+        const val APP_HIDE_DIRECTORY = "apphide"
+        const val HIDDEN_APPLICATIONS_FILE = "hidden-applications.nvh"
     }
 }
