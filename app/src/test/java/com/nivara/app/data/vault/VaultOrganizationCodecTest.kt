@@ -102,7 +102,7 @@ class VaultOrganizationCodecTest {
 
     @Test
     fun `a record from a newer build is reported with its version`() {
-        val newer = PayloadWrite.ascii("NVAO").byte(2).byte(0).long(1L).toByteArray()
+        val newer = PayloadWrite().ascii("NVAO").byte(2).byte(0).long(1L).toByteArray()
 
         val header = VaultOrganizationCodec.readHeader(newer)
 
