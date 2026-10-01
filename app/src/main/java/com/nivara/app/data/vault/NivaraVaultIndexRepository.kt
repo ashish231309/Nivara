@@ -625,3 +625,38 @@ private class LimitedSource(
 
     override suspend fun close() = delegate.close()
 }
+
+/**
+ * The ciphertext sink, reporting a refused write as the failure it is.
+ *
+ * Writing to the platform's own stream is the one place where a failure means "the destination would
+ * not take this byte" rather than anything cryptographic. Saying so keeps the import's failure
+ * accurate — a full or removed destination is not a failed authentication — and it keeps a raw
+ * platform exception from travelling upwards as an unnamed error.
+ */
+private class WriteFailureReportingSink(private val delegate: OutputStream) : OutputStream() {
+
+    override fun write(byte: Int) {
+        try {
+            delegate.write(byte)
+        } catch (refused: IOException) {
+            throw VaultImportException(VaultImportFailure.WriteFailed)
+        }
+    }
+
+    override fun write(buffer: ByteArray, offset: Int, length: Int) {
+        try {
+            delegate.write(buffer, offset, length)
+        } catch (refused: IOException) {
+            throw VaultImportException(VaultImportFailure.WriteFailed)
+        }
+    }
+
+    override fun flush() {
+        try {
+            delegate.flush()
+        } catch (refused: IOException) {
+            throw VaultImportException(VaultImportFailure.WriteFailed)
+        }
+    }
+}

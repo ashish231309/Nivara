@@ -12,8 +12,12 @@ import com.nivara.app.domain.vault.VaultSourceReference
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.testing.valueOrFail
 import java.security.SecureRandom
+import com.nivara.app.domain.vault.VaultContentSource
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -282,6 +286,39 @@ class NivaraVaultIndexRepositoryTest {
 
         assertEquals(VaultImportFailure.VerificationFailed, (result as NivaraResult.Failure).error)
         assertTrue(content.documents.isEmpty())
+    }
+
+    @Test
+    fun `an import that is cancelled leaves no item and nothing half-written`() = runTest {
+        val waiting = CompletableDeferred<Unit>()
+        val started = CompletableDeferred<Unit>()
+        opener.source = object : VaultContentSource {
+            override val displayName: String = "interrupted.bin"
+            override val mimeType: String? = "application/octet-stream"
+            override val declaredSizeBytes: Long? = null
+
+            override suspend fun read(buffer: ByteArray): Int {
+                // The import is interrupted while it waits for the source, which is the worst
+                // moment: the pending document exists and the index does not.
+                started.complete(Unit)
+                waiting.await()
+                return -1
+            }
+
+            override suspend fun close() = Unit
+        }
+
+        val job = launch { repository().importFile(source(), authorize = { true }) }
+        started.await()
+        assertTrue(
+            "the pending object exists while the write is in progress",
+            content.documents.keys.any { name -> name.endsWith(".pending") },
+        )
+        job.cancelAndJoin()
+
+        assertTrue("nothing is left under any name", content.documents.isEmpty())
+        assertTrue(metadata.documents.keys.none { name -> name.startsWith("index.") })
+        assertEquals(VaultIndexState.Missing, repository().read())
     }
 
     // ------------------------------------------------------------------ the destination

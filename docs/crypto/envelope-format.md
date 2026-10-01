@@ -47,8 +47,10 @@ tag.
 | `0x04` | Application security data |
 | `0x05` | Key wrapping |
 | `0x06` | Device-protected key material |
+| `0x07` | Vault content index |
 
-`0x00` and `0x07`–`0xFF` are reserved and rejected as unsupported in v1.
+`0x00` and `0x08`–`0xFF` are reserved and rejected as unsupported in v1: the tag must name one of
+the purposes above, and `fromTag` returns nothing for anything else.
 
 ## Parsing rules
 
@@ -61,10 +63,39 @@ A parser must reject, and never silently fall back or reinterpret:
 | `version` is not `1` | `UnsupportedVersion` |
 | `keyScheme` is not `1` | `UnsupportedKeyScheme` |
 | `algorithm` is not `1` | `UnsupportedAlgorithm` |
-| `contextTag` is `0x00` or greater than `0x06` | `UnsupportedContext` |
+| `contextTag` names no purpose | `UnsupportedContext` |
 | `reserved` is not zero | `MalformedEnvelope` |
 | `contextTag` differs from the purpose the caller asked for | `ContextMismatch` |
 | GCM tag does not verify (wrong key, edited nonce, ciphertext, header or AAD) | `AuthenticationFailed` |
+
+## Streamed objects (content format 1)
+
+Files that may be larger than memory are encrypted as a stream instead of as one envelope. The
+format is `NVCO` (version 1) and it reuses the same cipher, key and purpose rules — the streaming
+format is a different *framing*, not a second cryptosystem.
+
+```
+header: magic(4) | version(1) | reserved(1) | contextTag(1) | keyScheme(1) | algorithm(1)
+      | chunkSize(4) | nonce(12) | identity(16)
+record: plaintextLength(4) | sequence(8) | flags(1) | ciphertextLength(4) | ciphertext+tag
+```
+
+* One random 12-byte header nonce per stream. Record `i` uses `headerNonce XOR bigEndian64(i + 1)`,
+  so no nonce is reused within a key and no nonce is derived from a file name, an identifier or any
+  other metadata.
+* Every record is sealed with AES-256-GCM under the stream's key and purpose, and its AAD covers the
+  whole header, the record's own header and the flag that marks the last record. The 16-byte
+  `identity` — for vault content, the item id — is part of that header, so a record cannot be moved
+  from one object to another.
+* The stream is complete only when a record carries `flags = 0x01` and nothing follows it. A reader
+  rejects a stream that ends without that record, that carries bytes after it, or that presents a
+  record out of sequence, so a truncated, reordered, duplicated or edited object is never accepted
+  as a shorter or different file.
+* Records are read and written in bounded pieces (64 KiB of plaintext per record), so memory does
+  not depend on the size of the file.
+
+The vault's own documentation (`docs/vault/README.md`) describes how this format is used for imported
+files: object names, the index, and what an interrupted import leaves behind.
 
 ## Sealed-key container format (version 1)
 

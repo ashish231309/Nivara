@@ -15,6 +15,7 @@ import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.testing.keyOf
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -82,7 +83,11 @@ internal class FakeVaultContentStorage : VaultContentStorage {
 
         val pendingName = VaultContentNames.pendingName(itemId)
         val objectName = VaultContentNames.objectName(itemId)
+        // The platform creates the document under its temporary name before any byte is written, so
+        // the double does too: it is what makes "a failed or cancelled write leaves nothing behind"
+        // a fact about storage rather than a promise about a call.
         documents.remove(pendingName)
+        documents[pendingName] = ByteArray(0)
 
         val buffer = java.io.ByteArrayOutputStream()
         val sink = if (writeFailureAfterBytes != null) {
@@ -92,25 +97,34 @@ internal class FakeVaultContentStorage : VaultContentStorage {
         }
         try {
             produce(sink)
+        } catch (cancellation: CancellationException) {
+            // The platform deletes the pending document and lets the cancellation through, so a
+            // cancelled import is cancelled rather than reported as a failed one.
+            documents.remove(pendingName)
+            throw cancellation
         } catch (failure: Exception) {
             // The platform deletes the pending document when a write fails; so does this.
+            documents.remove(pendingName)
             return NivaraResult.Failure(failure.asStoredFailure())
         }
 
         val stored = buffer.toByteArray()
-        if (stored.isEmpty()) {
-            // Nothing was written at all: the write is treated as refused rather than stored.
+        documents[pendingName] = stored
+        if (swallowWrites) {
+            documents.remove(pendingName)
+            return NivaraResult.Success(Unit)
+        }
+        if (renameRefused) {
+            documents.remove(pendingName)
             return NivaraResult.Failure(VaultFailure.WriteFailed)
         }
-        if (swallowWrites) return NivaraResult.Success(Unit)
 
         val objectBytes = if (corruptWrites) {
             stored.copyOf().also { bytes -> bytes[bytes.size / 2] = (bytes[bytes.size / 2].toInt() xor 0x01).toByte() }
         } else {
             stored
         }
-
-        if (renameRefused) return NivaraResult.Failure(VaultFailure.WriteFailed)
+        documents.remove(pendingName)
         documents[objectName] = objectBytes
         onObjectFinalized?.invoke()
         return NivaraResult.Success(Unit)
@@ -126,6 +140,8 @@ internal class FakeVaultContentStorage : VaultContentStorage {
         return try {
             ByteArrayInputStream(bytes.copyOf()).use { input -> consume(input) }
             NivaraResult.Success(Unit)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (failure: Exception) {
             NivaraResult.Failure(failure.asStoredFailure())
         }
