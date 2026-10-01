@@ -16,6 +16,7 @@ import com.nivara.app.data.applock.AndroidForegroundApplicationDetector
 import com.nivara.app.data.apphide.FileHiddenApplicationRepository
 import com.nivara.app.data.applock.FileProtectedApplicationRepository
 import com.nivara.app.data.applock.NivaraAppLockMonitor
+import com.nivara.app.data.camouflage.AndroidCamouflageRepository
 import com.nivara.app.data.permissions.AndroidOverlayCapabilityRepository
 import com.nivara.app.data.permissions.AndroidUsageAccessRepository
 import com.nivara.app.data.session.InMemorySessionManager
@@ -29,6 +30,7 @@ import com.nivara.app.domain.applock.ForegroundApplicationDetector
 import com.nivara.app.domain.applock.ProtectedApplicationRepository
 import com.nivara.app.domain.apphide.HiddenApplicationRepository
 import com.nivara.app.domain.applock.ProtectionDecisionEngine
+import com.nivara.app.domain.camouflage.CamouflageRepository
 import com.nivara.app.domain.permissions.OverlayCapabilityRepository
 import com.nivara.app.domain.permissions.UsageAccessRepository
 import com.nivara.app.data.security.AndroidBiometricKeyStore
@@ -149,6 +151,16 @@ interface AppContainer {
      * nothing on the device.
      */
     val hiddenApplicationRepository: HiddenApplicationRepository
+
+    /**
+     * The identity Nivara presents to the device's launcher.
+     *
+     * The one owner of that presentation: the configuration screen writes it and reads it back, and
+     * nothing else in the application keeps a copy. It holds no secret — an identity is a name and
+     * an icon — and it is stored by the platform rather than by Nivara, so there is no file, no
+     * format and no migration behind it. See docs/camouflage/README.md.
+     */
+    val camouflageRepository: CamouflageRepository
 
     /**
      * Reports the application currently in the foreground.
@@ -304,6 +316,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val hiddenApplicationRepository: HiddenApplicationRepository by lazy {
         FileHiddenApplicationRepository(File(appHideDirectory, HIDDEN_APPLICATIONS_FILE))
+    }
+
+    override val camouflageRepository: CamouflageRepository by lazy {
+        AndroidCamouflageRepository(applicationContext)
     }
 
     override val foregroundApplicationDetector: ForegroundApplicationDetector by lazy {
