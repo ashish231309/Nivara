@@ -11,6 +11,12 @@ import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.security.SessionState
 import com.nivara.app.domain.vault.VaultFailure
 import com.nivara.app.domain.vault.VaultIdentity
+import com.nivara.app.domain.vault.VaultImportFailure
+import com.nivara.app.domain.vault.VaultImportProgress
+import com.nivara.app.domain.vault.VaultIndexRepository
+import com.nivara.app.domain.vault.VaultIndexState
+import com.nivara.app.domain.vault.VaultItem
+import com.nivara.app.domain.vault.VaultSourceReference
 import com.nivara.app.domain.vault.VaultLocation
 import com.nivara.app.domain.vault.VaultLocationRead
 import com.nivara.app.domain.vault.VaultRepository
@@ -509,10 +515,12 @@ class VaultViewModelTest {
 
     private fun viewModel(
         repository: VaultRepository,
+        index: VaultIndexRepository = FakeVaultIndexRepository(),
         locations: FakeVaultLocationStore = FakeVaultLocationStore(),
         session: SessionManager = testSessionManager(clock),
     ): VaultViewModel = VaultViewModel(
         vaultRepository = repository,
+        indexRepository = index,
         locationStore = locations,
         sessionManager = session,
     )
@@ -520,6 +528,43 @@ class VaultViewModelTest {
     private fun readyState(viewModel: VaultViewModel): VaultUiState.Ready =
         viewModel.uiState.value as? VaultUiState.Ready
             ?: error("the screen never left its loading state")
+
+    /**
+     * A list of files the test controls.
+     *
+     * Reading reports whatever the test set; importing records the request and reports the result the
+     * test chose, so the screen's handling of a committed import, a refused one and an interrupted
+     * session can all be driven without a vault on storage.
+     */
+    private class FakeVaultIndexRepository(
+        var state: VaultIndexState = VaultIndexState.Missing,
+        private val importResult: NivaraResult<VaultItem> =
+            NivaraResult.Failure(VaultImportFailure.StorageUnavailable),
+    ) : VaultIndexRepository {
+
+        var readCalls: Int = 0
+        val imported: MutableList<VaultSourceReference> = mutableListOf()
+        var importGate: CompletableDeferred<Unit>? = null
+        var importThrows: Boolean = false
+        var observedAuthorize: Boolean? = null
+
+        override suspend fun read(): VaultIndexState {
+            readCalls += 1
+            return state
+        }
+
+        override suspend fun importFile(
+            source: VaultSourceReference,
+            authorize: () -> Boolean,
+            onProgress: (VaultImportProgress) -> Unit,
+        ): NivaraResult<VaultItem> {
+            imported += source
+            importGate?.await()
+            if (importThrows) throw IllegalStateException("the storage is gone")
+            observedAuthorize = authorize()
+            return importResult
+        }
+    }
 
     /**
      * A repository whose state the test controls.

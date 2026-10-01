@@ -85,7 +85,7 @@ internal class NivaraVaultRepository(
     private val encryptionService: EncryptionService,
     private val random: SecureRandomGenerator,
     private val lock: Mutex = Mutex(),
-) : VaultRepository {
+) : VaultRepository, VaultKeyAccess {
 
     override suspend fun inspect(): VaultState = lock.withLock {
         when (val stored = locationStore.storedLocation()) {
@@ -107,6 +107,87 @@ internal class NivaraVaultRepository(
             return NivaraResult.Failure(refusal)
         }
         createVault(location, survey)
+    }
+
+    override suspend fun <T> withVaultKey(
+        block: suspend (location: VaultLocation, key: EncryptionKey) -> NivaraResult<T>,
+    ): NivaraResult<T> {
+        // The record is opened under the lock, so the key and the location come from one look at the
+        // vault; the block then runs outside it, because an import can take minutes and reading the
+        // vault's state must not wait for a file to be encrypted.
+        val borrowed = lock.withLock { openWrappedKey() }
+        val available = when (borrowed) {
+            is Borrowed.Available -> borrowed
+            is Borrowed.Refused -> return NivaraResult.Failure(borrowed.failure)
+        }
+
+        val vaultKey = contentKeyWrapper.unwrap(
+            wrappedKey = available.wrappedKey,
+            wrappingKey = available.wrappingKey,
+            context = EncryptionContext.KeyWrapping,
+        ).valueOrNull() ?: return NivaraResult.Failure(VaultFailure.KeyUnavailable)
+
+        return try {
+            block(available.location, vaultKey)
+        } finally {
+            // Cleared in every case: a caller that forgot, an exception on the way out, or a normal
+            // return. The key never outlives the work it was borrowed for.
+            (vaultKey as? EncryptionKey.InProcess)?.clear()
+        }
+    }
+
+    /** What one attempt to reach the vault's key found. */
+    private sealed interface Borrowed {
+
+        data class Available(
+            val location: VaultLocation,
+            val wrappingKey: EncryptionKey,
+            val wrappedKey: ByteArray,
+        ) : Borrowed
+
+        data class Refused(val failure: VaultFailure) : Borrowed
+    }
+
+    /**
+     * Reads the newest record and its wrapped key, or says why it cannot.
+     *
+     * The same survey the rest of the repository uses, so "the vault is ready" means the same thing
+     * here as it does on the screen: a structure that is there, a record that authenticates, and a
+     * content area to put objects in.
+     */
+    private suspend fun openWrappedKey(): Borrowed {
+        val location = when (val stored = locationStore.storedLocation()) {
+            VaultLocationRead.None -> return Borrowed.Refused(VaultFailure.InvalidLocation)
+            VaultLocationRead.Unreadable -> return Borrowed.Refused(VaultFailure.LocationUnreadable)
+            is VaultLocationRead.Present -> stored.location
+        }
+
+        val survey = survey(location)
+        val seen = when (survey) {
+            is Survey.Problem -> return Borrowed.Refused(survey.failure)
+            is Survey.Seen -> survey
+        }
+        if (!seen.contentAreaPresent) {
+            // The record authenticates but the area its content belongs in is gone. That is an
+            // incomplete structure, not an empty vault, and nothing may be imported into it.
+            return Borrowed.Refused(
+                VaultFailure.VaultUnreadable(VaultUnreadableReason.StructureIncomplete),
+            )
+        }
+        val record = seen.records.maxByOrNull { candidate -> candidate.generation }
+            ?: return Borrowed.Refused(
+                VaultFailure.VaultUnreadable(VaultUnreadableReason.StructureIncomplete),
+            )
+
+        val wrappingKey = when (val key = deviceKeyStore.retrieveKey(WRAPPING_KEY_ALIAS)) {
+            is NivaraResult.Success -> key.value
+            is NivaraResult.Failure -> return Borrowed.Refused(VaultFailure.KeyUnavailable)
+        }
+        return Borrowed.Available(
+            location = location,
+            wrappingKey = wrappingKey,
+            wrappedKey = record.wrappedKey,
+        )
     }
 
     // ------------------------------------------------------------------ reading
@@ -131,11 +212,19 @@ internal class NivaraVaultRepository(
         data class Problem(val failure: VaultFailure) : Survey
     }
 
-    /** One metadata document: the slot it sits in, its generation, and the identity it carries. */
+    /**
+     * One metadata document: the slot it sits in, its generation, the identity it carries, and the
+     * wrapped key it holds.
+     *
+     * The wrapped key is kept as it was authenticated rather than read again later: lending the key
+     * must be the same act as opening the record, or a record could be opened for one generation and
+     * lent against another.
+     */
     private data class Record(
         val slot: String,
         val generation: Long,
         val identity: VaultIdentity,
+        val wrappedKey: ByteArray,
     )
 
     private suspend fun survey(location: VaultLocation): Survey {
@@ -224,7 +313,12 @@ internal class NivaraVaultRepository(
         if (payload.generation != header.generation) return OpenOutcome.Damaged
         if (payload.wrappedKey.isEmpty()) return OpenOutcome.Damaged
         return OpenOutcome.Opened(
-            Record(slot = slot, generation = payload.generation, identity = payload.identity),
+            Record(
+                slot = slot,
+                generation = payload.generation,
+                identity = payload.identity,
+                wrappedKey = payload.wrappedKey,
+            ),
         )
     }
 

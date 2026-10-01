@@ -297,6 +297,11 @@ internal fun <T> NivaraResult<T>.mapVaultFailure(
     is NivaraResult.Failure -> NivaraResult.Failure(
         when (val error = error) {
             is VaultRootException -> error.failure
+            // A source that could not be read, and a write the destination refused, are passed
+            // through untouched: an import must not report a document it was refused, or a full
+            // destination, as a failure of the vault's own storage.
+            is VaultSourceException -> error.failure
+            is VaultImportException -> error.failure
             is SecurityException -> VaultFailure.AccessDenied
             is FileNotFoundException -> VaultFailure.StorageUnavailable
             // An IO failure means different things on the two sides of the port, and only the call

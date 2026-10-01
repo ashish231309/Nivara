@@ -31,6 +31,17 @@ enum class EncryptionContext(val tag: Int) {
 
     /** Key material guarded by an Android Keystore key. */
     DeviceProtectedKey(tag = 0x06),
+
+    /**
+     * The record that lists what a vault holds.
+     *
+     * A purpose of its own rather than [VaultMetadata]: the vault's own record and the list of
+     * files inside it are different things with different lifetimes — one is written once when the
+     * vault is created, the other grows with every import — and a ciphertext made for one must
+     * never be accepted for the other. Since the purpose is authenticated, copying an index
+     * envelope into the vault record (or the reverse) fails before anything is decrypted.
+     */
+    VaultIndex(tag = 0x07),
     ;
 
     companion object {

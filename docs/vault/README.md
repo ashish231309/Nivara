@@ -4,15 +4,18 @@ This document records what Nivara's vault storage is, where it lives, what is wr
 the user chooses, which key protects it, how a vault is created and reopened, and what every failure
 state means. It is the durable reference for the storage foundation, not a walkthrough of the screen.
 
-It covers one stage:
+It covers two stages:
 
 * **[Stage 13: external encrypted vault storage](#stage-13-external-encrypted-vault-storage)** — the
   vault root, its structure, its authenticated metadata record, and creating a vault at a root the
   user selected.
+* **[Stage 14: file import, content encryption and the vault index](#stage-14-file-import-content-encryption-and-the-vault-index)** —
+  choosing one document, encrypting it into the vault as a bounded-memory stream, and recording it in
+  an authenticated index that is only ever replaced once its replacement has been read back.
 
-What the vault stores is *not* covered here. Importing files, encrypting content, the vault index,
-media, albums, search, trash and recovery are later stages, and this document says what they will
-build on rather than anticipating them.
+Still **not** covered here, because it does not exist yet: presenting a stored file, media and
+document rendering, albums, search and sorting, trash and restore, recovery, and the vault's visual
+polish. This document describes what is implemented, and nothing else.
 
 # Stage 13: external encrypted vault storage
 
@@ -305,4 +308,241 @@ change. The instrumented suite for the vault's screens is **compiled but not exe
 integration, because no device or emulator is attached: nothing here claims that the Storage Access
 Framework behaves in a particular way on a particular Android version, that a provider persists a
 write, or that a picker returns a grant — those are platform behaviours that require a device to
+observe, and the code is written to fail safely when they do not hold.
+
+# Stage 14: file import, content encryption and the vault index
+
+## Purpose
+
+A vault is only worth having if a file can get into it, and it is only trustworthy if that first real
+write cannot half-happen. This stage delivers the smallest honest version of that:
+
+* **one document**, picked by the user through Android's own document picker, read once during the
+  import and never modified, moved or remembered afterwards;
+* **one encrypted object** per imported file, written as a bounded-memory stream under a temporary
+  name and only then given its own;
+* **one authenticated index** that names what the vault holds, replaced a whole generation at a time
+  and only after the replacement has been read back and opened;
+* **one screen section** that shows the list, offers the import, shows progress while it runs, and
+  says exactly which of the many things went wrong when one did.
+
+Video, audio, images and documents are all treated the same way here: a file is a name, a declared
+type, a size, an arrival time and a stream of bytes. Understanding what is inside a file — rendering
+it, extracting a thumbnail, reading its duration — belongs to the stage that presents it.
+
+## The import pipeline, in order
+
+```
+ authorize → vault ready → index readable → allocate a random item id → open the source
+     → validate the declared name and type → stream-encrypt into <id>.nvo.pending
+     → flush and sync → rename to <id>.nvo → read back: digest the stored bytes,
+       decrypt every record to the expected plaintext size → authorize again
+     → seal a new index generation → write it into the slot that is not authoritative
+     → read it back, authenticate it, compare its items → prune the superseded slot
+     → only now is the item reported
+```
+
+Every step before the last can fail without leaving an item: an import reports success only after the
+encrypted object has been written, read back, opened, and named by an index that itself was read back
+and opened. A failure anywhere reports what did *not* happen, and never reports that the file is in
+the vault.
+
+## Content model
+
+`VaultItem` is deliberately small, and every field has a reason to exist:
+
+| Field | Why it is there |
+| --- | --- |
+| `id` — 128 random bits, lower-case hex | Names the encrypted object, binds every record of it, and is what a duplicate check compares |
+| `name` — the file's own name | So its owner recognises it. Validated, bounded, never a path, never an object name |
+| `mimeType` — the provider's declared type, if usable | A generic kind for the list; a claim, so it is validated and dropped when unusable |
+| `sizeBytes` — the plaintext size | Read from the object that was verified, not from what the provider claimed |
+| `importedAtEpochMillis` | The list's ordering and nothing else |
+| `contentFormatVersion` | Which content format the object is in, so a later stage can migrate deliberately |
+| `contentDigest` — SHA-256 of the stored ciphertext | Describes the bytes that are on storage; computed from the read-back, never from the write |
+
+Not in the model, on purpose: albums, tags, favourites, ranking, thumbnails, duration, dimensions,
+media metadata, trash, restore and any notion of a file being "moved in". Importing never deletes or
+modifies the source; the vault keeps its own encrypted copy, and a file whose original is later moved,
+renamed or deleted stays readable because nothing about the item refers to where it came from. The
+source reference is used for one import and is **not stored in the index**.
+
+## The encrypted object format (version 1)
+
+A user file can be gigabytes, so it is not one envelope: it is a stream of authenticated records in
+`data/security/EncryptedStream.kt`, driven by `EncryptionService.encryptStream` / `decryptStream`.
+
+```
+ header (41 bytes)
+ offset 0        4        5         6        7          8           9            13        25
+       | "NVCO" | version| reserved | context| keyScheme| algorithm | chunkSize(4)| nonce(12)| identity(16) |
+
+ record, repeated to the end of the stream
+ offset 0                  4             12           13            17            17 + length + tag
+       | plaintextLength(4) | sequence(8) | flags(1) | ciphertextLength(4) | ciphertext + tag |
+
+ the record's nonce is derived, not stored:  recordNonce(i) = headerNonce XOR bigEndian64(i + 1)
+ the fourth byte of a record header is its last, non-final record: FLAG_FINAL = 0x01
+```
+
+* **Purpose.** Every stream is bound to `EncryptionContext.VaultContent` (tag `0x01`), written into
+  the header and checked before a byte of ciphertext is read. The vault's own record uses
+  `VaultMetadata` (`0x02`), and the index uses `VaultIndex` (`0x07`), so no ciphertext written for one
+  purpose can be accepted as another.
+* **Identity.** The item's 16-byte identifier is written into the header and bound — with the whole
+  header — as associated data of every record. A stream written for one item cannot be read as
+  another's, even under the right key.
+* **Sequence and completeness.** Each record authenticates its own plaintext length, its sequence
+  number, its flags and its ciphertext length. A reader requires the sequence to advance by one from
+  zero, requires a final record, and requires nothing to follow it: a dropped record, two records
+  swapped, a record duplicated, an edited length, or a truncated stream all fail rather than yield a
+  shorter, reordered or different file.
+* **Nonces.** One fresh random 96-bit nonce per stream, with the record counter exclusive-ored in, so
+  no record in a stream reuses another's nonce and the header's own value is never used as a record
+  nonce. Nothing derives a nonce from a name, an identifier, a time or a counter alone, and no nonce
+  is ever written to output.
+* **Memory.** Two fixed 64 KiB buffers are reused for a whole file: memory does not depend on the size
+  of the file, and no code path holds a whole file, reads one with `readBytes()`, or base64-encodes
+  one.
+* **Where the cryptography lives.** `EncryptedStream` and the streaming methods on
+  `JcaEncryptionService` are the only implementation; the vault calls them through `EncryptionService`
+  and never reaches for a cipher, a digest or a random source of its own.
+
+## Object names, temporary names and orphans
+
+An object is named from the item's identifier and from nothing else: `<id>.nvo` for a completed
+object, `<id>.nvo.pending` while it is being written. The original file's name never appears in the
+content area, which is what makes a name provided by a document provider — a path, a traversal
+sequence, a control character — impossible to turn into a location. The classifier recognises three
+things and no more: a completed object (which may be an item), a pending object (which never is), and
+anything else in the folder, which Nivara did not put there and will not touch.
+
+That gives crash consistency a simple, checkable shape:
+
+| Interruption | What is on storage | What the vault reports |
+| --- | --- | --- |
+| Before the object is created | Nothing | Nothing; the import failed |
+| During encryption, or a refused write | Nothing: the pending document is removed | Nothing; the import failed |
+| After the object is complete, before the index is committed | `<id>.nvo`, named by no index | An **orphan**: counted as unindexed, never shown as a file, and never deleted |
+| After the index is committed | `<id>.nvo` plus an index naming it | The item |
+
+Nothing but the index can make a file appear, and an object the index does not name is left where it
+is: deleting content Nivara cannot match to a list is how a vault loses files. Only one deletion
+exists in the whole pipeline — the object *this* import wrote and then could not commit, because the
+session closed before the change was authorized.
+
+## The index format (version 1)
+
+`index.0.nvi` / `index.1.nvi` live in the metadata area next to the vault's own record, sealed under
+`EncryptionContext.VaultIndex`.
+
+```
+ record  | "NVIN" | version | reserved | generation(8) | envelope |
+ payload | "NVIN" | version | reserved | generation(8) | vault generation(8) | item count(2) | items… |
+ item    | id(16) | name length(2) | name | mime length(2) | mime | size(8) | imported at(8) |
+         | content format(1) | content digest(32) |
+```
+
+* **The clear header is not secret and not encrypted.** It says this is a Nivara index, which version
+  wrote it and which generation it is, so a reader can tell "no index yet" from "an index I cannot
+  open" and from "an index a newer Nivara wrote" without holding a key.
+* **The payload is sealed by the existing cryptographic layer** under a purpose of its own, so an
+  index envelope can never be accepted where the vault's record is expected, or the other way round.
+  The index does not store a key, a wrapped key, a nonce or a source reference.
+* **The generation is checked twice** — in the clear header and inside the sealed payload. Editing the
+  header to promote an older index therefore makes that index invalid rather than authoritative.
+* **Parsing is bounded and strict.** Every length is checked against a bound before use, every string
+  is validated as a name or a type, identifiers must be exactly sixteen bytes of hex, a duplicate
+  identifier invalidates the whole record, and trailing bytes are refused. A failure to parse is never
+  an empty list: an index with no items is a valid record with a count of zero, and anything else is
+  reported as damage.
+* **Replacement is a two-slot commit.** A new generation is written into the slot that is *not*
+  authoritative, read back, opened and compared item by item; only then is the superseded slot pruned.
+  If anything fails, the previous index is left exactly as it was — it is never truncated first.
+
+## Which key, and how it is used
+
+Stage 13's hierarchy is unchanged and is the only one: the device key in the platform key store
+(alias `nivara.vault.v1`) wraps the vault key, which is sealed inside the vault's authenticated
+metadata record. The content path borrows that same vault key for the duration of a call, through the
+smallest contract that does so — `VaultKeyAccess` in the data layer — and the key is cleared when the
+call returns, whatever happened.
+
+There is no separate content password, no credential-derived content key, no per-item key stored
+beside the object, and no second encryption service. The item's identity is the binding: it is
+authenticated into every record, so an object cannot be read as another item's. Key material never
+reaches a screen, a saved state, the index, preferences or any output.
+
+## Failure states
+
+| What happened | What the user sees |
+| --- | --- |
+| No vault, or a vault that cannot be opened | The vault's own state, unchanged from Stage 13; the list is not shown as empty |
+| The index exists and cannot be read | "File list cannot be read" — and importing is refused, because appending to a list Nivara cannot read could replace it |
+| The index was written by a newer Nivara | "File list from a newer Nivara"; nothing is written over |
+| The index is full | The import is refused; the format's bound is reported rather than worked around |
+| The selected document cannot be read, or access was withdrawn | The import fails, and the file is not in the vault |
+| The document is larger than the import bound (16 GiB) | Refused from the declared size and again while reading |
+| The vault's storage is unreachable or refuses a write | The import fails; nothing is indexed and the previous index is untouched |
+| What was written did not come back as it was written | The import fails rather than claiming the file is in the vault |
+| The platform key protecting the vault is gone | Reported as the vault's own key failure |
+| The session closed before the import was authorized | The import is abandoned, its unfinished object removed, and the user is sent to the existing unlock screen |
+
+## Concurrency, cancellation and the session
+
+* **One import at a time.** A single lock covers the whole pipeline, so two imports cannot interleave
+  their index generations, and each import has its own identifier, its own temporary object and its
+  own encryption state. Two imports that run at once both end up in the index; neither can overwrite
+  the other.
+* **Reads are not blocked.** Reading the index takes no lock: a commit in progress is invisible until
+  it finishes.
+* **Cancellation is safe by construction.** If the import is cancelled — the screen goes away, the
+  process is killed — the pending document is removed and no index record was written, so the vault
+  is exactly as it was.
+* **The session is asked, never extended.** The import asks the existing session manager whether the
+  gate is open before it starts and again before the index is committed. A long encryption does not
+  extend the session and there is no separate import session. A session that closes mid-import stops
+  the import; the file the user picked is **not** remembered for a later unlock, because starting a
+  write after some other unlock would be a change they did not ask for at that moment.
+
+## Permissions and platform boundaries
+
+The document picker uses the Storage Access Framework's single-document chooser and grants access to
+that one document. Nivara does **not** persist that grant: the document is read during the import and
+never again, and no source reference is stored. The vault root keeps the separate *persisted* grant it
+already had, and the two are never confused — a source reference is not a vault location, and an
+object's name is not a path. No storage permission is involved (no `MANAGE_EXTERNAL_STORAGE`, no
+`READ_MEDIA_*`), Nivara still never creates a folder of its own choosing, and the platform document
+API remains behind the data layer: the vault's domain and pipeline never see a `Uri`, a
+`ContentResolver` or a `DocumentFile`.
+
+## Security and privacy boundaries
+
+* No filename, URI, path, plaintext, key or nonce reaches any output; failures are fixed, non-secret
+  sentences.
+* No network, no analytics, no telemetry and no usage history: importing is entirely local.
+* No plaintext temporary file exists at any point — the only temporary object is the ciphertext under
+  a pending name, inside the vault.
+* The original file is never deleted, modified or moved.
+
+## Scope
+
+Delivered: the content model, the streaming content format and its service methods, the import
+pipeline with injectable storage failures, the authenticated index and its two-slot commit, the
+document picker and its adapter, the index state in the vault screen, the verifier rules and the
+tests.
+
+Deliberately **not** in this stage: rendering, opening or playing an imported file, thumbnails, media
+metadata, albums, search, sorting, tagging, favourites, trash, restore, permanent deletion,
+deduplicating identical content, rebuilding a damaged index, scanning the content area to reconstruct
+a list, and recovery after reinstalling (Stages 15–18).
+
+## Runtime verification status
+
+The content model, the index format, the streaming format and the import pipeline are verified by
+local JVM suites and by the static checks, which run on every change. The instrumented suite for the
+vault's screens is **compiled but not executed** in continuous integration, because no device or
+emulator is attached. Nothing here claims that a particular provider returns a display name or a size,
+that a provider honours a rename, that a large file encrypts at a particular speed, or what a device
+does when the process is killed mid-import — those are platform behaviours that require a device to
 observe, and the code is written to fail safely when they do not hold.

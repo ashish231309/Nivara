@@ -1,5 +1,6 @@
 package com.nivara.app.ui.vault
 
+import com.nivara.app.domain.vault.VaultImportProgress
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraMessage
@@ -40,12 +41,27 @@ sealed interface VaultUiState {
      */
     data class Ready(
         val vault: VaultState,
+        val index: VaultIndexUiState = VaultIndexUiState.Loading,
         val sessionAuthenticated: Boolean,
         val busy: Boolean = false,
+        val importing: Boolean = false,
+        val progress: VaultImportProgress? = null,
         val unlockRequired: Boolean = false,
         val failure: NivaraMessage? = null,
         val noticeRes: Int? = null,
     ) : VaultUiState {
+
+        /**
+         * Whether the screen should offer to import a file.
+         *
+         * Everything that has to be true at once: the vault can be opened, its list can be read (or
+         * does not exist yet), no other change is running, and the gate is open. An import is a
+         * durable change to the vault, so it is offered under exactly the session the rest of the
+         * screen's changes use.
+         */
+        val canImport: Boolean
+            get() = !busy && !importing && sessionAuthenticated &&
+                vault is VaultState.Ready && index.acceptsImport
 
         /**
          * Whether the root is one a vault may be created at — a fact about the storage alone.

@@ -10,9 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import android.text.format.DateUtils
+import android.text.format.Formatter
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -20,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -27,6 +31,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.domain.vault.VaultImportProgress
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraLoadingState
@@ -76,9 +81,21 @@ fun VaultRoute(
         uri?.let { chosen -> viewModel.onRootSelected(chosen.toString()) }
     }
 
+    // Android's own single-document chooser, for the file to import. It grants access to exactly the
+    // document the user picked — no folder, no broader permission — and the grant is *not* persisted:
+    // the document is read once during the import, and the vault keeps its own encrypted copy. The
+    // handle is converted to the vault's opaque reference in this callback and is never drawn, logged
+    // or kept in any state.
+    val documentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let { chosen -> viewModel.onFileSelected(chosen.toString()) }
+    }
+
     VaultScreen(
         uiState = uiState,
         onChooseRoot = { picker.launch(null) },
+        onImport = { documentPicker.launch(arrayOf("*/*")) },
         onInitialize = viewModel::initialize,
         onReplaceUnreadable = viewModel::replaceUnreadable,
         onRetry = viewModel::refresh,
@@ -102,13 +119,15 @@ fun VaultRoute(
  *
  * It decides nothing: the state is what the repository read, and a tap is reported. It does not
  * display the storage reference — a platform URI is unreadable to a person — and it never shows a
- * file, a key or anything from inside the vault. Importing, media, albums, search and trash belong to
- * the stages that follow and are absent here on purpose.
+ * key or anything that could open the vault. What it does show is the vault's own list of imported
+ * files: a name, a kind, a size and an arrival time. Opening those files, rendering them, albums,
+ * search and trash belong to the stages that follow and are absent here on purpose.
  */
 @Composable
 fun VaultScreen(
     uiState: VaultUiState,
     onChooseRoot: () -> Unit,
+    onImport: () -> Unit,
     onInitialize: () -> Unit,
     onReplaceUnreadable: () -> Unit,
     onRetry: () -> Unit,
@@ -122,6 +141,7 @@ fun VaultScreen(
         is VaultUiState.Ready -> VaultContent(
             state = uiState,
             onChooseRoot = onChooseRoot,
+            onImport = onImport,
             onInitialize = onInitialize,
             onReplaceUnreadable = onReplaceUnreadable,
             onRetry = onRetry,
@@ -136,6 +156,7 @@ fun VaultScreen(
 private fun VaultContent(
     state: VaultUiState.Ready,
     onChooseRoot: () -> Unit,
+    onImport: () -> Unit,
     onInitialize: () -> Unit,
     onReplaceUnreadable: () -> Unit,
     onRetry: () -> Unit,
@@ -223,6 +244,27 @@ private fun VaultContent(
             )
         }
 
+        // The list of files, and the one action that adds to it. The action is offered only where it
+        // can succeed: a vault that opens, a list that can be read, no other change running, and an
+        // open gate — importing is a durable change to the vault like any other.
+        if (state.vault is VaultState.Ready) {
+            VaultIndexCard(index = state.index)
+        }
+
+        if (state.importing) {
+            ImportProgressCard(progress = state.progress)
+        }
+
+        if (state.canImport) {
+            Button(
+                onClick = onImport,
+                enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(text = stringResource(id = R.string.vault_import_action))
+            }
+        }
+
         state.noticeRes?.let { noticeRes ->
             Text(
                 text = stringResource(id = noticeRes),
@@ -278,6 +320,137 @@ private fun VaultStateCard(
 }
 
 /**
+ * The list of files in the vault, in one card.
+ *
+ * The card draws the list's state as its own fact — empty, readable, unreadable, from a newer Nivara,
+ * unreachable — and never lets a failure look like emptiness. Items are drawn as name, kind, size and
+ * arrival time: enough to recognise a file, and nothing that could open it.
+ */
+@Composable
+private fun VaultIndexCard(
+    index: VaultIndexUiState,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = if (index is VaultIndexUiState.Indexed) {
+                    stringResource(id = index.titleRes(), index.items.size)
+                } else {
+                    stringResource(id = index.titleRes())
+                },
+                style = MaterialTheme.typography.titleMedium,
+            )
+            index.bodyRes()?.let { bodyRes ->
+                Text(text = stringResource(id = bodyRes), style = MaterialTheme.typography.bodyMedium)
+            }
+            index.noticesRes().forEach { notice ->
+                Text(
+                    text = stringResource(id = notice.textRes, notice.count),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (index is VaultIndexUiState.Indexed && index.items.isNotEmpty()) {
+                index.items.forEach { item -> VaultItemRow(item = item) }
+            }
+        }
+    }
+}
+
+/** One imported file: what it was called, what kind it is, how large it is and when it arrived. */
+@Composable
+private fun VaultItemRow(
+    item: VaultItemUi,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val kind = stringResource(id = vaultItemTypeRes(item.mimeType))
+    val size = Formatter.formatShortFileSize(context, item.sizeBytes)
+    val imported = DateUtils.getRelativeTimeSpanString(item.importedAtEpochMillis)
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(text = item.name, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = stringResource(id = R.string.vault_item_details_format, kind, size),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(
+            text = stringResource(id = R.string.vault_item_imported_format, imported),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+/**
+ * How far the encryption of the file being imported has come.
+ *
+ * The percentage describes the source that is being read; it says nothing about what is written, and
+ * it cannot: the object is authenticated as it is produced, and a bar that moved is not a file that
+ * is in the vault. Only the index, read back afterwards, says that.
+ */
+@Composable
+private fun ImportProgressCard(
+    progress: VaultImportProgress?,
+    modifier: Modifier = Modifier,
+) {
+    val total = progress?.totalBytes
+    val processed = progress?.bytesProcessed ?: 0L
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(id = R.string.vault_import_progress_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (total != null && total > 0L) {
+                LinearProgressIndicator(
+                    progress = { (processed.toFloat() / total.toFloat()).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = stringResource(
+                        id = R.string.vault_import_progress_percent,
+                        ((processed * 100) / total).toInt().coerceIn(0, 100),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                // A provider that reports no size cannot be turned into a percentage, and inventing
+                // one would be a lie about a file the user is watching being encrypted.
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Text(
+                    text = stringResource(id = R.string.vault_import_progress_unknown),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
+/**
  * Where the vault lives and what protects it, in the user's own terms.
  *
  * The copy is deliberately explicit that the folder is the user's own choice, that the vault is one
@@ -322,6 +495,7 @@ private fun VaultNotConfiguredPreview() {
         VaultScreen(
             uiState = previewState(VaultState.NotConfigured),
             onChooseRoot = {},
+            onImport = {},
             onInitialize = {},
             onReplaceUnreadable = {},
             onRetry = {},
@@ -343,6 +517,7 @@ private fun VaultReadyPreview() {
                 ),
             ),
             onChooseRoot = {},
+            onImport = {},
             onInitialize = {},
             onReplaceUnreadable = {},
             onRetry = {},
@@ -359,6 +534,7 @@ private fun VaultUnreadablePreview() {
         VaultScreen(
             uiState = previewState(VaultState.Unreadable(VaultUnreadableReason.MetadataDamaged)),
             onChooseRoot = {},
+            onImport = {},
             onInitialize = {},
             onReplaceUnreadable = {},
             onRetry = {},

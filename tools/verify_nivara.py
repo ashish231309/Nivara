@@ -1335,13 +1335,17 @@ for path in vault_domain_sources:
 # selection. Everything above them speaks of named children, bytes and typed failures.
 saf_owner = vault_data_dir / "SafVaultRootStorage.kt"
 location_owner = vault_data_dir / "FileVaultLocationStore.kt"
-for owner in (saf_owner, location_owner):
+content_owner = vault_data_dir / "SafVaultContentStorage.kt"
+source_owner = vault_data_dir / "SafDocumentSource.kt"
+for owner in (saf_owner, content_owner, location_owner):
     if owner.exists():
         owner_code = strip_comments(owner.read_text())
         if "DocumentsContract" not in owner_code:
             err(f"{owner.relative_to(ROOT)} must be where document access happens")
+platform_handle_owners = ("SafVaultRootStorage.kt", "SafVaultContentStorage.kt",
+                          "SafDocumentSource.kt", "FileVaultLocationStore.kt")
 for path in vault_data_sources:
-    if path.name in ("SafVaultRootStorage.kt", "FileVaultLocationStore.kt"):
+    if path.name in platform_handle_owners:
         continue
     code = strip_comments(path.read_text())
     for pattern, why in (
@@ -1573,8 +1577,260 @@ vault_tests = sum(len(re.findall(r"@Test\b", (ROOT / suite).read_text()))
                       "app/src/test/java/com/nivara/app/ui/vault/VaultViewModelTest.kt",
                       "app/src/test/java/com/nivara/app/ui/vault/VaultPresentationTest.kt",
                   ) if (ROOT / suite).exists())
+# ---------------------------------------------------------------- vault content (stage 14)
+#
+# Importing a file is the first operation that writes real content. Its rules are the same shape as
+# stage 13's and stricter where the stakes are higher: one streaming implementation, one purpose per
+# ciphertext, an object that cannot exist under a name a reader trusts until it is complete, an index
+# that is only replaced once its replacement has been read back, and no state anywhere that can turn
+# "this cannot be read" into "there is nothing here".
+content_domain_files = ["VaultItem.kt", "VaultItemId.kt", "VaultContentDigest.kt", "VaultIndexState.kt",
+                        "VaultImportFailure.kt", "VaultContentSource.kt", "VaultSourceReference.kt",
+                        "VaultIndexRepository.kt"]
+content_data_files = ["VaultIndexCodec.kt", "VaultContentStorage.kt", "SafVaultContentStorage.kt",
+                      "SafDocumentSource.kt", "NivaraVaultIndexRepository.kt", "VaultKeyAccess.kt",
+                      "VaultFailures.kt"]
+content_security_files = ["EncryptedStream.kt", "ContentDigester.kt"]
+for name in content_domain_files:
+    if not (vault_domain_dir / name).exists():
+        err(f"the vault content layer is missing domain/vault/{name}")
+for name in content_data_files:
+    if not (vault_data_dir / name).exists():
+        err(f"the vault content layer is missing data/vault/{name}")
+for name in content_security_files:
+    if not (ROOT / "app/src/main/java/com/nivara/app/data/security" / name).exists():
+        err(f"the vault content layer is missing data/security/{name}")
+
+index_repository_source = vault_data_dir / "NivaraVaultIndexRepository.kt"
+content_storage_source = vault_data_dir / "VaultContentStorage.kt"
+saf_content_source = vault_data_dir / "SafVaultContentStorage.kt"
+document_source_source = vault_data_dir / "SafDocumentSource.kt"
+index_codec_source = vault_data_dir / "VaultIndexCodec.kt"
+index_repository_code = strip_comments(index_repository_source.read_text()) \
+    if index_repository_source.exists() else ""
+
+# The vault's content encryption is the project's existing streaming primitive, used through the
+# existing service. A second cipher, digest or random source anywhere in the vault would be a second
+# set of rules for the same files, and the vault's own sources are already checked for that above.
+if index_repository_code:
+    for call in ("encryptStream(", "decryptStream("):
+        if call not in index_repository_code:
+            err(f"the import pipeline must encrypt and verify through the existing service ('{call}')")
+    for contract in ("EncryptionService", "SecureRandomGenerator", "VaultItemId", "VaultContentDigest"):
+        if contract not in index_repository_code:
+            err(f"the import pipeline must build on the existing {contract} contract")
+    # An object is named from the item's identifier and nothing else, and the naming lives in exactly
+    # one place: the pipeline may ask for a name, but it may not build one — no file extension, no
+    # temporary suffix and no name from the source appears anywhere above the storage port.
+    for leak in (".nvo", ".pending", "PENDING_SUFFIX", "OBJECT_SUFFIX"):
+        if leak in index_repository_code:
+            err(f"the import pipeline must not build object names itself ('{leak}')")
+    if "VaultContentNames.objectName(" not in index_repository_code:
+        err("the import pipeline must name an object through the content port's own naming rule")
+    # The identifier is generated, never derived from the file: a name from a provider must not be
+    # able to influence which object an item is written to.
+    if "VaultItemId.create(" not in index_repository_code:
+        err("the import pipeline must allocate the item identifier from the random generator")
+    if "displayName" not in index_repository_code or "sanitize(" not in index_repository_code:
+        err("the import pipeline must validate the source name before storing it")
+    # The order that makes an import true: the object is written, read back and verified, the index
+    # is committed, and only then is an item reported. Each of these is checked as a fact about the
+    # source, not as a comment about the intention.
+    if "VerificationFailed" not in index_repository_code:
+        err("the import pipeline must verify what it wrote before reporting an item")
+    if "writeObject(" not in index_repository_code or "readObject(" not in index_repository_code:
+        err("the import pipeline must write the object and read it back")
+    if "commitIndex(" not in index_repository_code:
+        err("the import pipeline must commit the index")
+    elif "NivaraResult.Success(item)" in index_repository_code:
+        if index_repository_code.index("commitIndex(") > index_repository_code.index("NivaraResult.Success(item)"):
+            err("the import pipeline must not report an item before its index is committed")
+    # Content the vault cannot match to a list is never deleted; the only deletion is the object this
+    # very import wrote and could not commit, so exactly one deletion exists in the pipeline.
+    if index_repository_code.count("deleteObject(") != 1:
+        err("the import pipeline may delete exactly one thing: the object an abandoned import wrote")
+    if "NotAuthorized" not in index_repository_code:
+        err("the import pipeline must refuse to work without the session's authorization")
+    # A concurrent import cannot interleave with another: one lock covers the whole pipeline.
+    if "Mutex" not in index_repository_code or "withLock" not in index_repository_code:
+        err("the import pipeline must serialize imports")
+    # No credential, session, biometric or identity is handled here: authorization arrives as a
+    # question the caller answers, which is what keeps this layer free of the gate's business.
+    for pattern, why in (
+        (r"\bSessionManager\b", "the session gate"),
+        (r"\bCredentialManager\b", "the credential layer"),
+        (r"\bBiometricAuthenticator\b", "biometrics"),
+        (r"\bDeviceSecurityProvider\b", "the device security posture"),
+        (r"\bKeyDerivationService\b", "credential-based key derivation"),
+    ):
+        if re.search(pattern, index_repository_code):
+            err(f"the import pipeline must not use {why}")
+    # A source is read while it is being imported and never written to; the original file is the
+    # user's, and "importing" must never mean "moving".
+    if document_source_source.exists():
+        document_source_code = strip_comments(document_source_source.read_text())
+        for pattern, why in (
+            (r"deleteDocument", "deleting a document"),
+            (r"renameDocument", "renaming a document"),
+            (r"createDocument", "creating a document"),
+            (r"openOutputStream", "opening a document for writing"),
+        ):
+            if re.search(pattern, document_source_code):
+                err(f"the source opener must not {why}: the picked file is read, never moved into "
+                    f"the vault ('{pattern}')")
+
+# The streaming format is one implementation with one purpose, and the object a reader trusts is a
+# completed object: a temporary name must never classify as an item, and the completed name must come
+# from the identifier alone.
+content_storage_code = strip_comments(content_storage_source.read_text()) if content_storage_source.exists() else ""
+if content_storage_code:
+    for token in ("OBJECT_SUFFIX", "PENDING_SUFFIX", "VaultItemId"):
+        if token not in content_storage_code:
+            err(f"the content port must name objects from the item identifier ('{token}' missing)")
+saf_content_code = strip_comments(saf_content_source.read_text()) if saf_content_source.exists() else ""
+if saf_content_code:
+    if "pendingName" not in saf_content_code:
+        err("the platform content storage must write objects under a temporary name first")
+    if "renameDocument" not in saf_content_code:
+        err("the platform content storage must finalize an object by giving it its own name")
+
+# The index is versioned, authenticated, bounded and strict, and it is sealed under a purpose of its
+# own — never the vault's metadata purpose, which would make one record acceptable where the other is
+# expected. It holds no key material and no source reference.
+index_codec_code = strip_comments(index_codec_source.read_text()) if index_codec_source.exists() else ""
+if index_codec_code:
+    for token in ("MAGIC", "VERSION", "MAXIMUM_INDEX_LENGTH", "MAXIMUM_ITEM_COUNT", "fileVersion"):
+        if token not in index_codec_code:
+            err(f"the index record must carry its format facts ('{token}' missing)")
+    index_state_code = strip_comments((vault_domain_dir / "VaultIndexState.kt").read_text())
+    if "UnsupportedVersion" not in index_state_code or "fileVersion" not in index_state_code:
+        err("the vault must report an index it cannot read because it is newer, with the version it read")
+    if "expectedGeneration" not in index_codec_code:
+        err("the index payload must be checked against the generation in its clear header")
+    for forbidden, why in (
+        ("EncryptionKey", "key material"),
+        ("SensitiveBytes", "key material"),
+        ("wrappedKey", "key material"),
+        ("VaultSourceReference", "a reference to the file it came from"),
+        ("Uri", "a platform handle"),
+    ):
+        if forbidden in index_codec_code:
+            err(f"the index record must not carry {why} ('{forbidden}')")
+encryption_context_source = ROOT / "app/src/main/java/com/nivara/app/domain/security/EncryptionContext.kt"
+encryption_context_code = strip_comments(encryption_context_source.read_text())
+for purpose in ("VaultContent", "VaultMetadata", "VaultIndex"):
+    if purpose not in encryption_context_code:
+        err(f"the content path needs its own encryption purpose ('{purpose}' missing)")
+if index_repository_code:
+    if "EncryptionContext.VaultIndex" not in index_repository_code:
+        err("the index must be sealed under its own purpose, not the vault's metadata purpose")
+    if "EncryptionContext.VaultContent" not in index_repository_code:
+        err("content must be sealed under the vault content purpose")
+    if "EncryptionContext.VaultMetadata" in index_repository_code:
+        err("the index must not be sealed under the vault's metadata purpose")
+if vault_repository_source.exists():
+    # The vault's own record is unchanged by this stage: it is not rewritten per import and it does
+    # not learn about the index.
+    repository_code_stage14 = strip_comments(vault_repository_source.read_text())
+    if "VaultIndex" in repository_code_stage14:
+        err("the vault's metadata record must not be rewritten or extended for the index")
+
+# Nothing in the content path assumes a whole file fits in memory, and nothing turns bytes into text.
+for path in vault_domain_sources + vault_data_sources:
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\breadBytes\s*\(", "reading a whole file into memory"),
+        (r"\breadText\s*\(", "reading a whole file into memory"),
+        (r"\bBase64\b", "base64-encoding a file"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: {why} ('{pattern}')")
+# No platform File exists in the stage 14 content sources: objects are named children of the vault's
+# content area, and a path would be the beginning of a second way to reach them.
+for name in ("NivaraVaultIndexRepository.kt", "VaultContentStorage.kt", "SafVaultContentStorage.kt",
+             "SafDocumentSource.kt", "VaultIndexCodec.kt", "VaultKeyAccess.kt", "VaultFailures.kt"):
+    path = vault_data_dir / name
+    if not path.exists():
+        continue
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bjava\.io\.File\b", "a filesystem path"),
+        (r"\bEnvironment\.", "a platform storage directory"),
+        (r"\bMediaStore\b", "the media store"),
+        (r"\bBitmapFactory\b|\bBitmap\b|\bImageDecoder\b|\bExifInterface\b", "media decoding"),
+        (r"\bMediaMetadataRetriever\b|\bThumbnailUtils\b", "media metadata or thumbnails"),
+        (r"\bMediaPlayer\b|\bExoPlayer\b", "media playback"),
+        (r"\bokhttp\b|\bRetrofit\b|\bHttpURLConnection\b|\bSocket\b", "the network"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: {why} does not belong in the vault's content path "
+                f"('{pattern}')")
+# The platform adapters for content are constructed in the composition root and nowhere else, exactly
+# like the vault's own storage.
+for needle, defining_source, what in (
+    ("NivaraVaultIndexRepository(", "NivaraVaultIndexRepository.kt", "the vault content repository"),
+    ("SafVaultContentStorage(", "SafVaultContentStorage.kt", "the platform content storage"),
+    ("SafDocumentSourceOpener(", "SafDocumentSource.kt", "the document source opener"),
+):
+    owners = [p for p in main_kt
+              if needle in strip_comments(p.read_text()) and p.name != defining_source]
+    if len(owners) != 1 or owners[0].name != "AppContainer.kt":
+        err(f"{what} must be created only in the composition root (found in "
+            f"{[p.name for p in owners] or 'nothing'})")
+
+# The screen shows the list's state as its own fact and never as emptiness, and every state and
+# failure the content path can produce has wording. A dropped state would be drawn as whatever a
+# reader guessed, which is how "cannot be read" becomes "no files".
+index_ui_source = vault_ui_dir / "VaultIndexUiState.kt"
+index_ui_code = strip_comments(index_ui_source.read_text()) if index_ui_source.exists() else ""
+if not index_ui_code:
+    err("the vault screen must have a state for the list of files")
+else:
+    state_code = strip_comments((vault_domain_dir / "VaultIndexState.kt").read_text())
+    for state in re.findall(r"data (?:object|class) (\w+)[^\n]*\n?", state_code):
+        if f"VaultIndexState.{state}" not in index_ui_code:
+            err(f"the screen has no state for the index's '{state}'")
+messages_code = strip_comments(vault_messages_source.read_text()) if vault_messages_source.exists() else ""
+reason_block = re.search(r"enum class VaultIndexUnreadable\s*\{(.*?)\}",
+                         strip_comments((vault_domain_dir / "VaultIndexState.kt").read_text()), re.S)
+if messages_code and reason_block is not None:
+    for reason in re.findall(r"^\s+(\w+),$", reason_block.group(1), re.M):
+        if f"VaultIndexUnreadable.{reason}" not in messages_code:
+            err(f"the screen has no wording for '{reason}'")
+failure_code = strip_comments((vault_domain_dir / "VaultImportFailure.kt").read_text())
+if messages_code:
+    for failure in re.findall(r"data (?:object|class) (\w+)[^\n]*\n\s*VaultImportFailure\(", failure_code):
+        if f"VaultImportFailure.{failure}" not in messages_code:
+            err(f"the screen has no wording for the import failure '{failure}'")
+if messages_code:
+    for pattern, why in ((r"\bByteArray\b", "raw bytes"), (r"\bEncryptionKey\b", "key material"),
+                         (r"\bSensitiveBytes\b", "key material")):
+        if re.search(pattern, messages_code):
+            err(f"the screen's wording must not carry {why} ('{pattern}')")
+
+# The content path's own suites: the model, the record codec, the streaming format, the pipeline with
+# injectable storage failures, and the screen's import behaviour.
+for suite in (
+    "app/src/test/java/com/nivara/app/domain/vault/VaultItemTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/VaultIndexCodecTest.kt",
+    "app/src/test/java/com/nivara/app/data/security/EncryptedStreamTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/NivaraVaultIndexRepositoryTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/VaultImportTest.kt",
+):
+    if not (ROOT / suite).exists():
+        err(f"the vault content test suite is missing: {suite}")
+
+content_tests = sum(len(re.findall(r"@Test\b", (ROOT / suite).read_text()))
+                    for suite in (
+                        "app/src/test/java/com/nivara/app/domain/vault/VaultItemTest.kt",
+                        "app/src/test/java/com/nivara/app/data/vault/VaultIndexCodecTest.kt",
+                        "app/src/test/java/com/nivara/app/data/security/EncryptedStreamTest.kt",
+                        "app/src/test/java/com/nivara/app/data/vault/NivaraVaultIndexRepositoryTest.kt",
+                        "app/src/test/java/com/nivara/app/ui/vault/VaultImportTest.kt",
+                    ) if (ROOT / suite).exists())
 notes.append(f"vault review: {len(vault_domain_sources)} domain, {len(vault_data_sources)} data and "
-             f"{len(vault_ui_sources)} presentation sources; {vault_tests} local vault tests")
+             f"{len(vault_ui_sources)} presentation sources; {vault_tests} local vault tests; "
+             f"{content_tests} content tests")
 
 # ---------------------------------------------------------------- wrapper / hygiene
 wrapper_props = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()

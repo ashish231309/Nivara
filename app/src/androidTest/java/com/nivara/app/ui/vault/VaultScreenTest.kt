@@ -226,6 +226,7 @@ class VaultNavigationTest {
 private fun content(
     state: VaultUiState,
     onChooseRoot: () -> Unit = {},
+    onImport: () -> Unit = {},
     onInitialize: () -> Unit = {},
     onReplaceUnreadable: () -> Unit = {},
     onRetry: () -> Unit = {},
@@ -236,6 +237,7 @@ private fun content(
         VaultScreen(
             uiState = state,
             onChooseRoot = onChooseRoot,
+            onImport = onImport,
             onInitialize = onInitialize,
             onReplaceUnreadable = onReplaceUnreadable,
             onRetry = onRetry,

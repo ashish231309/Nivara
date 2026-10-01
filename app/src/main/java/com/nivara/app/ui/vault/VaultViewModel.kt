@@ -11,9 +11,13 @@ import com.nivara.app.core.common.NivaraResult
 import com.nivara.app.core.common.isSuccess
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.vault.VaultFailure
+import com.nivara.app.domain.vault.VaultImportFailure
+import com.nivara.app.domain.vault.VaultImportProgress
+import com.nivara.app.domain.vault.VaultIndexRepository
 import com.nivara.app.domain.vault.VaultLocation
 import com.nivara.app.domain.vault.VaultLocationStore
 import com.nivara.app.domain.vault.VaultRepository
+import com.nivara.app.domain.vault.VaultSourceReference
 import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.ui.components.NivaraMessage
 import kotlinx.coroutines.CancellationException
@@ -56,6 +60,7 @@ import kotlinx.coroutines.launch
  */
 class VaultViewModel(
     private val vaultRepository: VaultRepository,
+    private val indexRepository: VaultIndexRepository,
     private val locationStore: VaultLocationStore,
     private val sessionManager: SessionManager,
 ) : ViewModel() {
@@ -66,7 +71,11 @@ class VaultViewModel(
     val uiState: StateFlow<VaultUiState> = mutableUiState.asStateFlow()
 
     private var vaultState: VaultState? = null
+    private var indexState: VaultIndexUiState = VaultIndexUiState.Loading
     private var busy: Boolean = false
+    private var importing: Boolean = false
+    private var progress: VaultImportProgress? = null
+    private var publishedProgressBytes: Long = 0L
     private var unlockRequired: Boolean = false
     private var failure: NivaraMessage? = null
     private var noticeRes: Int? = null
@@ -150,6 +159,114 @@ class VaultViewModel(
         if (current.busy || !current.vaultHasUnreadableRecords) return
         if (!hasSession()) return
         run(replaceUnreadable = true)
+    }
+
+    /**
+     * Imports the document the user picked.
+     *
+     * The reference arrives from the platform's own document picker and is used for this import only:
+     * it is not stored, and the vault never depends on it again — the imported file must keep working
+     * after the original has been moved, renamed or deleted.
+     *
+     * Nothing is imported while the gate is closed. The user is sent to the existing credential
+     * screen, and the selection is *dropped* rather than remembered: an import writes an encrypted
+     * copy of a file the user chose, and starting it later — after some other unlock — would be a
+     * change they did not ask for at that moment. They pick the file again, deliberately.
+     */
+    fun onFileSelected(reference: String) {
+        val current = readyState() ?: return
+        if (current.busy || current.importing) return
+
+        val source = VaultSourceReference.create(reference)
+        if (source == null) {
+            unlockRequired = false
+            noticeRes = null
+            failure = vaultImportSelectionFailedMessage()
+            publish()
+            return
+        }
+
+        if (!hasSession()) {
+            // `hasSession` has already asked for the credential screen and explained why; the file
+            // itself is not kept.
+            failure = vaultImportLockedMessage()
+            publish()
+            return
+        }
+
+        startImport(source)
+    }
+
+    private fun startImport(source: VaultSourceReference) {
+        importing = true
+        busy = true
+        progress = null
+        publishedProgressBytes = 0L
+        failure = null
+        noticeRes = null
+        publish()
+
+        viewModelScope.launch {
+            val result = try {
+                indexRepository.importFile(
+                    source = source,
+                    // Asked again by the pipeline at the moment a durable change would be made, so a
+                    // session that closes during a long encryption stops the import instead of being
+                    // extended by it. Nothing here refreshes or lengthens the session.
+                    authorize = { sessionManager.currentState().isAuthenticated },
+                    onProgress = { update -> onImportProgress(update) },
+                )
+            } catch (cancellation: CancellationException) {
+                // The screen is gone or the work was cancelled: the pipeline removes the unfinished
+                // object it wrote, and no item was ever added to the index.
+                throw cancellation
+            } catch (error: Exception) {
+                // The contract reports failures as results. An implementation that throws anyway is
+                // reported as a failed import, never as an imported file.
+                null
+            }
+
+            importing = false
+            busy = false
+            progress = null
+            when {
+                result == null -> failure = vaultImportFailedMessage()
+
+                result is NivaraResult.Failure -> {
+                    val typed = result.error as? VaultImportFailure
+                    if (typed == VaultImportFailure.NotAuthorized) {
+                        // The session closed while the file was being encrypted. The import was
+                        // abandoned and its unfinished object removed; the user is asked to unlock
+                        // and to pick the file again.
+                        unlockRequired = true
+                    }
+                    failure = typed?.asMessage() ?: vaultImportFailedMessage()
+                }
+
+                else -> noticeRes = R.string.vault_notice_imported
+            }
+            // The vault and its list are read again rather than assumed: the screen shows what the
+            // storage says, and a committed import appears because the index names it.
+            inspect(showLoading = false, keepMessages = true)
+        }
+    }
+
+    /**
+     * Reports how far the encryption has come.
+     *
+     * Progress is a display concern and nothing else: it changes no byte that is written and no
+     * record that is authenticated. The state is republished only when the reported position has
+     * moved far enough to change what a person sees, so a large file does not redraw the screen
+     * thousands of times for the same percentage.
+     */
+    private fun onImportProgress(update: VaultImportProgress) {
+        progress = update
+        if (update.bytesProcessed - publishedProgressBytes >= PROGRESS_PUBLISH_BYTES ||
+            update.bytesProcessed == 0L
+        ) {
+            publishedProgressBytes = update.bytesProcessed
+            publish()
+        }
     }
 
     /**
@@ -274,6 +391,9 @@ class VaultViewModel(
                 VaultState.Unavailable
             }
             vaultState = state
+            // The list of files is a second fact, read only when the vault itself can be opened. An
+            // index that cannot be read becomes its own state, never an empty list.
+            indexState = if (state is VaultState.Ready) readIndex() else VaultIndexUiState.VaultNotReady
             if (!keepMessages) {
                 failure = null
                 noticeRes = null
@@ -282,13 +402,31 @@ class VaultViewModel(
         }
     }
 
+    /**
+     * Reads the vault's list of files.
+     *
+     * The domain reports every way this can fail as its own state, so nothing here has to interpret
+     * a failure: a list that cannot be read stays a list that cannot be read. An implementation that
+     * throws instead is reported as unreachable rather than as an empty vault.
+     */
+    private suspend fun readIndex(): VaultIndexUiState = try {
+        indexRepository.read().toUiState()
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (error: Exception) {
+        VaultIndexUiState.Unavailable
+    }
+
     /** Rebuilds the drawn state from the last read, without touching the repository. */
     private fun publish() {
         val state = vaultState ?: return
         mutableUiState.value = VaultUiState.Ready(
             vault = state,
+            index = indexState,
             sessionAuthenticated = sessionManager.currentState().isAuthenticated,
             busy = busy,
+            importing = importing,
+            progress = progress,
             unlockRequired = unlockRequired,
             failure = failure,
             noticeRes = noticeRes,
@@ -298,11 +436,20 @@ class VaultViewModel(
     companion object {
 
         /**
+         * How far the reported position must move before the screen is redrawn.
+         *
+         * A quarter of a megabyte is far below what a person can see and far above a single chunk, so
+         * a large file redraws a handful of times rather than tens of thousands.
+         */
+        private const val PROGRESS_PUBLISH_BYTES = 256L * 1024
+
+        /**
          * Factory that supplies the dependencies of [VaultViewModel] from the application container.
          *
-         * Three dependencies, and no cryptographic one among them: the view model can show the vault's
-         * state and ask for one to be created, and it has no way to reach a key, a cipher or a
-         * credential.
+         * Four dependencies, and no cryptographic one among them: the view model can show the vault's
+         * state, ask for one to be created and ask for a file to be imported, and it has no way to
+         * reach a key, a cipher or a credential. Importing is a request to the vault's own repository;
+         * the key never leaves the data layer.
          */
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -311,6 +458,7 @@ class VaultViewModel(
                 val container = application.container
                 VaultViewModel(
                     vaultRepository = container.vaultRepository,
+                    indexRepository = container.vaultIndexRepository,
                     locationStore = container.vaultLocationStore,
                     sessionManager = container.sessionManager,
                 )

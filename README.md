@@ -501,10 +501,15 @@ devices.
 | Creating a vault | Explicit, session-gated, and reported as done only after the record has been read back and opened |
 | Opening a vault | A read; nothing is created, repaired, deleted or replaced while looking |
 | What is at the folder | States from "no folder chosen" to "a newer Nivara wrote this" — damage, a lost key and unreachable storage are never drawn as an empty vault |
-| What it is not | A way to import or store a file yet, a second password, or a hidden route: the vault is reached from the home screen like any other settings screen |
+| Importing a file | One document at a time, chosen through Android's own picker; read once, never moved or modified, and encrypted into the vault in bounded pieces |
+| What a stored file is | One encrypted object named after a random per-file identifier, listed by an authenticated index that never holds a key or a source reference |
+| When a file counts as imported | Only after its object is complete and read back, and the index that names it has itself been read back and opened |
+| The list on the screen | Name, generic kind, size and arrival time, plus honest states for an index that cannot be read, a newer format, unfinished imports and encrypted files that are not listed |
+| What it is not | A media viewer, a gallery, an album or search, trash or restore, a second password, or a hidden route: the vault is reached from the home screen like any other settings screen |
 
-The full contract — the structure, the metadata format, the key hierarchy, the failure states and the
-verification status — is in [`docs/vault/README.md`](docs/vault/README.md).
+The full contract — the structure, the metadata format, the content format, the index format, the
+import pipeline, the key hierarchy, the failure states and the verification status — is in
+[`docs/vault/README.md`](docs/vault/README.md).
 
 ## Repository checks
 

@@ -21,7 +21,10 @@ import com.nivara.app.data.permissions.AndroidOverlayCapabilityRepository
 import com.nivara.app.data.permissions.AndroidUsageAccessRepository
 import com.nivara.app.data.session.InMemorySessionManager
 import com.nivara.app.data.vault.FileVaultLocationStore
+import com.nivara.app.data.vault.NivaraVaultIndexRepository
 import com.nivara.app.data.vault.NivaraVaultRepository
+import com.nivara.app.data.vault.SafDocumentSourceOpener
+import com.nivara.app.data.vault.SafVaultContentStorage
 import com.nivara.app.data.vault.SafVaultRootStorage
 import com.nivara.app.domain.app.ApplicationLauncher
 import com.nivara.app.domain.app.ApplicationRepository
@@ -56,6 +59,7 @@ import com.nivara.app.domain.security.RecoveryKeyEnvelopeService
 import com.nivara.app.domain.security.SessionManager
 import com.nivara.app.domain.security.SessionTimeoutPolicy
 import com.nivara.app.domain.security.SecureRandomGenerator
+import com.nivara.app.domain.vault.VaultIndexRepository
 import com.nivara.app.domain.vault.VaultLocationStore
 import com.nivara.app.domain.vault.VaultRepository
 import com.nivara.app.ui.applications.ApplicationIconLoader
@@ -245,6 +249,15 @@ interface AppContainer {
      * is not a secret, and what protects the vault is its encryption.
      */
     val vaultLocationStore: VaultLocationStore
+
+    /**
+     * What the vault holds: the authenticated list of imported files, and the one operation that adds
+     * to it.
+     *
+     * This is the interface the screen reaches for a file count, a list and an import; the platform's
+     * document picker and the vault's key stay behind it. See docs/vault/README.md.
+     */
+    val vaultIndexRepository: VaultIndexRepository
 }
 
 /**
@@ -447,7 +460,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
         )
     }
 
-    override val vaultRepository: VaultRepository by lazy {
+    /**
+     * The vault's storage, created once.
+     *
+     * It serves two contracts — the domain's [VaultRepository], which knows nothing about keys, and
+     * the data layer's key borrow — and it is one object on purpose: one lock, one view of the record
+     * slots, and one place where the vault key is opened and cleared. A second object would be a
+     * second answer to "what is at this folder".
+     */
+    private val nivaraVaultStorage: NivaraVaultRepository by lazy {
         NivaraVaultRepository(
             locationStore = vaultLocationStore,
             // Storage handles are built from the stored reference only when they are needed, so
@@ -457,6 +478,33 @@ class DefaultAppContainer(context: Context) : AppContainer {
             },
             deviceKeyStore = deviceKeyStore,
             contentKeyWrapper = contentKeyWrapper,
+            encryptionService = encryptionService,
+            random = secureRandomGenerator,
+        )
+    }
+
+    override val vaultRepository: VaultRepository get() = nivaraVaultStorage
+
+    /**
+     * The vault's content path: the index, and importing a file into it.
+     *
+     * Importing is the only operation in the application that reads a document the user selected and
+     * writes an encrypted copy of it. Everything it needs is assembled here — the vault's storage and
+     * key, the existing encryption service, and two platform adapters that are the only classes in the
+     * vault that know what a document is: one for the metadata area, one for the file that was picked.
+     * Nothing is cached between imports, and no reference to a picked file outlives the import.
+     */
+    override val vaultIndexRepository: VaultIndexRepository by lazy {
+        NivaraVaultIndexRepository(
+            vaultRepository = nivaraVaultStorage,
+            keyAccess = nivaraVaultStorage,
+            metadataStorageFactory = { location ->
+                SafVaultRootStorage(context = applicationContext, location = location)
+            },
+            contentStorageFactory = { location ->
+                SafVaultContentStorage(context = applicationContext, location = location)
+            },
+            sourceOpener = SafDocumentSourceOpener(context = applicationContext),
             encryptionService = encryptionService,
             random = secureRandomGenerator,
         )
