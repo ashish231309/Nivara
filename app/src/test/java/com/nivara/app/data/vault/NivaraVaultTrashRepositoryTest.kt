@@ -256,12 +256,13 @@ class NivaraVaultTrashRepositoryTest {
         indexState = VaultIndexState.Ready(items = listOf(testItem(seed = VaultTrashLimits.MAXIMUM_TRASHED_ITEMS + 1)))
         val full = (1..VaultTrashLimits.MAXIMUM_TRASHED_ITEMS).map { seed -> testTrashEntry(seed = seed) }
         putRecord(full)
+        val writesBefore = metadata.writeCalls
         val result = repository().trash(
             itemId = testItemId(VaultTrashLimits.MAXIMUM_TRASHED_ITEMS + 1),
             authorize = ::authorize,
         )
         assertEquals(VaultTrashFailure.TrashFull, result.failure())
-        assertEquals(0, metadata.writeCalls)
+        assertEquals(writesBefore, metadata.writeCalls)
     }
 
     @Test
