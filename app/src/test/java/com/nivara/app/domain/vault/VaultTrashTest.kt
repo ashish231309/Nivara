@@ -130,8 +130,9 @@ class VaultTrashTest {
 
     @Test
     fun a_typed_trash_failure_reads_back_out_of_a_result() {
-        val result: NivaraResult<Unit> = NivaraResult.Failure(VaultTrashFailure.ItemNotInVault)
-        assertEquals(VaultTrashFailure.ItemNotInVault, result.error.asTrashFailure())
+        val result: NivaraResult<*> = NivaraResult.Failure(VaultTrashFailure.ItemNotInVault)
+        val failure = result as NivaraResult.Failure
+        assertEquals(VaultTrashFailure.ItemNotInVault, failure.error.asTrashFailure())
     }
 
     @Test
