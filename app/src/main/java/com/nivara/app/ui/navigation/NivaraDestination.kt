@@ -88,6 +88,18 @@ sealed interface NivaraDestination {
         override val titleRes: Int = R.string.apphide_manage_title
     }
 
+    /**
+     * Nivara as the device's Home application: the launcher surface and its app drawer.
+     *
+     * A destination like any other, so that reaching Nivara's settings from the launcher is ordinary
+     * navigation through the existing graph rather than a second copy of it. The Home application
+     * starts the graph here, which is why the app shell hides its app bar for this one destination.
+     */
+    data object Launcher : NivaraDestination {
+        override val route: String = "launcher"
+        override val titleRes: Int = R.string.app_name
+    }
+
     companion object {
         /**
          * All destinations that exist in the graph.
@@ -96,6 +108,7 @@ sealed interface NivaraDestination {
          */
         val entries: List<NivaraDestination> =
             listOf(
+                Launcher,
                 Home,
                 About,
                 CredentialSetup,

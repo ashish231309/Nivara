@@ -6,6 +6,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.nivara.app.ui.about.AboutRoute
+import com.nivara.app.ui.launcher.LauncherRoute
 import com.nivara.app.ui.applock.AppLockSetupRoute
 import com.nivara.app.ui.apphide.management.HiddenManagementRoute
 import com.nivara.app.ui.applock.management.AppLockManagementRoute
@@ -21,17 +22,33 @@ import com.nivara.app.ui.home.HomeRoute
  * One entry per destination, mirroring [NivaraDestination.entries]. Screens are reached
  * through their `…Route` composables, which own state creation; the screens themselves stay
  * stateless and previewable.
+ *
+ * [startDestination] exists because Nivara has two entry points into one graph: the application's
+ * own task starts at [NivaraDestination.Home], and the Home application starts at
+ * [NivaraDestination.Launcher]. Everything else — every settings screen, every route, the whole
+ * back stack — is shared, so there is one graph and not two.
  */
 @Composable
 fun NivaraNavHost(
     navController: NavHostController,
+    startDestination: String = NivaraDestination.Home.route,
     modifier: Modifier = Modifier,
 ) {
     NavHost(
         navController = navController,
-        startDestination = NivaraDestination.Home.route,
+        startDestination = startDestination,
         modifier = modifier,
     ) {
+        composable(route = NivaraDestination.Launcher.route) {
+            LauncherRoute(
+                // Nivara's own screens are the existing ones: the settings home, the hidden-application
+                // screen and the credential screen. The launcher reimplements none of them, and
+                // authenticates nobody itself.
+                onOpenSettings = { navController.navigateTo(NivaraDestination.Home) },
+                onOpenHiddenManagement = { navController.navigateTo(NivaraDestination.HiddenApps) },
+                onUnlock = { navController.navigateTo(NivaraDestination.CredentialVerify) },
+            )
+        }
         composable(route = NivaraDestination.Home.route) {
             HomeRoute(
                 onOpenAbout = { navController.navigateTo(NivaraDestination.About) },

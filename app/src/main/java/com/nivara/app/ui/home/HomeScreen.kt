@@ -171,6 +171,11 @@ private fun HomeContent(
 
         HiddenAppsCard(onOpenHiddenApps = onOpenHiddenApps)
 
+        InfoCard(
+            title = stringResource(id = R.string.home_launcher_title),
+            body = stringResource(id = R.string.home_launcher_summary),
+        )
+
         Button(onClick = onOpenAbout) {
             Text(text = stringResource(id = R.string.home_about_action))
         }

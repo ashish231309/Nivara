@@ -73,6 +73,37 @@
         </activity>
 
         <!--
+          Nivara as the device's Home application.
+
+          Apart from the application's own entry point below, this is the only exported component in
+          the project, and it is exported for exactly one reason: Android can only start a Home
+          application if it is allowed to start it from outside the application. The intent filter is the standard launcher contract and nothing else —
+          ACTION_MAIN with CATEGORY_HOME and CATEGORY_DEFAULT — so a caller that can start this
+          activity can do only what pressing Home does, which is show Nivara's launcher.
+
+          What is deliberately absent: no custom actions, no data URIs, no permissions on the
+          activity, and no handling of Intent extras. Nothing outside Nivara can ask it to launch an
+          application, reveal a hidden one, or report any state.
+
+          Nivara does not make itself the default Home application and does not change any system
+          setting; the user selects it through Android's own Home settings, as documented in
+          docs/launcher/README.md.
+        -->
+        <activity
+            android:name=".ui.launcher.LauncherActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Nivara">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
           App Lock detection and its protection surface.
           A plain started service — not a foreground service — so it declares no foreground service
           type and needs no notification. It owns no logic of its own: it starts and stops the

@@ -13,6 +13,8 @@
     <string name="home_foundation_title">Foundation release</string>
     <string name="home_foundation_summary">This build contains the application shell only. Security modules are added in the releases that follow.</string>
     <string name="home_about_action">About Nivara</string>
+    <string name="home_launcher_title">Nivara launcher</string>
+    <string name="home_launcher_summary">Nivara includes a Home application: an app drawer that leaves out the applications you hid. Select it in Android\'s Home settings, and switch back at any time. Nothing is hidden from Android itself.</string>
     <string name="home_apphide_title">Hidden applications</string>
     <string name="home_apphide_summary">Mark applications Nivara should keep out of sight. Android\'s launcher still shows them.</string>
     <string name="home_apphide_action">Choose hidden applications</string>
@@ -332,6 +334,39 @@
     <string name="apphide_manage_error_hidden_unreadable">Nivara could not read which applications are hidden, so that change was not made. Nothing has been changed or removed.</string>
     <string name="apphide_manage_error_hidden_unavailable">Where Nivara records hidden applications is not reachable, so that change was not made. The list below shows the last state it read.</string>
     <string name="apphide_manage_notice_changed">Saved. The list shows what is stored.</string>
+<!-- The launcher: Nivara as the device's Home application. -->
+    <string name="launcher_home_summary">Nivara is your Home application. Applications you hide in Nivara are left out of this drawer; Android still shows them everywhere else.</string>
+    <string name="launcher_open_drawer">All applications</string>
+    <string name="launcher_settings_action">Nivara settings</string>
+    <string name="launcher_manage_action">Manage hidden applications</string>
+    <string name="launcher_hidden_card_title">Hidden applications</string>
+    <string name="launcher_hidden_card_summary">%1$d application(s) are hidden from this drawer.</string>
+    <string name="launcher_hidden_card_note">Showing them needs Nivara to be unlocked, and they are hidden again as soon as it locks. Nothing is deleted or uninstalled.</string>
+    <string name="launcher_reveal_action">Show hidden applications</string>
+    <string name="launcher_conceal_action">Hide them again</string>
+    <string name="launcher_unlock_action">Unlock Nivara</string>
+    <string name="launcher_reveal_notice">Hidden applications are shown until Nivara locks.</string>
+    <string name="launcher_drawer_title">Applications</string>
+    <string name="launcher_drawer_close">Close applications</string>
+    <string name="launcher_drawer_search_label">Search applications</string>
+    <string name="launcher_drawer_all">All applications</string>
+    <string name="launcher_drawer_hidden">Hidden applications</string>
+    <string name="launcher_drawer_sort_name_ascending">Name A–Z</string>
+    <string name="launcher_drawer_sort_name_descending">Name Z–A</string>
+    <string name="launcher_empty_device">No launchable applications were found on this device.</string>
+    <string name="launcher_empty_all_hidden">Every application on this device is hidden. Unlock Nivara and show hidden applications to see them.</string>
+    <string name="launcher_empty_search">No applications match your search.</string>
+    <string name="launcher_empty_hidden">No applications are hidden.</string>
+    <string name="launcher_discovery_unavailable_title">Applications are unavailable</string>
+    <string name="launcher_discovery_unavailable">Nivara could not list the applications on this device, so it shows none of them. Nothing has been changed or removed.</string>
+    <string name="launcher_hidden_unreadable_title">Hidden applications cannot be read</string>
+    <string name="launcher_hidden_unreadable">Nivara cannot read which applications are hidden, so it shows none of them. Nothing has been changed, and nothing was removed.</string>
+    <string name="launcher_hidden_unavailable_title">Hidden applications are unavailable</string>
+    <string name="launcher_hidden_unavailable">Where Nivara records hidden applications is not reachable, so it shows none of them. Nothing has been changed.</string>
+    <string name="launcher_error_not_installed">That application is not installed any more. Nothing was opened, and the list has been refreshed.</string>
+    <string name="launcher_error_launch_failed">Nivara could not open that application.</string>
+    <string name="launcher_error_discovery">Nivara could not read the device\'s applications this time. The list below is the last one it read.</string>
 </resources>
+
 
 
