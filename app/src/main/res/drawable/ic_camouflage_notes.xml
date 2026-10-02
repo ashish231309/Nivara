@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Notes identity mark: a page with three rules cut out of it. Drawn as one path with an even-odd
+  hole so that it also works as the monochrome (themed icon) layer, as Nivara's own mark does.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="1.9"
+        android:scaleY="1.9"
+        android:translateX="31.2"
+        android:translateY="31.2">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M5,2 L19,2 L19,22 L5,22 Z M8,7 H16 V8.6 H8 Z M8,11 H16 V12.6 H8 Z M8,15 H13 V16.6 H8 Z" />
+    </group>
+</vector>

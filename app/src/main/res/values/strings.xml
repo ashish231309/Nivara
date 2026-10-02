@@ -1,0 +1,722 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nivara</string>
+
+    <!-- Home -->
+    <string name="home_tagline">Privacy. Security. Control.</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="about_version_label">Version</string>
+    <string name="about_build_type_label">Build type</string>
+    <string name="about_package_label">Application ID</string>
+    <string name="about_platform_label">Android API level</string>
+    <string name="about_privacy_title">Privacy defaults</string>
+    <string name="about_privacy_summary">Nivara asks for one permission — Usage Access, which you grant in Android\'s settings for App Lock. It blocks cleartext network traffic and disables cloud backup of application data.</string>
+
+    <!-- Shared states -->
+    <string name="state_loading">Loading…</string>
+    <string name="state_error_title">Something went wrong</string>
+    <string name="state_error_summary">Nivara could not load this screen.</string>
+    <string name="state_retry_action">Try again</string>
+    <string name="navigation_back">Back</string>
+
+    <!-- Credential enrollment and verification -->
+    <string name="credential_setup_title">Set up credential</string>
+    <string name="credential_change_title">Change credential</string>
+    <string name="credential_verify_title">Verify credential</string>
+
+    <string name="credential_type_pin">PIN</string>
+    <string name="credential_type_pin_summary">Digits entered on a keypad.</string>
+    <string name="credential_type_password">Password</string>
+    <string name="credential_type_password_summary">Text entered on the keyboard.</string>
+    <string name="credential_type_pattern">Pattern</string>
+    <string name="credential_type_pattern_summary">A drawing that connects dots on a grid.</string>
+
+    <string name="credential_choose_type_title">Choose a credential</string>
+    <string name="credential_choose_type_summary">One method protects your private space. You can change it later.</string>
+
+    <string name="credential_enter_pin_title">Enter a PIN</string>
+    <string name="credential_enter_pin_summary">At least four digits, and not a repeated or sequential run.</string>
+    <string name="credential_enter_password_title">Enter a password</string>
+    <string name="credential_enter_password_summary">Length matters more than symbols. Eight characters is the minimum.</string>
+    <string name="credential_enter_pattern_title">Draw a pattern</string>
+    <string name="credential_enter_pattern_summary">Connect at least four dots. Dots you cross on the way count too.</string>
+
+    <string name="credential_confirm_title">Enter it again</string>
+    <string name="credential_confirm_summary">Confirming now means a typo cannot lock you out later.</string>
+
+    <string name="credential_verify_current_title">Confirm your current credential</string>
+    <string name="credential_verify_current_summary">The stored credential is replaced only after the current one is accepted.</string>
+
+    <string name="credential_working_message">Protecting your credential…</string>
+    <string name="credential_verifying_message">Checking your credential…</string>
+
+    <string name="credential_saved_title">Credential saved</string>
+    <string name="credential_saved_summary">Nivara will ask for it before it opens protected content.</string>
+
+    <string name="credential_unlock_title">Enter your credential</string>
+    <string name="credential_unlock_summary">Nivara neither shows nor stores what you enter.</string>
+
+    <string name="credential_verified_title">Credential accepted</string>
+    <string name="credential_verified_summary">That matches the credential configured on this device.</string>
+
+    <string name="credential_not_configured_summary">Set a credential up first; there is nothing to check against yet.</string>
+    <string name="credential_invalid_configuration_summary">The stored credential cannot be read. Recovery arrives in a later release.</string>
+
+    <string name="credential_password_label">Password</string>
+    <string name="credential_pin_backspace">Delete digit</string>
+    <string name="credential_pattern_area_description">Pattern area. Drag across the dots to draw your pattern.</string>
+
+    <string name="credential_action_continue">Continue</string>
+    <string name="credential_action_save">Save credential</string>
+    <string name="credential_action_verify">Verify</string>
+    <string name="credential_action_change">Change credential</string>
+    <string name="credential_action_done">Done</string>
+
+    <string name="credential_error_too_short">Too short. The minimum length is %1$d.</string>
+    <string name="credential_error_too_long">Too long. The maximum length is %1$d.</string>
+    <string name="credential_error_invalid_characters">That credential contains characters that are not allowed.</string>
+    <string name="credential_error_too_common">That choice is too easy to guess. Pick another one.</string>
+    <string name="credential_error_pattern_too_short">Connect at least %1$d dots.</string>
+    <string name="credential_error_pattern_invalid">That is not a valid pattern.</string>
+    <string name="credential_error_confirmation_mismatch">The two entries do not match.</string>
+    <string name="credential_error_not_configured">No credential is configured yet.</string>
+    <string name="credential_error_already_configured">A credential is already set up. Use change instead.</string>
+    <string name="credential_error_failed">That credential was not accepted.</string>
+    <string name="credential_error_invalid_configuration">The stored credential cannot be used.</string>
+    <string name="credential_error_blocked">Too many attempts. Try again in %1$d s.</string>
+    <string name="credential_error_generic">Nivara could not complete that. Try again.</string>
+
+    <!-- Home: primary credential -->
+
+    <!-- Home: biometric unlock -->
+
+    <!-- Biometric authentication (secondary to the primary credential) -->
+    <string name="biometric_screen_title">Biometric unlock</string>
+    <string name="biometric_screen_intro">Biometric unlock is a faster way to authenticate. It never replaces your primary credential, which keeps working in every situation below.</string>
+    <string name="biometric_action_enable">Turn on biometric unlock</string>
+    <string name="biometric_action_re_enable">Set up biometric unlock again</string>
+    <string name="biometric_action_disable">Turn off biometric unlock</string>
+    <string name="biometric_action_authenticate">Authenticate</string>
+    <string name="biometric_action_use_primary">Use primary credential</string>
+    <string name="biometric_action_cancel">Cancel</string>
+    <string name="biometric_approval_message">Confirm your primary credential to change biometric settings.</string>
+    <string name="biometric_notice_authenticated">Biometric authentication succeeded.</string>
+    <string name="biometric_notice_enabled">Biometric unlock is on.</string>
+    <string name="biometric_notice_disabled">Biometric unlock is off, and its key has been removed.</string>
+    <string name="biometric_notice_delay_cleared">The biometric delay was cleared.</string>
+    <string name="biometric_busy_notice">Waiting for Android to answer</string>
+    <string name="biometric_throttle_notice">Nivara paused biometric attempts. Try again in %1$d s, or use your primary credential below to clear the pause.</string>
+    <string name="biometric_system_lockout_note">Android can lock biometrics on its own after repeated failures. Nivara cannot lift that lockout, and does not try to.</string>
+
+    <string name="biometric_status_enabled">Biometric unlock is on</string>
+    <string name="biometric_status_disabled">Biometric unlock is off</string>
+    <string name="biometric_status_invalidated">Biometric unlock has to be set up again</string>
+    <string name="biometric_status_enabled_summary">Android confirms your identity before this convenience path opens.</string>
+    <string name="biometric_status_disabled_summary">You can turn it on after setting up a primary credential.</string>
+    <string name="biometric_status_invalidated_summary">The device biometric enrolment changed, so the stored key can no longer be used. Your primary credential is unchanged.</string>
+    <string name="biometric_status_unavailable_summary">Biometric unlock stays off. Use your primary credential instead.</string>
+    <string name="biometric_status_unavailable_no_hardware">This device has no biometric sensor</string>
+    <string name="biometric_status_unavailable_hardware">The biometric sensor is not available right now</string>
+    <string name="biometric_status_unavailable_not_enrolled">No biometric is enrolled on this device</string>
+    <string name="biometric_status_unavailable_unsupported">This device cannot use biometrics for this app</string>
+    <string name="biometric_status_unavailable_security_update">Android requires a security update before biometrics can be used</string>
+    <string name="biometric_status_unavailable_unknown">Biometrics are not available right now</string>
+
+    <string name="biometric_fallback_title">Primary credential</string>
+    <string name="biometric_fallback_hint">Enter your %1$s to confirm this change. The credential itself is never stored.</string>
+    <string name="biometric_fallback_submit">Use primary credential</string>
+    <string name="biometric_fallback_no_credential">No primary credential is set up yet. Set one up first: biometric unlock is only a shortcut for it.</string>
+    <string name="biometric_fallback_set_up_credential">Set up primary credential</string>
+
+    <string name="biometric_error_primary_required">Set up your primary credential first. Biometric unlock never replaces it.</string>
+    <string name="biometric_error_failed">That biometric was not recognised.</string>
+    <string name="biometric_error_cancelled">Biometric authentication was cancelled.</string>
+    <string name="biometric_error_app_blocked">Nivara paused biometric attempts. Try again in %1$d s.</string>
+    <string name="biometric_error_system_locked">Android has locked biometrics for now. Nivara cannot lift that lockout. Use your primary credential, or unlock the device with its own screen lock and try again later.</string>
+    <string name="biometric_error_system_locked_permanent">Android has disabled biometrics until the device is unlocked with its own screen lock. Nivara cannot lift that lockout.</string>
+    <string name="biometric_error_not_enabled">Biometric unlock is not on.</string>
+    <string name="biometric_error_invalidated">Biometric unlock can no longer be used, because the device biometric enrolment changed. Your primary credential is unchanged; turn biometric unlock on again to set it up anew.</string>
+    <string name="biometric_error_key_unavailable">Android could not provide the biometric key.</string>
+    <string name="biometric_error_generic">Nivara could not complete that. Try again.</string>
+
+    <!-- Copy shown inside Android\'s own biometric prompt -->
+    <string name="biometric_prompt_enable_title">Confirm it is you</string>
+    <string name="biometric_prompt_enable_subtitle">Authenticate to turn on biometric unlock.</string>
+    <string name="biometric_prompt_authenticate_title">Biometric unlock</string>
+    <string name="biometric_prompt_authenticate_subtitle">Confirm your identity to continue.</string>
+    <string name="biometric_prompt_disable_title">Confirm it is you</string>
+    <string name="biometric_prompt_disable_subtitle">Authenticate to turn off biometric unlock.</string>
+    <string name="biometric_prompt_negative">Cancel</string>
+
+    <!-- Session: the in-memory authorization state, its timeout and Quick Lock. -->
+    <string name="session_status_authenticated">Unlocked — session active</string>
+    <string name="session_status_locked">Locked — authentication required</string>
+    <string name="session_summary_locked">Nivara locks itself after a period of inactivity, and whenever you lock it. Nothing is kept on disk, so closing the app ends the session too.</string>
+    <string name="session_source_primary">Opened with your primary credential. Biometrics stay a shortcut, and the credential still works on its own.</string>
+    <string name="session_source_biometric">Opened with Android biometrics. Your primary credential is unchanged and still works on its own.</string>
+    <string name="session_action_lock">Lock now</string>
+    <string name="session_notice_locked">Nivara is locked. Authenticate again to continue.</string>
+    <string name="session_notice_ended">The session ended. Authenticate again to continue.</string>
+
+    <!-- App Lock preparation: discovery, Usage Access and the setup state -->
+    <string name="applock_setup_title">App Lock preparation</string>
+    <string name="applock_setup_intro">App Lock needs two things before it can protect your applications. This screen checks both, and shows what is still missing.</string>
+
+    <string name="applock_setup_readiness_title">Preparation status</string>
+    <string name="applock_setup_readiness_ready">Everything App Lock needs is in place.</string>
+    <string name="applock_setup_readiness_missing">Still needed: %1$s</string>
+    <string name="applock_setup_prerequisite_discovery">application discovery</string>
+    <string name="applock_setup_prerequisite_usage_access">Usage Access</string>
+
+    <string name="applock_setup_discovery_title">Application discovery</string>
+    <string name="applock_setup_discovery_count">Applications Nivara can see: %1$d</string>
+    <string name="applock_setup_discovery_summary">These are the applications you can open from your launcher. Each one is identified by its package name, never by the name shown here.</string>
+    <string name="applock_setup_discovery_preview_title">First few</string>
+    <string name="applock_setup_discovery_preview_more">and %1$d more</string>
+    <string name="applock_setup_discovery_preview_note">The full list, search and sorting arrive with App Lock.</string>
+    <string name="applock_setup_discovery_unavailable">Nivara could not read the list of installed applications</string>
+    <string name="applock_setup_discovery_unavailable_summary">Android did not answer the query this time. Try again; if it keeps failing, restart the device.</string>
+    <string name="applock_setup_discovery_retry">Try again</string>
+
+    <string name="applock_setup_usage_access_title">Usage Access</string>
+    <string name="applock_setup_usage_access_granted">Granted</string>
+    <string name="applock_setup_usage_access_not_granted">Not granted</string>
+    <string name="applock_setup_usage_access_unavailable">Unavailable</string>
+    <string name="applock_setup_usage_access_summary">App Lock uses Usage Access to recognise which application is in the foreground, so it can protect that application when you open it.</string>
+    <string name="applock_setup_usage_access_explanation">Android grants Usage Access in its own settings, not with a dialog inside Nivara. Nivara cannot switch it on for you, and it will never show you a prompt that claims to.</string>
+    <string name="applock_setup_usage_access_action">Open Usage Access settings</string>
+    <string name="applock_setup_usage_access_settings_note">That screen belongs to Android. Nivara only reads whether the grant exists, and checks again when you come back.</string>
+    <string name="applock_setup_usage_access_granted_notice">Usage Access is on.</string>
+    <string name="applock_setup_settings_unavailable">Nivara could not open Android\'s settings screen on this device.</string>
+
+
+    <!-- App Lock protection surface (Stage 8) -->
+    <string name="applock_overlay_title">App Lock</string>
+    <string name="applock_overlay_summary">Nivara is protecting this application.</string>
+    <string name="applock_overlay_explanation">Enter your %1$s to continue.</string>
+    <string name="applock_overlay_checking">Checking your credential\u2026</string>
+    <string name="applock_overlay_biometric_action">Use biometric unlock</string>
+    <string name="applock_overlay_no_credential_title">No credential is set up</string>
+    <string name="applock_overlay_no_credential_summary">Nivara has no PIN, password or pattern yet, so this application cannot be unlocked. Open Nivara and set one up; the application stays protected until you do.</string>
+    <string name="applock_overlay_leave_action">Leave this application</string>
+    <string name="applock_overlay_leave_note">Leaving takes you to your home screen. Nothing is unlocked by leaving, and coming back asks again.</string>
+    <string name="applock_overlay_unpresentable_title">App Lock cannot be shown</string>
+    <string name="applock_overlay_unpresentable_not_granted">Android\'s overlay permission is missing, so Nivara cannot draw the App Lock surface. Open Nivara and work through the App Lock preparation screen.</string>
+    <string name="applock_overlay_unpresentable_unavailable">Nivara could not read Android\'s overlay permission, so it cannot claim the surface is available. Open Nivara and check the App Lock preparation screen.</string>
+    <string name="applock_overlay_unpresentable_failed">Android refused the App Lock surface. Nothing has been unlocked. Open Nivara and check the App Lock preparation screen.</string>
+
+    <!-- App Lock preparation: overlay prerequisite and the protection switch (Stage 8) -->
+    <string name="applock_setup_prerequisite_overlay">overlay permission</string>
+    <string name="applock_setup_overlay_title">Overlay permission</string>
+    <string name="applock_setup_overlay_granted">Granted</string>
+    <string name="applock_setup_overlay_not_granted">Not granted</string>
+    <string name="applock_setup_overlay_unavailable">Unavailable</string>
+    <string name="applock_setup_overlay_summary">App Lock shows its authentication surface above the protected application. Android allows that only with this permission, and it is granted in Android\'s own settings.</string>
+    <string name="applock_setup_overlay_explanation">Without it Nivara cannot show the App Lock surface. A protected application is never treated as unprotected because of that: Nivara reports the missing permission instead.</string>
+    <string name="applock_setup_overlay_action">Open overlay settings</string>
+    <string name="applock_setup_overlay_settings_note">That screen belongs to Android. Nivara only reads whether the grant exists, and checks again when you come back.</string>
+    <string name="applock_setup_overlay_granted_notice">Overlay permission is on.</string>
+    <string name="applock_setup_protection_title">Protection</string>
+    <string name="applock_setup_protection_running">Protection is on. Nivara watches for protected applications while it is running.</string>
+    <string name="applock_setup_protection_stopped">Protection is off. Nothing is being detected.</string>
+    <string name="applock_setup_protection_unavailable">Detection is on but cannot decide anything right now: a prerequisite is missing or Android will not answer. The statuses above say which.</string>
+    <string name="applock_setup_protection_blocked">Protection needs every prerequisite above. Fix what is missing first.</string>
+    <string name="applock_setup_protection_start_action">Turn on protection</string>
+    <string name="applock_setup_protection_stop_action">Turn off protection</string>
+    <string name="applock_setup_protection_failed">The device did not accept the change. Protection is not running.</string>
+    <string name="applock_setup_protection_note">Protection runs while Nivara is open and for as long as Android keeps its background service alive; Android stops background services on its own terms, and Nivara does not claim otherwise.</string>
+<!-- App Lock management: choosing which applications are protected. -->
+    <string name="applock_manage_title">App Lock</string>
+    <string name="applock_manage_summary">Choose which applications need your credential before they open. Nivara watches for them while protection is running and shows its App Lock surface above the one you opened.</string>
+    <string name="applock_manage_ready">Nivara has everything App Lock needs.</string>
+    <string name="applock_manage_missing">App Lock still needs:</string>
+    <string name="applock_manage_missing_item">\u2022 %1$s</string>
+    <string name="applock_manage_counts">%1$d of %2$d discovered applications are set to be protected.</string>
+    <string name="applock_manage_not_installed">%1$d protected application(s) are not installed right now. They stay protected, and are covered again if they come back.</string>
+    <string name="applock_manage_protected_set_unreadable">Nivara cannot read which applications are protected, so no application\'s state is shown below. Nothing has been changed or removed.</string>
+    <string name="applock_manage_open_preparation">Open App Lock preparation</string>
+    <string name="applock_manage_locked">Unlock Nivara to change which applications are protected. You can look at the list without unlocking.</string>
+    <string name="applock_manage_unlock_action">Unlock Nivara</string>
+    <string name="applock_manage_search_label">Search applications</string>
+    <string name="applock_manage_section_label">Show</string>
+    <string name="applock_manage_section_all">All applications</string>
+    <string name="applock_manage_section_protected">Protected applications</string>
+    <string name="applock_manage_sort_label">Sort</string>
+    <string name="applock_manage_sort_name_ascending">Name A\u2013Z</string>
+    <string name="applock_manage_sort_name_descending">Name Z\u2013A</string>
+    <string name="applock_manage_state_protected">Protected</string>
+    <string name="applock_manage_state_not_protected">Not protected</string>
+    <string name="applock_manage_state_unavailable">Protected — Nivara cannot show the App Lock surface yet</string>
+    <string name="applock_manage_state_unknown">Protection state unavailable</string>
+    <string name="applock_manage_action_protect">Protect</string>
+    <string name="applock_manage_action_unprotect">Unprotect</string>
+    <string name="applock_manage_action_indeterminate">Unavailable</string>
+    <string name="applock_manage_action_protect_description">Protect %1$s</string>
+    <string name="applock_manage_action_unprotect_description">Stop protecting %1$s</string>
+    <string name="applock_manage_action_indeterminate_description">Protection state unavailable for %1$s</string>
+    <string name="applock_manage_empty_device">No launchable applications were found on this device.</string>
+    <string name="applock_manage_empty_search">No applications match your search.</string>
+    <string name="applock_manage_empty_protected">No applications are protected yet.</string>
+    <string name="applock_manage_empty_unreadable">Which applications are protected could not be read, so they cannot be listed.</string>
+    <string name="applock_manage_error_change_not_stored">Nivara could not store that change. Nothing was altered, and the list below shows the stored state.</string>
+    <string name="applock_manage_error_not_installed">That application is not installed any more. Nothing was changed, and the list has been refreshed.</string>
+    <string name="applock_manage_error_locked">Unlock Nivara before changing which applications are protected.</string>
+    <string name="applock_manage_error_discovery">Nivara could not read the device\'s applications this time. The list below is the last one it read; nothing about protection was changed.</string>
+    <string name="applock_manage_error_protected_set">Nivara could not read which applications are protected. Nothing was changed or removed.</string>
+    <string name="applock_manage_notice_changed">Protection saved. The list shows what is stored.</string>
+<!-- Hidden applications: what the user asked Nivara to keep out of sight. -->
+    <string name="apphide_manage_title">Hidden applications</string>
+    <string name="apphide_manage_summary">Choose the applications Nivara should keep out of sight. Hiding is a Nivara preference: Android\'s launcher still shows these applications, and every one of them stays installed and usable.</string>
+    <string name="apphide_manage_launcher_note">Nivara\'s own launcher will read this list when it arrives. Nothing on the device is changed in this build.</string>
+    <string name="apphide_manage_counts">%1$d of %2$d discovered applications are hidden.</string>
+    <string name="apphide_manage_not_installed">%1$d hidden application(s) are not installed right now. They stay hidden, and are hidden again if they come back.</string>
+    <string name="apphide_manage_state_unreadable">Nivara cannot read which applications are hidden, so no application\'s state is shown below. Nothing has been changed or removed.</string>
+    <string name="apphide_manage_state_unavailable">Where Nivara records hidden applications is not reachable right now, so no application\'s state is shown below. Nothing has been changed or removed.</string>
+    <string name="apphide_manage_locked">Unlock Nivara to change which applications are hidden. You can look at the list without unlocking.</string>
+    <string name="apphide_manage_unlock_action">Unlock Nivara</string>
+    <string name="apphide_manage_search_label">Search applications</string>
+    <string name="apphide_manage_section_label">Show</string>
+    <string name="apphide_manage_section_all">All applications</string>
+    <string name="apphide_manage_section_hidden">Hidden applications</string>
+    <string name="apphide_manage_sort_label">Sort</string>
+    <string name="apphide_manage_sort_name_ascending">Name A\u2013Z</string>
+    <string name="apphide_manage_sort_name_descending">Name Z\u2013A</string>
+    <string name="apphide_manage_state_hidden">Hidden</string>
+    <string name="apphide_manage_state_visible">Visible</string>
+    <string name="apphide_manage_state_unknown">Hidden state unavailable</string>
+    <string name="apphide_manage_action_hide">Hide</string>
+    <string name="apphide_manage_action_unhide">Unhide</string>
+    <string name="apphide_manage_action_indeterminate">Unavailable</string>
+    <string name="apphide_manage_action_hide_description">Hide %1$s</string>
+    <string name="apphide_manage_action_unhide_description">Show %1$s</string>
+    <string name="apphide_manage_action_indeterminate_description">Hidden state unavailable for %1$s</string>
+    <string name="apphide_manage_empty_device">No launchable applications were found on this device.</string>
+    <string name="apphide_manage_empty_search">No applications match your search.</string>
+    <string name="apphide_manage_empty_hidden">No applications are hidden yet.</string>
+    <string name="apphide_manage_empty_unreadable">Which applications are hidden could not be read, so they cannot be listed.</string>
+    <string name="apphide_manage_empty_unavailable">Where Nivara records hidden applications is not reachable, so they cannot be listed.</string>
+    <string name="apphide_manage_error_change_not_stored">Nivara could not store that change. Nothing was altered, and the list below shows the stored state.</string>
+    <string name="apphide_manage_error_not_installed">That application is not installed any more. Nothing was changed, and the list has been refreshed.</string>
+    <string name="apphide_manage_error_locked">Unlock Nivara before changing which applications are hidden.</string>
+    <string name="apphide_manage_error_discovery">Nivara could not read the device\'s applications this time. The list below is the last one it read; nothing about hiding was changed.</string>
+    <string name="apphide_manage_error_hidden_unreadable">Nivara could not read which applications are hidden, so that change was not made. Nothing has been changed or removed.</string>
+    <string name="apphide_manage_error_hidden_unavailable">Where Nivara records hidden applications is not reachable, so that change was not made. The list below shows the last state it read.</string>
+    <string name="apphide_manage_notice_changed">Saved. The list shows what is stored.</string>
+<!-- The launcher: Nivara as the device's Home application. -->
+    <string name="launcher_home_summary">Nivara is your Home application. Applications you hide in Nivara are left out of this drawer; Android still shows them everywhere else.</string>
+    <string name="launcher_open_drawer">All applications</string>
+    <string name="launcher_settings_action">Nivara settings</string>
+    <string name="launcher_manage_action">Manage hidden applications</string>
+    <string name="launcher_hidden_card_title">Hidden applications</string>
+    <string name="launcher_hidden_card_summary">%1$d application(s) are hidden from this drawer.</string>
+    <string name="launcher_hidden_card_note">Showing them needs Nivara to be unlocked, and they are hidden again as soon as it locks. Nothing is deleted or uninstalled.</string>
+    <string name="launcher_reveal_action">Show hidden applications</string>
+    <string name="launcher_conceal_action">Hide them again</string>
+    <string name="launcher_unlock_action">Unlock Nivara</string>
+    <string name="launcher_reveal_notice">Hidden applications are shown until Nivara locks.</string>
+    <string name="launcher_drawer_title">Applications</string>
+    <string name="launcher_drawer_close">Close applications</string>
+    <string name="launcher_drawer_search_label">Search applications</string>
+    <string name="launcher_drawer_all">All applications</string>
+    <string name="launcher_drawer_hidden">Hidden applications</string>
+    <string name="launcher_drawer_sort_name_ascending">Name A–Z</string>
+    <string name="launcher_drawer_sort_name_descending">Name Z–A</string>
+    <string name="launcher_empty_device">No launchable applications were found on this device.</string>
+    <string name="launcher_empty_all_hidden">Every application on this device is hidden. Unlock Nivara and show hidden applications to see them.</string>
+    <string name="launcher_empty_search">No applications match your search.</string>
+    <string name="launcher_empty_hidden">No applications are hidden.</string>
+    <string name="launcher_discovery_unavailable_title">Applications are unavailable</string>
+    <string name="launcher_discovery_unavailable">Nivara could not list the applications on this device, so it shows none of them. Nothing has been changed or removed.</string>
+    <string name="launcher_hidden_unreadable_title">Hidden applications cannot be read</string>
+    <string name="launcher_hidden_unreadable">Nivara cannot read which applications are hidden, so it shows none of them. Nothing has been changed, and nothing was removed.</string>
+    <string name="launcher_hidden_unavailable_title">Hidden applications are unavailable</string>
+    <string name="launcher_hidden_unavailable">Where Nivara records hidden applications is not reachable, so it shows none of them. Nothing has been changed.</string>
+    <string name="launcher_error_not_installed">That application is not installed any more. Nothing was opened, and the list has been refreshed.</string>
+    <string name="launcher_error_launch_failed">Nivara could not open that application.</string>
+    <string name="launcher_error_discovery">Nivara could not read the device\'s applications this time. The list below is the last one it read.</string>
+
+    <!--
+      Application identity (camouflage). The copy states the limitation as plainly as the feature:
+      renaming the launcher entry changes presentation, is not a security boundary, and does not
+      remove Nivara from Android's own lists. Recovery is described as the ordinary thing it is.
+    -->
+    <string name="camouflage_title">Application identity</string>
+    <string name="camouflage_summary">Choose the name and icon Nivara\'s launcher entry shows. Nivara\'s package, data, protection and settings are unchanged.</string>
+    <string name="camouflage_current_title">Shown now</string>
+    <string name="camouflage_current_summary">Nivara\'s launcher entry currently shows as %1$s.</string>
+    <string name="camouflage_choose_label">Show Nivara as</string>
+    <string name="camouflage_profile_notes_label">Notes</string>
+    <string name="camouflage_profile_calculator_label">Calculator</string>
+    <string name="camouflage_profile_weather_label">Weather</string>
+    <string name="camouflage_action_use">Use this identity</string>
+    <string name="camouflage_action_current">In use</string>
+    <string name="camouflage_limitation_title">What this does not do</string>
+    <string name="camouflage_limitation">This changes presentation only. Nivara stays installed under the same package name, so Android\'s settings, the package manager and any device or work-profile management tool still list it, and it is not a way to hide Nivara or any other application from someone who looks. It is not a security boundary and not a secret: your credential, biometric unlock, App Lock and the session timeout are what protect you, and none of them changes.</string>
+    <string name="camouflage_recovery_title">Getting back to Nivara</string>
+    <string name="camouflage_recovery">However Nivara is named right now, it can always be opened: from its launcher entry, or from Android\'s application list, where it is still Nivara. It opens on Nivara\'s home screen, and this screen is one card down from there. If you forget which name you chose, Android\'s settings still say Nivara. Nothing about reaching Nivara is hidden, and no code or gesture is needed to find it.</string>
+    <string name="camouflage_locked">Unlock Nivara to change its identity. You can look at this screen without unlocking.</string>
+    <string name="camouflage_unlock_action">Unlock Nivara</string>
+    <string name="camouflage_notice_changed">Identity changed. Android\'s launcher may take a moment to show the new entry.</string>
+    <string name="camouflage_error_not_changed">Nivara could not change its launcher identity. Nothing was changed, and the identity shown above is the one in use.</string>
+
+    <!--
+      The vault: where it lives, what is at it, and what each state means. The copy states plainly
+      that a vault Nivara cannot read has not been deleted, because "the vault is empty" is the one
+      reading this screen must never invite.
+    -->
+    <string name="home_vault_action">Set up vault storage</string>
+    <string name="vault_title">Vault storage</string>
+    <string name="vault_state_not_configured_title">No vault folder chosen</string>
+    <string name="vault_state_not_configured">Nivara does not have a vault yet, and does not create one on its own. Choose the folder that should hold it, then create the vault there.</string>
+    <string name="vault_state_location_unknown_title">The vault folder is unknown</string>
+    <string name="vault_state_location_unknown">Nivara\'s record of which folder holds the vault cannot be read, so it cannot say where the vault is. Nothing has been deleted, and no other folder has been used. Choose the folder again to reconnect to it.</string>
+    <string name="vault_state_missing_title">No vault in this folder</string>
+    <string name="vault_state_missing">This folder does not hold a Nivara vault yet. You can create one here; nothing else in the folder is touched.</string>
+    <string name="vault_state_ready_title">Vault ready</string>
+    <string name="vault_state_ready">The vault in this folder is intact and can be opened. Its contents are encrypted with a key that never leaves the device, and nothing else is stored here.</string>
+    <string name="vault_state_unreadable_title">Vault cannot be opened</string>
+    <string name="vault_state_unreadable_metadata">There is a Nivara vault in this folder, and its metadata cannot be read: the record may be damaged, or the device key that protects it may no longer be the one it was written with. Nothing has been changed, deleted or replaced, and the vault has not been treated as empty.</string>
+    <string name="vault_state_incomplete_title">Vault setup is incomplete</string>
+    <string name="vault_state_unreadable_structure">Nivara\'s structure is in this folder without a complete vault record, which usually means an earlier setup did not finish. Nothing has been deleted. If you expected an existing vault here, stop and check the folder before creating one.</string>
+    <string name="vault_state_unreadable_key">The vault in this folder is intact, and the device key that protects its key material is no longer available — this happens when the screen lock is removed. Nothing has been changed or deleted.</string>
+    <string name="vault_state_unsupported_title">Vault from a newer Nivara</string>
+    <string name="vault_state_unsupported">This folder holds a vault written by a newer version of Nivara. This build refuses to touch it rather than risk your data. Update Nivara to open it.</string>
+    <string name="vault_state_unavailable_title">Vault storage unavailable</string>
+    <string name="vault_state_unavailable">The folder that holds the vault cannot be reached right now — the storage may be removed, or the folder may no longer exist. Nothing has been changed or deleted.</string>
+    <string name="vault_state_access_denied_title">Vault storage not permitted</string>
+    <string name="vault_state_access_denied">Nivara no longer has permission to use this folder. Choose it again to grant access; nothing has been changed or deleted.</string>
+    <string name="vault_choose_root_action">Choose vault folder</string>
+    <string name="vault_change_root_action">Choose a different folder</string>
+    <string name="vault_initialize_action">Create vault here</string>
+    <string name="vault_replace_action">Replace the unreadable vault</string>
+    <string name="vault_replace_warning">This deletes the unreadable records in this folder and starts a new vault. Anything the old vault held cannot be recovered.</string>
+    <string name="vault_locked">Unlock Nivara to change vault storage. You can look at this screen without unlocking.</string>
+    <string name="vault_unlock_action">Unlock Nivara</string>
+    <string name="vault_notice_root_selected">Vault folder saved.</string>
+    <string name="vault_notice_initialized">Vault created in the selected folder.</string>
+    <string name="vault_error_selection_failed">Nivara could not use that folder. Nothing was changed.</string>
+    <string name="vault_error_invalid_location">That folder cannot hold a Nivara vault. Nothing was changed.</string>
+    <string name="vault_error_location_unreadable">Nivara cannot read where the vault is, so it will not replace it. Nothing was changed.</string>
+    <string name="vault_error_access_denied">Nivara does not have permission for that folder. Nothing was changed.</string>
+    <string name="vault_error_storage_unavailable">That storage cannot be reached right now. Nothing was changed.</string>
+    <string name="vault_error_already_exists">A vault already exists in that folder. Nothing was replaced.</string>
+    <string name="vault_error_not_replaced">Nivara will not replace that vault. Nothing was changed.</string>
+    <string name="vault_error_write_failed">Nivara could not write to that folder. Nothing was created.</string>
+    <string name="vault_error_not_verified">The vault record could not be verified after writing, so no vault was created. Nothing was left behind.</string>
+    <string name="vault_error_key_unavailable">The device key that protects the vault is not available, so no vault was created.</string>
+    <string name="vault_error_cryptography">Nivara\'s encryption layer refused the operation, so no vault was created.</string>
+    <string name="vault_recover_entry_action">Recover an existing vault</string>
+    <string name="vault_recovery_setup_card">This vault has no recovery code. If Nivara is reinstalled or its own storage is cleared, the vault cannot be opened again without one. Setting it up does not change the vault or its key.</string>
+    <string name="vault_recovery_setup_action">Set up a recovery code</string>
+    <string name="vault_recovery_setup_damaged">The recovery record in this vault cannot be read. Setting up a new recovery code replaces it; the vault itself is not changed.</string>
+    <string name="vault_recovery_code_title">Your recovery code</string>
+    <string name="vault_recovery_code_intro">This code is the only way back into this vault if Nivara\'s own storage is ever gone. Write it down and keep it somewhere safe — it is shown exactly once, and Nivara keeps no copy of it.</string>
+    <string name="vault_recovery_code_stored_action">I have stored this code</string>
+    <string name="vault_error_recovery_not_ready">The vault must be open before a recovery code can be set up. Nothing was changed.</string>
+    <string name="vault_error_recovery_failed">The recovery code could not be written. Nothing was changed.</string>
+    <string name="vault_recovery_title">Recover a vault</string>
+    <string name="vault_recovery_intro">If Nivara was reinstalled or its own storage was cleared, the vault on your storage is still there — this screen reconnects to it with the recovery code you were given when it was set up. Nothing is created, replaced or repaired here.</string>
+    <string name="vault_recovery_choose_action">Choose the vault\'s folder</string>
+    <string name="vault_recovery_not_a_vault">That folder does not hold a Nivara vault, so there is nothing to recover there. Nothing was changed.</string>
+    <string name="vault_recovery_not_set_up">That folder holds a Nivara vault, but no recovery code was ever set up for it. Without the code there is no way back in, and Nivara will not guess or replace anything. Nothing was changed.</string>
+    <string name="vault_recovery_damaged">That folder holds a Nivara vault whose recovery record cannot be read. Nivara refuses to guess at damaged records and repairs nothing. Nothing was changed.</string>
+    <string name="vault_recovery_unsupported">That folder holds a recovery record written by a newer version of Nivara. This build refuses to use it rather than risk your vault. Nothing was changed.</string>
+    <string name="vault_recovery_location_unavailable">That folder could not be read — the selection may have been revoked, or the storage may be unavailable. Nothing was changed.</string>
+    <string name="vault_recovery_identity_label">Vault fingerprint</string>
+    <string name="vault_recovery_identity_explainer">This fingerprint identifies the vault in that folder. Confirm it is the vault you mean before entering its code.</string>
+    <string name="vault_recovery_code_label">Recovery code</string>
+    <string name="vault_recovery_recover_action">Recover this vault</string>
+    <string name="vault_recovery_code_malformed">That is not a recovery code. Check the characters and try again — nothing was changed.</string>
+    <string name="vault_recovery_code_checksum">That code does not match its own checksum, so it was mistyped somewhere. Nothing was changed.</string>
+    <string name="vault_recovery_wrong_material">That code does not open this vault. Nothing was changed.</string>
+    <string name="vault_recovery_key_mismatch">The code opened something, but not a key that belongs to this vault. Nothing was reconnected.</string>
+    <string name="vault_recovery_locked">Too many attempts. Try again in %1$d seconds.</string>
+    <string name="vault_recovery_write_failed">The reconnection could not be written to the folder and verified. Nothing was changed.</string>
+    <string name="vault_recovery_failed">Recovery could not finish. Nothing was changed.</string>
+    <string name="vault_recovery_success_title">Vault reconnected</string>
+    <string name="vault_recovery_success">This device is connected to the vault again — the same vault, with the same key and everything it holds. Your files, albums and trash are as they were. Unlock Nivara as usual to open it; the code you used is not needed for that, and it is not stored here.</string>
+    <string name="vault_recovery_done_action">Return to the vault</string>
+    <string name="vault_import_action">Import a file</string>
+    <string name="vault_import_progress_title">Importing and encrypting</string>
+    <string name="vault_import_progress_percent">%1$d%%</string>
+    <string name="vault_import_progress_unknown">This file does not report a size, so the import cannot show a percentage. It will finish when the file has been read and encrypted.</string>
+    <string name="vault_import_locked">Unlock Nivara to import a file. The file you picked was not imported.</string>
+    <string name="vault_notice_imported">File imported and encrypted in the vault. The original file was not changed.</string>
+    <string name="vault_import_error_selection_failed">Nivara could not use that selection, so nothing was imported.</string>
+    <string name="vault_import_error_generic">The import did not finish, so the file is not in the vault. Nothing in the vault was changed, and the original file was not touched.</string>
+    <string name="vault_import_error_not_authorized">Importing needs an open session, so the file was not imported. Unlock Nivara and choose the file again.</string>
+    <string name="vault_import_error_vault_not_ready">The vault is not ready to hold files, so nothing was imported. The vault\'s own message above says why.</string>
+    <string name="vault_import_error_index_unreadable">The vault\'s list of files cannot be read, so nothing was imported and the list was left exactly as it is. Nothing has been deleted.</string>
+    <string name="vault_import_error_index_unsupported">The vault\'s list of files was written by a newer Nivara, so nothing was imported. Update Nivara to add files to it.</string>
+    <string name="vault_import_error_index_full">The vault\'s list of files cannot hold another entry, so nothing was imported. Nothing was changed.</string>
+    <string name="vault_import_error_source_unavailable">The selected file could not be read — it may have been moved or deleted — so nothing was imported.</string>
+    <string name="vault_import_error_source_access_denied">Nivara was not allowed to read the selected file, so nothing was imported.</string>
+    <string name="vault_import_error_source_too_large">The selected file is larger than Nivara imports, so nothing was imported.</string>
+    <string name="vault_import_error_source_name">The selected file\'s name cannot be stored in the vault, so nothing was imported. The file itself was not changed.</string>
+    <string name="vault_import_error_storage_unavailable">The vault\'s storage cannot be reached right now, so nothing was imported. Nothing was changed.</string>
+    <string name="vault_import_error_access_denied">Nivara no longer has permission for the vault folder, so nothing was imported. Choose the folder again to grant access.</string>
+    <string name="vault_import_error_write_failed">The vault\'s storage refused a write, so nothing was imported. Nothing in the vault was changed.</string>
+    <string name="vault_import_error_not_verified">What was written did not come back as it was written, so the file was not added to the vault. Nothing was changed, and the vault\'s own list was left as it was.</string>
+    <string name="vault_import_error_key_unavailable">The device key that protects the vault is not available, so nothing was imported.</string>
+    <string name="vault_import_error_cryptography">Nivara\'s encryption layer refused the operation, so nothing was imported.</string>
+    <string name="vault_import_error_duplicate_id">Nivara could not allocate a safe identifier for the file, so nothing was imported. Nothing was changed.</string>
+    <string name="vault_index_title">Files in the vault</string>
+    <string name="vault_index_loading">Reading the vault\'s list of files…</string>
+    <string name="vault_index_not_ready">The files in the vault are listed once the vault itself can be opened.</string>
+    <string name="vault_index_empty_title">No files imported yet</string>
+    <string name="vault_index_empty">Nothing has been imported into this vault yet. Importing keeps an encrypted copy in the vault; the file you pick stays where it is.</string>
+    <string name="vault_index_items_title">Files in the vault (%1$d)</string>
+    <string name="vault_index_missing_content">%1$d listed file(s) have no encrypted content in the vault. Their entries are kept, and nothing has been deleted.</string>
+    <string name="vault_index_unfinished_objects">%1$d earlier import(s) stopped before they finished. Nivara does not treat them as files and has not deleted anything.</string>
+    <string name="vault_index_unindexed_objects">%1$d encrypted file(s) in this folder are not listed. Nivara has not deleted them and does not treat them as imported files.</string>
+    <string name="vault_index_unreadable_title">File list cannot be read</string>
+    <string name="vault_index_unreadable">The record that lists this vault\'s files cannot be read, so Nivara will not import: writing a new list could replace one it cannot read. Nothing has been deleted, and the encrypted files in the vault are untouched.</string>
+    <string name="vault_index_unreadable_key_title">File list cannot be opened</string>
+    <string name="vault_index_unreadable_key">The record that lists this vault\'s files is intact, and the key that opens it is not available right now. Nothing has been deleted.</string>
+    <string name="vault_index_unsupported_title">File list from a newer Nivara</string>
+    <string name="vault_index_unsupported">This vault\'s list of files was written by a newer version of Nivara. This build will not change it. Update Nivara to add files to it.</string>
+    <string name="vault_index_unavailable_title">File list unavailable</string>
+    <string name="vault_index_unavailable">Nivara could not read the list of files in this vault right now. Nothing has been changed or deleted.</string>
+    <string name="vault_index_access_denied_title">File list not permitted</string>
+    <string name="vault_index_access_denied">Nivara no longer has permission to read this vault. Choose the folder again to grant access; nothing has been changed or deleted.</string>
+    <string name="vault_item_type_image">Image</string>
+    <string name="vault_item_type_video">Video</string>
+    <string name="vault_item_type_audio">Audio</string>
+    <string name="vault_item_type_text">Text</string>
+    <string name="vault_item_type_document">Document</string>
+    <string name="vault_item_type_other">File</string>
+    <string name="vault_item_imported_format">Imported %1$s</string>
+    <string name="vault_item_details_format">%1$s · %2$s</string>
+    <string name="vault_item_open_action">Open</string>
+    <string name="vault_viewer_close_action">Back to the list</string>
+    <string name="vault_viewer_opening">Opening the file…</string>
+    <string name="vault_viewer_image_description">Imported file %1$s, shown from the vault</string>
+    <string name="vault_viewer_image_scaled">Shown at a reduced size, so a large picture fits the memory a viewer may use.</string>
+    <string name="vault_viewer_zoom_hint">Double-tap to zoom.</string>
+    <string name="vault_viewer_unsupported_title">Nivara cannot show this file</string>
+    <string name="vault_viewer_unsupported_body">The file is in the vault and its content is intact. There is no viewer for %1$s in this version, so Nivara shows what it records about the file and nothing else. The file itself is untouched.</string>
+    <string name="vault_viewer_missing_title">The file\'s content is not in the vault</string>
+    <string name="vault_viewer_missing_body">The vault\'s list names this file and its encrypted content is not there. Nivara has not deleted anything, and it has not removed the entry: a listed file whose content did not arrive is reported rather than silently forgotten.</string>
+    <string name="vault_viewer_unreadable_title">The file could not be read</string>
+    <string name="vault_viewer_unreadable_body">The vault\'s storage could not be reached, or refused the read. Nothing was shown, and nothing was changed.</string>
+    <string name="vault_viewer_corrupt_title">The file did not authenticate</string>
+    <string name="vault_viewer_corrupt_body">The encrypted content is not what Nivara wrote — it did not pass authentication, so none of it was shown. Not even the beginning of the file is displayed, because a part of a file is not the file.</string>
+    <string name="vault_viewer_failed_title">This device could not display the file</string>
+    <string name="vault_viewer_failed_body">The file was read and its content is intact, but this device\'s decoder could not handle it. The file itself is unaffected.</string>
+    <string name="vault_viewer_locked_title">Nivara is locked</string>
+    <string name="vault_viewer_locked_body">Showing a file needs an open session. Unlock Nivara with the credential screen, then open the file again.</string>
+    <string name="vault_viewer_play">Play</string>
+    <string name="vault_viewer_pause">Pause</string>
+    <string name="vault_viewer_position_format">%1$s / %2$s</string>
+    <string name="vault_viewer_position_unknown_format">%1$s</string>
+    <string name="vault_viewer_video_description">Playing %1$s from the vault</string>
+    <string name="vault_viewer_seek_description">Position</string>
+    <string name="vault_viewer_text_truncated">Showing the beginning of this file; the vault holds all of it.</string>
+    <string name="vault_viewer_text_characters_format">%1$d characters shown</string>
+    <string name="vault_viewer_document_page_format">Page %1$d of %2$d</string>
+    <string name="vault_viewer_previous_page">Previous page</string>
+    <string name="vault_viewer_next_page">Next page</string>
+    <!-- Organisation: the way the vault's files are arranged, searched and sorted. -->
+    <string name="vault_section_all_items">All files</string>
+    <string name="vault_section_albums">Albums</string>
+    <string name="vault_search_label">Search</string>
+    <string name="vault_search_hint">Name, type or kind</string>
+    <string name="vault_search_clear">Clear search</string>
+    <string name="vault_search_no_matches">No file in the vault matches \'%1$s\'. Search looks at names, types and kinds — it does not read file content.</string>
+    <string name="vault_search_cannot_search">The vault\'s list of files cannot be read, so nothing could be searched. The list\'s own state above says why.</string>
+    <string name="vault_search_result_format">%1$d of %2$d files match</string>
+    <string name="vault_search_no_album_matches">No album matches \'%1$s\'. Search looks at album titles.</string>
+    <string name="vault_search_albums_result_format">%1$d of %2$d albums match</string>
+    <string name="vault_search_cannot_search_albums">The album record cannot be read, so no album could be searched. The albums\' own state above says why.</string>
+    <string name="vault_sort_field_label">Order</string>
+    <string name="vault_sort_by_name">Name</string>
+    <string name="vault_sort_by_size">Size</string>
+    <string name="vault_sort_by_imported">Imported</string>
+    <string name="vault_sort_by_type">Type</string>
+    <string name="vault_sort_direction_ascending">Ascending</string>
+    <string name="vault_sort_direction_descending">Descending</string>
+    <string name="vault_albums_none">No albums yet. An album is a list you keep inside the vault; creating one does not copy, move or change any file.</string>
+    <string name="vault_album_create_label">New album</string>
+    <string name="vault_album_name_label">Album name</string>
+    <string name="vault_album_create_action">Create album</string>
+    <string name="vault_album_cancel_action">Cancel</string>
+    <string name="vault_album_open_action">Open album</string>
+    <string name="vault_album_back_action">Back to albums</string>
+    <string name="vault_album_rename_action">Rename</string>
+    <string name="vault_album_rename_confirm">Save name</string>
+    <string name="vault_album_delete_action">Delete album</string>
+    <string name="vault_album_delete_confirm">Delete the album</string>
+    <string name="vault_album_delete_warning">Deleting an album deletes the album and nothing else. Its files stay in the vault with their content untouched, and they stay in every other album they are in.</string>
+    <string name="vault_album_created_format">Created %1$s</string>
+    <string name="vault_album_member_count_format">%1$d items</string>
+    <string name="vault_album_member_count_partial_format">%1$d items, %2$d of them no longer in the vault</string>
+    <string name="vault_album_count_unresolved_format">%1$d items listed</string>
+    <string name="vault_album_empty">This album is empty. It stays here until you delete it.</string>
+    <string name="vault_album_no_matches">No file in this album matches the search.</string>
+    <string name="vault_album_unresolved">The vault\'s list of files cannot be read, so this album\'s items cannot be shown. The album itself is untouched, and its contents are still recorded.</string>
+    <string name="vault_album_stale_title">No longer in the vault</string>
+    <string name="vault_album_stale_body">This album names a file the vault\'s list does not have. Nivara keeps the reference and shows it rather than removing it quietly, and removing it is your decision alone.</string>
+    <string name="vault_album_stale_forget_action">Remove from album</string>
+    <string name="vault_album_manage_items_action">Add or remove files</string>
+    <string name="vault_album_manage_items_done">Done</string>
+    <string name="vault_album_in_album">In this album</string>
+    <string name="vault_album_add_item_action">Add</string>
+    <string name="vault_album_remove_item_action">Remove</string>
+    <string name="vault_album_manage_items_hint">Adding a file to an album changes nothing about the file. It is still in the vault, still in every other album it is in, and its encrypted content is untouched.</string>
+    <string name="vault_albums_unreadable_title">The albums cannot be read</string>
+    <string name="vault_albums_unreadable_body">Nivara\'s record of your albums is there and cannot be opened. Nothing was created, renamed or deleted, and it has not been replaced: albums that cannot be read are still there.</string>
+    <string name="vault_albums_key_unavailable_body">The platform key that protects the vault is not available, so the album record cannot be opened. Nothing was changed.</string>
+    <string name="vault_albums_unsupported_title">The albums were written by a newer Nivara</string>
+    <string name="vault_albums_unsupported_body">This build does not know the album record\'s format. It is left exactly as it is, so a newer Nivara can still read it.</string>
+    <string name="vault_albums_unavailable_title">The albums cannot be reached</string>
+    <string name="vault_albums_unavailable_body">The vault\'s storage could not be reached, so the album record could not be read. Nothing was changed.</string>
+    <string name="vault_albums_access_denied_title">The albums are not accessible</string>
+    <string name="vault_albums_access_denied_body">Access to the vault\'s folder was refused, so the album record could not be read. Nothing was changed.</string>
+    <string name="vault_album_error_not_authorized">Changing albums needs an open session. Unlock Nivara, then try again.</string>
+    <string name="vault_album_error_vault_not_ready">The vault is not open, so its albums cannot be changed.</string>
+    <string name="vault_album_error_unreadable">The album record cannot be read, so it was not changed. Nothing was written over it.</string>
+    <string name="vault_album_error_unsupported">The album record was written by a newer Nivara and is never written over.</string>
+    <string name="vault_album_error_unavailable">The album record cannot be reached right now, so nothing was changed.</string>
+    <string name="vault_album_error_access_denied">Access to the vault\'s folder was refused, so nothing was changed.</string>
+    <string name="vault_album_error_not_found">That album is not in this vault.</string>
+    <string name="vault_album_error_invalid_name">An album name has to be text of a reasonable length, without control characters.</string>
+    <string name="vault_album_error_name_unchanged">The album already has this name.</string>
+    <string name="vault_album_error_album_full">This album already holds as many files as one album can.</string>
+    <string name="vault_album_error_too_many">The vault already holds as many albums, or as many album entries, as it can.</string>
+    <string name="vault_album_error_storage_unavailable">The vault\'s storage could not be reached, so nothing was changed.</string>
+    <string name="vault_album_error_write_failed">The vault\'s storage refused the write. The albums are unchanged.</string>
+    <string name="vault_album_error_not_verified">What was written did not read back as it was written, so it was discarded. The albums are unchanged.</string>
+    <string name="vault_album_error_key_unavailable">The platform key that protects the vault is not available, so the album record cannot be opened.</string>
+    <string name="vault_album_error_cryptography">A cryptographic service refused the operation. The albums are unchanged.</string>
+    <string name="vault_album_error_failed">The album change could not be completed. Nothing was changed.</string>
+    <string name="vault_album_notice_created">Album created.</string>
+    <string name="vault_album_notice_renamed">Album renamed.</string>
+    <string name="vault_album_notice_deleted">Album deleted. Its files are untouched.</string>
+    <string name="vault_album_notice_item_added">File added to the album.</string>
+    <string name="vault_album_notice_item_removed">File removed from the album. The file itself is untouched.</string>
+    <string name="vault_explanation_title">Where the vault lives</string>
+    <string name="vault_explanation">The vault is one folder on storage you choose, and Nivara only ever touches that folder. Inside it, Nivara keeps an authenticated record of the vault and an encrypted content area; nothing is written anywhere else and nothing is uploaded. The folder can be on a memory card or in a synced location, which is also how it moves between devices — and why the storage is not a secret: what protects it is the encryption, not where it sits.</string>
+
+    <string name="vault_section_trash">Trash</string>
+    <string name="vault_trash_sort_by_trashed">Trashed</string>
+    <string name="vault_trash_title">Trash</string>
+    <string name="vault_trash_count_title">In Trash (%1$d)</string>
+    <string name="vault_trash_empty">Nothing is in the trash. Moving a file here keeps it in the vault; it is not deleted.</string>
+    <string name="vault_trash_explanation">Moving a file to Trash takes it out of your files without deleting it. The encrypted file stays in the vault with its name, its albums and everything else until you restore it.</string>
+    <string name="vault_trash_unreadable_title">The trash cannot be read</string>
+    <string name="vault_trash_unreadable_body">Nivara\'s record of what you moved to Trash is there and cannot be opened. Nothing was deleted, and it has not been replaced.</string>
+    <string name="vault_trash_key_unavailable_body">The key that opens the vault is not available, so the trash record cannot be read. Nothing was deleted.</string>
+    <string name="vault_trash_unsupported_title">The trash was written by a newer Nivara</string>
+    <string name="vault_trash_unsupported_body">This version cannot read it, so it has not been changed. A newer Nivara can still open it.</string>
+    <string name="vault_trash_unavailable_title">The trash cannot be reached</string>
+    <string name="vault_trash_unavailable_body">The vault\'s storage could not be reached, so the trash record could not be read. Nothing was changed.</string>
+    <string name="vault_trash_access_denied_title">Access to the trash was refused</string>
+    <string name="vault_trash_access_denied_body">The platform no longer grants access to the vault, so the trash record could not be read. Nothing was changed.</string>
+    <string name="vault_trash_row_unknown_title">A file in Trash</string>
+    <string name="vault_trash_row_trashed_format">Moved to Trash %1$s</string>
+    <string name="vault_trash_row_missing_from_list">This file is no longer in the vault\'s list. The entry is kept until the file is restored or the entry is removed.</string>
+    <string name="vault_trash_row_list_unreadable">The vault\'s list cannot be read, so this file\'s details cannot be shown right now.</string>
+    <string name="vault_trash_row_content_missing">Its encrypted content is missing from the vault.</string>
+    <string name="vault_album_all_trashed">Every file in this album is in the Trash.</string>
+    <string name="vault_trash_restore_action">Restore</string>
+    <string name="vault_trash_move_action">Move to Trash</string>
+    <string name="vault_trash_notice_trashed">Moved to Trash.</string>
+    <string name="vault_trash_notice_restored">Moved out of Trash.</string>
+    <string name="vault_trash_search_result_format">%1$d of %2$d trashed files</string>
+    <string name="vault_trash_search_no_matches">Nothing in the trash matches \'%1$s\'.</string>
+    <string name="vault_trash_search_cannot_search">The trash cannot be searched right now because the vault\'s list cannot be read.</string>
+    <string name="vault_trash_state_unknown_notice">The trash record cannot be read right now, so files you moved to Trash may still be listed here.</string>
+    <string name="vault_trash_error_not_authorized">Moving files to and from Trash needs an open session.</string>
+    <string name="vault_trash_error_vault_not_ready">The vault is not ready, so its trash cannot be changed.</string>
+    <string name="vault_trash_error_unreadable">The trash record cannot be read, so it was not changed.</string>
+    <string name="vault_trash_error_key_unavailable">The key that opens the vault is not available, so the trash was not changed.</string>
+    <string name="vault_trash_error_unsupported">The trash record was written by a newer Nivara, so it was not changed.</string>
+    <string name="vault_trash_error_unavailable">The trash record could not be reached, so nothing was changed.</string>
+    <string name="vault_trash_error_access_denied">Access to the vault was refused, so the trash was not changed.</string>
+    <string name="vault_trash_error_index_unreadable">The vault\'s list cannot be read, so Nivara cannot tell whether the file is in the vault. Nothing was changed.</string>
+    <string name="vault_trash_error_index_unsupported">The vault\'s list was written by a newer Nivara, so the file could not be checked. Nothing was changed.</string>
+    <string name="vault_trash_error_index_unavailable">The vault\'s list could not be reached, so the file could not be checked. Nothing was changed.</string>
+    <string name="vault_trash_error_item_not_in_vault">That file is not in this vault, so nothing was moved.</string>
+    <string name="vault_trash_error_full">The trash already holds as many files as one record can carry.</string>
+    <string name="vault_trash_error_storage_unavailable">The vault\'s storage cannot be reached, so nothing was changed.</string>
+    <string name="vault_trash_error_write_failed">The vault\'s storage refused the change, so nothing was changed.</string>
+    <string name="vault_trash_error_not_verified">The change did not read back as it was written, so it was not kept.</string>
+    <string name="vault_trash_error_cryptography">A cryptographic service refused the operation, so the trash was not changed.</string>
+    <string name="vault_trash_error_not_writable">The trash cannot be changed right now because its record cannot be read.</string>
+    <string name="vault_trash_error_failed">The change to the trash failed.</string>
+    <string name="vault_album_member_count_trashed_format">%1$d items, %2$d of them in Trash</string>
+    <string name="vault_album_member_count_partial_trashed_format">%1$d items, %2$d no longer in the vault, %3$d in Trash</string>
+
+    <!-- Onboarding: the first-run permission gate. -->
+    <string name="onboarding_title">Welcome to Nivara</string>
+    <string name="onboarding_intro">Nivara needs three permissions to protect your apps. Each one is granted in Android\'s own screen, and Nivara checks again every time you return.</string>
+    <string name="onboarding_usage_title">Usage access</string>
+    <string name="onboarding_usage_summary">Lets App Lock see which app is open, so it can lock it.</string>
+    <string name="onboarding_usage_action">Enable</string>
+    <string name="onboarding_overlay_title">Display over other apps</string>
+    <string name="onboarding_overlay_summary">Lets App Lock draw its lock screen above the app it protects.</string>
+    <string name="onboarding_overlay_action">Allow</string>
+    <string name="onboarding_battery_title">Run in background</string>
+    <string name="onboarding_battery_summary">Stops Android from pausing App Lock when you leave Nivara.</string>
+    <string name="onboarding_battery_action">Allow</string>
+    <string name="onboarding_notifications_title">Notifications</string>
+    <string name="onboarding_notifications_summary">Optional. Shows a quiet notice while App Lock is running.</string>
+    <string name="onboarding_notifications_action">Allow</string>
+    <string name="onboarding_optional">optional</string>
+    <string name="onboarding_status_granted">Granted</string>
+    <string name="onboarding_status_not_granted">Not granted</string>
+    <string name="onboarding_status_unavailable">Could not be checked</string>
+    <string name="onboarding_ready">All set. Nivara is ready to protect your apps.</string>
+    <string name="onboarding_settings_unavailable">Nivara could not open Android\'s settings screen on this device.</string>
+
+    <!-- App Lock protection notification. -->
+    <string name="protection_channel_name">App Lock running</string>
+    <string name="protection_channel_description">A quiet notice shown while App Lock protection is on.</string>
+    <string name="protection_notification_title">App Lock is on</string>
+    <string name="protection_notification_text">Nivara is watching your protected apps.</string>
+
+    <!-- Redesigned home. -->
+    <string name="home_tile_vault">Vault</string>
+    <string name="home_tile_applock">App Lock</string>
+    <string name="home_tile_hide">Hide apps</string>
+    <string name="home_tile_all">All features</string>
+    <string name="home_scan_title">Security check</string>
+    <string name="home_scan_action">Check</string>
+    <string name="home_scan_running">Protection is running</string>
+    <string name="home_scan_stopped">Protection is off</string>
+    <string name="home_scan_no_credential">No credential set</string>
+    <string name="home_sheet_unlocked">Unlocked</string>
+    <string name="home_sheet_locked">Locked</string>
+    <string name="home_unlock_title">Unlock to change locks</string>
+    <string name="home_unlock_summary">Your credential is needed before apps can be locked or unlocked.</string>
+    <string name="home_unlock_action">Unlock</string>
+    <string name="home_cd_hide_apps">Hide apps</string>
+    <string name="home_cd_camouflage">App disguise</string>
+    <string name="home_cd_all_features">All features</string>
+    <string name="home_lock_cd_lock">Lock this app</string>
+    <string name="home_lock_cd_unlock">Unlock this app</string>
+
+    <!-- All features screen. -->
+    <string name="all_features_title">All features</string>
+    <string name="all_features_security_header">Security</string>
+    <string name="all_features_protection_header">Protection</string>
+    <string name="all_features_privacy_header">Privacy</string>
+    <string name="all_features_info_header">About</string>
+    <string name="all_features_credential_title">App lock credential</string>
+    <string name="all_features_credential_summary_none">Set a PIN, password or pattern</string>
+    <string name="all_features_credential_summary_some">Protected by your %1$s</string>
+    <string name="all_features_biometric_title">Biometric unlock</string>
+    <string name="all_features_biometric_summary">Unlock with fingerprint or face</string>
+    <string name="all_features_prep_title">App Lock preparation</string>
+    <string name="all_features_prep_summary">Permissions and checks App Lock needs</string>
+    <string name="all_features_launcher_title">Nivara launcher</string>
+    <string name="all_features_launcher_summary">Use Nivara as your home screen</string>
+    <string name="all_features_camouflage_title">App disguise</string>
+    <string name="all_features_camouflage_summary">Change Nivara\'s name and icon</string>
+    <string name="all_features_recovery_title">Vault recovery</string>
+    <string name="all_features_recovery_summary">Reconnect a vault after reinstall</string>
+    <string name="all_features_about_title">About Nivara</string>
+    <string name="all_features_about_summary">Version and privacy defaults</string>
+</resources>
