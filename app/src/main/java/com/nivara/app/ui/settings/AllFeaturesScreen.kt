@@ -1,5 +1,6 @@
 package com.nivara.app.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,7 +30,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.NivaraApplication
 import com.nivara.app.R
-import com.nivara.app.domain.app.HomeSettingsOpener
 import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.ui.credential.credentialTypeNameRes
 import com.nivara.app.ui.home.HomeUiState
