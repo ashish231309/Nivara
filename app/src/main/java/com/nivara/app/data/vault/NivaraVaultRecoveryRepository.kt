@@ -124,11 +124,15 @@ internal class NivaraVaultRecoveryRepository(
         }
 
         val seen = when (val found = surveyRecoverySlots(location)) {
-            is RecoverySlots.Problem -> return found.failure
+            is RecoverySlots.Problem -> {
+                recoveryKey.clear()
+                return found.failure
+            }
             is RecoverySlots.Seen -> found
         }
         val newest = seen.recoveryRecords.maxByOrNull { record -> record.payload.generation }
         if (newest == null) {
+            recoveryKey.clear()
             return when {
                 seen.recoveryUnsupported ->
                     NivaraResult.Failure(VaultRecoveryFailure.VaultUnsupported)
@@ -266,10 +270,14 @@ internal class NivaraVaultRecoveryRepository(
         val areaPresent = metadataArea.valueOrNull()
             ?: return RecoverySlots.Problem(problemOf(metadataArea))
         if (!areaPresent) {
-            return RecoverySlots.Problem(
-                // No structure at all is the one confident "nothing to recover here": it is what a
-                // plain folder, an empty folder and another app's folder all look like.
-                NivaraResult.Failure(VaultRecoveryFailure.NotAVault),
+            // No structure at all is the one confident "nothing to recover here": it is what a
+            // plain folder, an empty folder and another app's folder all look like. That is a
+            // survey result, not an error — the look succeeded, and this is what it found.
+            return RecoverySlots.Seen(
+                recoveryRecords = emptyList(),
+                recoveryDamaged = false,
+                recoveryUnsupported = false,
+                vaultRecordEvidence = false,
             )
         }
 

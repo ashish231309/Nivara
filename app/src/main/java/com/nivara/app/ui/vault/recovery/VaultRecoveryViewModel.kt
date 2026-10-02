@@ -91,6 +91,8 @@ class VaultRecoveryViewModel(
                     publish(phase = VaultRecoveryPhase.VaultDamaged)
                 VaultRecoverySurvey.VaultUnsupported ->
                     publish(phase = VaultRecoveryPhase.VaultUnsupported)
+                VaultRecoverySurvey.Unavailable ->
+                    publish(phase = VaultRecoveryPhase.LocationUnavailable)
                 is VaultRecoverySurvey.RecoveryAvailable -> publish(
                     phase = VaultRecoveryPhase.RecoveryRequired(
                         identityFingerprint = survey.identityFingerprint,

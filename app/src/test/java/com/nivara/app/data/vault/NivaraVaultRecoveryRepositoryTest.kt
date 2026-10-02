@@ -765,9 +765,12 @@ class NivaraVaultRecoveryRepositoryTest {
     @Test
     fun `setup hands over a code that unwraps the vault's own key`() = runTest {
         createVault()
-        var keyMaterial: com.nivara.app.domain.security.SensitiveBytes? = null
+        // The borrowed key is cleared the moment the borrow ends, so the assertion keeps a copy of
+        // its material, taken inside the borrow.
+        var keyMaterial: ByteArray? = null
         withVaultKey { key ->
-            keyMaterial = (key as com.nivara.app.domain.security.EncryptionKey.InProcess).material
+            keyMaterial = (key as com.nivara.app.domain.security.EncryptionKey.InProcess)
+                .material.copyBytes()
         }
 
         val code = setUpRecovery()
@@ -784,10 +787,11 @@ class NivaraVaultRecoveryRepositoryTest {
             envelope = payload.envelope,
             recoveryKey = recoveryKey,
         ) as NivaraResult.Success).value
+        val recoveredMaterial = (recovered as com.nivara.app.domain.security.EncryptionKey.InProcess)
+            .material.copyBytes()
         assertTrue(
             "the envelope must wrap the vault's own key",
-            (recovered as com.nivara.app.domain.security.EncryptionKey.InProcess).material
-                .contentEquals(keyMaterial!!),
+            recoveredMaterial.contentEquals(keyMaterial!!),
         )
     }
 

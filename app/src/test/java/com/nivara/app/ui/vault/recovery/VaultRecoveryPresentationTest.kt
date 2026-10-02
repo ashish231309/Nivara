@@ -50,12 +50,17 @@ class VaultRecoveryPresentationTest {
         assertEquals(R.string.vault_recovery_key_mismatch, messages[8].textRes)
         assertEquals(R.string.vault_recovery_write_failed, messages[9].textRes)
 
-        val resources = messages.map { message -> message.textRes }
+        // The typed refusals each carry their own sentence; the three machinery failures that
+        // follow deliberately share the generic one, so distinctness is pinned over the ten.
+        val resources = messages.take(10).map { message -> message.textRes }
         assertEquals(
-            "no two refusals share one sentence",
+            "no two typed refusals share one sentence",
             resources.size,
             resources.distinct().size,
         )
+        assertEquals(R.string.vault_recovery_failed, messages[10].textRes)
+        assertEquals(R.string.vault_recovery_failed, messages[11].textRes)
+        assertEquals(R.string.vault_recovery_failed, messages[12].textRes)
     }
 
     @Test
