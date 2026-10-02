@@ -1,5 +1,7 @@
 package com.nivara.app.ui.home
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,8 +31,11 @@ import com.nivara.app.domain.security.BiometricStatus
 import com.nivara.app.domain.security.SessionState
 import com.nivara.app.ui.biometric.biometricStatusRes
 import com.nivara.app.ui.components.NivaraErrorState
+import com.nivara.app.ui.components.NivaraMotion
 import com.nivara.app.ui.components.NivaraSectionHeader
 import com.nivara.app.ui.components.NivaraSpacing
+import com.nivara.app.ui.components.rememberNivaraMotionScale
+import com.nivara.app.ui.components.scaledDurationMillis
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.credential.credentialTypeNameRes
 import com.nivara.app.ui.session.sessionStatusRes
@@ -92,10 +97,23 @@ fun HomeScreen(
     onOpenVault: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when (uiState) {
-        HomeUiState.Loading -> NivaraLoadingState(modifier = modifier)
-        HomeUiState.Error -> NivaraErrorState(onRetry = onRetry, modifier = modifier)
-        is HomeUiState.Ready -> HomeContent(
+    val motionScale = rememberNivaraMotionScale()
+
+    // The one transition this screen animates is progress giving way to what was found. The
+    // crossfade targets the kind of state, not the state itself: a Ready value is rebuilt on
+    // every refresh, and a refresh is not an arrival.
+    Crossfade(
+        targetState = uiState is HomeUiState.Ready,
+        animationSpec = tween(
+            durationMillis = scaledDurationMillis(NivaraMotion.STANDARD_MILLIS, motionScale),
+        ),
+        label = "home state",
+    ) { ready ->
+    when {
+        !ready && uiState is HomeUiState.Error ->
+            NivaraErrorState(onRetry = onRetry, modifier = modifier)
+        !ready -> NivaraLoadingState(modifier = modifier)
+        uiState is HomeUiState.Ready -> HomeContent(
             deviceLockConfigured = uiState.deviceLockConfigured,
             credentialType = uiState.credentialType,
             biometricStatus = uiState.biometricStatus,
@@ -113,6 +131,10 @@ fun HomeScreen(
             onOpenVault = onOpenVault,
             modifier = modifier,
         )
+
+        // The Ready branch above guards the type; nothing else is possible once `ready` is true.
+        else -> Unit
+    }
     }
 }
 

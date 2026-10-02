@@ -2,6 +2,8 @@ package com.nivara.app.ui.vault.recovery
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,8 +26,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraMotion
 import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.ui.components.NivaraMessageText
+import com.nivara.app.ui.components.rememberNivaraMotionScale
+import com.nivara.app.ui.components.scaledDurationMillis
 
 /**
  * The recovery screen's route.
@@ -72,6 +77,8 @@ internal fun VaultRecoveryScreen(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val motionScale = rememberNivaraMotionScale()
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -85,7 +92,18 @@ internal fun VaultRecoveryScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        when (val phase = uiState.phase) {
+        // The phase is the screen's state; it changes when the survey answers or an attempt
+        // finishes, and the content crossfades between answers rather than snapping. The motion
+        // follows the device's own animator scale — a person who asked for less of it gets the
+        // same phases without the fade.
+        Crossfade(
+            targetState = uiState.phase,
+            animationSpec = tween(
+                durationMillis = scaledDurationMillis(NivaraMotion.STANDARD_MILLIS, motionScale),
+            ),
+            label = "recovery phase",
+        ) { phase ->
+        when (phase) {
             VaultRecoveryPhase.SelectLocation -> VaultRecoverySelection(
                 busy = uiState.busy,
                 onChooseLocation = onChooseLocation,
@@ -127,6 +145,7 @@ internal fun VaultRecoveryScreen(
                 fingerprint = phase.identityFingerprint,
                 onDone = onDone,
             )
+        }
         }
 
         uiState.failure?.let { failure ->

@@ -3,6 +3,8 @@ package com.nivara.app.ui.vault
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -44,6 +46,9 @@ import com.nivara.app.domain.vault.VaultState
 import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.components.NivaraMessageText
+import com.nivara.app.ui.components.NivaraMotion
+import com.nivara.app.ui.components.rememberNivaraMotionScale
+import com.nivara.app.ui.components.scaledDurationMillis
 import com.nivara.app.ui.theme.NivaraTheme
 import com.nivara.app.ui.vault.viewer.VaultItemViewerScreen
 import com.nivara.app.ui.vault.viewer.VaultViewerUiState
@@ -223,10 +228,22 @@ fun VaultScreen(
     onRecoveryCodeAcknowledged: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    when (uiState) {
-        VaultUiState.Loading -> NivaraLoadingState(modifier = modifier)
+    val motionScale = rememberNivaraMotionScale()
 
-        is VaultUiState.Ready -> VaultContent(
+    // The one transition this screen animates is progress giving way to what was found. The
+    // crossfade targets the kind of state, not the state itself: the Ready value changes with
+    // every search keystroke and every sort, and none of those redraws is an arrival.
+    Crossfade(
+        targetState = uiState is VaultUiState.Ready,
+        animationSpec = tween(
+            durationMillis = scaledDurationMillis(NivaraMotion.STANDARD_MILLIS, motionScale),
+        ),
+        label = "vault state",
+    ) { ready ->
+    when {
+        !ready -> NivaraLoadingState(modifier = modifier)
+
+        uiState is VaultUiState.Ready -> VaultContent(
             state = uiState,
             onChooseRoot = onChooseRoot,
             onImport = onImport,
@@ -262,6 +279,10 @@ fun VaultScreen(
             onTrashSortDirectionToggled = onTrashSortDirectionToggled,
             modifier = modifier,
         )
+
+        // The Ready branch above guards the type; nothing else is possible once `ready` is true.
+        else -> Unit
+    }
     }
 }
 
