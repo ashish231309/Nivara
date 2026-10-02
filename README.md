@@ -21,8 +21,10 @@ leaves hidden applications out and can show them again for as long as Nivara is 
 **application identity**: the name and icon Nivara's launcher entry presents, and the ordinary route
 back to Nivara's own — and the **vault**: the folder the user chooses, the authenticated record that
 says a vault is there, the encrypted store imported files go into, opening one of those files again,
-organising what is in it — albums, search and the order of the list — and moving a file out of the
-active collection to trash and back again, with everything about the file kept exactly as it was.
+organising what is in it — albums, search and the order of the list — moving a file out of the
+active collection to trash and back again, with everything about the file kept exactly as it was,
+and reconnecting a vault that outlived the app's own state, with a recovery code the user was
+shown once.
 
 What works today:
 
@@ -85,7 +87,12 @@ What works today:
   and restored: the move is a state and nothing more — the encrypted file stays where it is with its
   name, its albums and its identity, nothing is deleted, nothing expires, and a trash record that
   cannot be read is never drawn as an empty trash; sharing is a later stage, so the screen says
-  nothing it does not do;
+  nothing it does not do. And a vault can be **recovered**: the vault's own key is sealed under a
+  recovery code the user is shown once, and after a reinstall — when the app's own state is gone
+  but the folder is not — the vault screen offers the way back in: choose the folder, confirm the
+  vault by its fingerprint, enter the code, and the same vault reconnects with the same identity,
+  files, albums and trash. Recovery never creates, replaces, re-encrypts or repairs anything, and
+  a wrong folder, a wrong code or a damaged record is its own typed refusal;
 - the cryptographic layer that later features are built on: AES-256-GCM authenticated encryption
   with a versioned envelope format, secure randomness, Android Keystore key management, key
   wrapping, PBKDF2 credential derivation and the recovery-key foundation.
@@ -132,7 +139,9 @@ project is clear; each one is implemented in its own release and is not present 
 - Organising an encrypted file vault: albums, search and sorting — delivered
 - A trash for the vault: moving files out of the active collection and restoring them — delivered,
   as a state change only; permanent deletion is deliberately not part of it
-- Recovery and session management
+- Secure recovery: reconnecting a vault after a reinstall with its recovery code — delivered,
+  without creating, replacing, re-encrypting or repairing anything; losing the code loses the way
+  back in, and that is said where the code is shown
 - Security settings, themes and the final visual design
 
 ## Technology stack
@@ -539,6 +548,10 @@ devices.
 | Searching and sorting | In memory, over the metadata that was read: no decryption, no second read of the vault, no fuzzy matching, no ranking and no record of what was searched or opened; the trash has its own search and its own order, both over the trash alone |
 | The order | Total and reproducible: every comparison ends in the file's own identifier, so two files that look identical still come out in the same sequence every time |
 | Opening a file | Read back through the same streaming decryption that wrote it, in bounded pieces, with the session asked before each one and no plaintext copy on disk |
+| Setting up recovery | Optional, session-gated, from the vault screen: the vault's own key is sealed under 256 random bits and the code is shown exactly once — Nivara keeps no copy, and the vault, its key and its content are unchanged |
+| Coming back after a reinstall | Choose the vault's folder, confirm the vault by its fingerprint, enter the code: the vault reconnects with the same identity, files, albums and trash, and opens through the usual unlock — the code is not a session and does not replace the credential |
+| What recovery never does | Create a vault over one that exists, regenerate a key or an identity, rewrite content, rebuild a record, or accept "decryption produced bytes" as proof: a wrong folder, a wrong code and a damaged record are each their own refusal |
+| Losing the recovery code | The vault cannot be opened again once the installation's state is gone — there is no copy, no account and no bypass; the vault screen keeps offering setup while a vault has no recovery record |
 | What can be shown | JPEG, PNG, WebP, GIF, BMP, HEIC and HEIF pictures (bounded decode); MP4, WebM, 3GPP, MPEG and Matroska video; MP3, AAC/M4A, WAV, OGG, FLAC and Opus audio through the platform's player; plain text, CSV, Markdown, XML and JSON as a bounded preview; PDF as rendered pages |
 | What is described instead | Office documents, archives, and any file whose declared type is missing, malformed or unfamiliar: the facts are shown and the screen says plainly that this build has no viewer |
 | When the session ends | Playback stops, every decoder and the content are released, and the viewer says the vault is locked; Quick Lock does the same instantly, and reopening goes through the credential screen that already exists |
