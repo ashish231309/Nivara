@@ -6,8 +6,10 @@ import androidx.compose.ui.graphics.Color
  * Nivara brand palette.
  *
  * The identity is a deep teal, a calm colour that reads as "protected" without looking like a
- * warning. Values are fixed here so the foundation release looks consistent; the full theme
- * work — including dynamic colour support and brand refinement — belongs to the UI stage.
+ * warning. The full Material 3 role set is defined for light and dark so screens never reach for
+ * a raw colour: actions and accents are primary, positive/success states are tertiary, failures
+ * are error, and quiet supporting text is onSurfaceVariant. Those meanings are the contract;
+ * adding a colour means adding it here as a role, not inline in a screen.
  */
 internal object NivaraColors {
     // Light

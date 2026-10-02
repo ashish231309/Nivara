@@ -1,10 +1,18 @@
 package com.nivara.app.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.nivara.app.ui.components.NivaraMotion
+import com.nivara.app.ui.components.rememberNivaraMotionScale
+import com.nivara.app.ui.components.scaledDurationMillis
 import com.nivara.app.ui.about.AboutRoute
 import com.nivara.app.ui.launcher.LauncherRoute
 import com.nivara.app.ui.applock.AppLockSetupRoute
@@ -37,10 +45,30 @@ fun NivaraNavHost(
     startDestination: String = NivaraDestination.Home.route,
     modifier: Modifier = Modifier,
 ) {
+    // One read of the device's animator setting, applied to every transition in the graph: a
+    // person who asked the platform for less motion gets the same destinations with none of the
+    // movement. A zero duration makes each transition resolve to its end state immediately.
+    val motionScale = rememberNivaraMotionScale()
+    val enterMillis = scaledDurationMillis(NivaraMotion.STANDARD_MILLIS, motionScale)
+    val exitMillis = scaledDurationMillis(NivaraMotion.QUICK_MILLIS, motionScale)
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
+        enterTransition = {
+            fadeIn(animationSpec = tween(enterMillis)) +
+                slideInHorizontally(animationSpec = tween(enterMillis)) { width -> width / 16 }
+        },
+        exitTransition = { fadeOut(animationSpec = tween(exitMillis)) },
+        popEnterTransition = {
+            fadeIn(animationSpec = tween(enterMillis)) +
+                slideInHorizontally(animationSpec = tween(enterMillis)) { width -> -width / 16 }
+        },
+        popExitTransition = {
+            fadeOut(animationSpec = tween(exitMillis)) +
+                slideOutHorizontally(animationSpec = tween(exitMillis)) { width -> width / 16 }
+        },
     ) {
         composable(route = NivaraDestination.Launcher.route) {
             LauncherRoute(

@@ -14,14 +14,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import com.nivara.app.R
 import com.nivara.app.ui.theme.NivaraTheme
 
 /**
  * Loading state shown while a screen waits for its first result.
  *
- * Kept free of screen-specific knowledge so every future screen reports progress the same way.
+ * Kept free of screen-specific knowledge so every screen reports progress the same way. It is
+ * only for first results: a screen that already has content shows its content and reports work
+ * in progress in place, never by replacing what the user was looking at with a spinner.
  */
 @Composable
 fun NivaraLoadingState(
@@ -31,7 +32,7 @@ fun NivaraLoadingState(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(NivaraSpacing.screen),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -41,7 +42,7 @@ fun NivaraLoadingState(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 16.dp),
+            modifier = Modifier.padding(top = NivaraSpacing.screen),
         )
     }
 }
@@ -50,8 +51,9 @@ fun NivaraLoadingState(
  * Error state with a single recovery action.
  *
  * The failure reason is intentionally not displayed: user-facing messages stay generic, and
- * technical details never leave the process. Screens that need richer messaging will provide
- * their own copy in the stage that introduces them.
+ * technical details never leave the process. A screen whose states carry their own words — the
+ * vault, recovery, the application lists — draws those words itself and never reaches for this;
+ * this is the surface for the rare place where nothing more specific can be said.
  */
 @Composable
 fun NivaraErrorState(
@@ -61,7 +63,7 @@ fun NivaraErrorState(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(NivaraSpacing.screen),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -76,14 +78,53 @@ fun NivaraErrorState(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = NivaraSpacing.small),
         )
         Button(
             onClick = onRetry,
-            modifier = Modifier.padding(top = 24.dp),
+            modifier = Modifier.padding(top = NivaraSpacing.section),
         ) {
             Text(text = stringResource(id = R.string.state_retry_action))
         }
+    }
+}
+
+/**
+ * The empty state of a screen: nothing to show, and exactly why.
+ *
+ * Every list that can be empty in Nivara is empty for its own reason — the device has nothing,
+ * the search matched nothing, the collection has nothing yet, or the record could not be read —
+ * and those reasons must never be merged into one generic message. This view draws whichever
+ * words the screen chose for its state; it is presentation only and decides nothing itself.
+ */
+@Composable
+fun NivaraEmptyState(
+    message: String,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(NivaraSpacing.screen),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (title != null) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = if (title != null) NivaraSpacing.small else NivaraSpacing.tight),
+        )
     }
 }
 
@@ -97,4 +138,10 @@ private fun NivaraLoadingStatePreview() {
 @Composable
 private fun NivaraErrorStatePreview() {
     NivaraTheme { NivaraErrorState(onRetry = {}) }
+}
+
+@Preview(name = "Empty", showBackground = true)
+@Composable
+private fun NivaraEmptyStatePreview() {
+    NivaraTheme { NivaraEmptyState(message = "Nothing here yet.") }
 }

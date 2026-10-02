@@ -57,9 +57,10 @@ private val DarkColorScheme = darkColorScheme(
 /**
  * Material 3 theme for Nivara.
  *
- * Follows the system light/dark setting. Only the colour scheme and typography are customised
- * at this stage — component shapes, motion and the final visual identity are handled by the
- * UI stage.
+ * Follows the system light/dark setting. The colour scheme, the type scale and the shape family
+ * are the application's one visual language: every screen takes its colours, text styles and
+ * corner radii from here, and motion is scaled by the device's own animator setting wherever it
+ * appears.
  */
 @Composable
 fun NivaraTheme(
@@ -69,6 +70,7 @@ fun NivaraTheme(
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         typography = NivaraTypography,
+        shapes = NivaraShapes,
         content = content,
     )
 }
