@@ -1,0 +1,189 @@
+name: Android CI
+
+# CI is intentionally not run on every push. Gradle builds are expensive and repeating them for
+# documentation or UI-only changes teaches nothing, so a run happens when build configuration
+# changes (pull request or push to main) or when someone starts one on purpose from the
+# Actions tab. Milestone and release verification is done with workflow_dispatch.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'app/build.gradle.kts'
+      - 'app/proguard-rules.pro'
+      - 'tools/**'
+      - '.github/workflows/android-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - 'app/build.gradle.kts'
+      - 'app/proguard-rules.pro'
+      - 'tools/**'
+      - '.github/workflows/android-ci.yml'
+
+# A newer run for the same ref makes an older one pointless.
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Build, test and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # Cheap repository checks (resources, versions, cryptographic hygiene). They run before the
+      # Gradle build so an obvious problem fails fast without paying for a full build.
+      - name: Run repository checks
+        run: python3 tools/verify_nivara.py
+
+      # --continue keeps the remaining tasks running so a single run reports every problem
+      # instead of stopping at the first one. The output is captured so failures can be reported
+      # as check annotations below, which a reviewer can read without the full log.
+      - name: Build, test and lint
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --stacktrace --continue --console=plain \
+            :app:assembleDebug \
+            :app:assembleDebugAndroidTest \
+            :app:testDebugUnitTest \
+            :app:assembleRelease \
+            :app:lintDebug 2>&1 | tee gradle-build.log
+
+      # Compiler errors, task failures and failing tests are surfaced as annotations.
+      - name: Report failures
+        if: failure()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re
+
+          try:
+              lines = open("gradle-build.log", errors="replace").read().splitlines()
+          except OSError:
+              print("no build log to inspect")
+              raise SystemExit(0)
+
+          pattern = re.compile(r"^e: |error:|error\b.*\.kt|FAILED|Execution failed|Could not |Caused by|> Task .*FAILED")
+          digest = [line.strip() for line in lines if pattern.search(line)][:40]
+          if not digest:
+              digest = ["build failed without a recognisable error line; see the job log"]
+          message = "\n".join(line[:400] for line in digest)
+          message = message.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+          print(f"::error title=Gradle failure::{message}")
+
+          # A failing test's message is in the unit-test report rather than in the log, so the first
+          # few are read back out of it: a red run should be diagnosable from its annotations.
+          import glob
+          import xml.etree.ElementTree as ET
+
+          details = []
+          for path in sorted(glob.glob("app/build/test-results/**/*.xml", recursive=True)):
+              try:
+                  root = ET.parse(path).getroot()
+              except ET.ParseError:
+                  continue
+              for case in root.iter("testcase"):
+                  node = case.find("failure")
+                  if node is None:
+                      node = case.find("error")
+                  if node is None:
+                      continue
+                  text = " ".join((node.get("message") or node.text or "").split())
+                  details.append(
+                      f"{case.get('classname', '').split('.')[-1]} > {case.get('name')}: {text[:240]}"
+                  )
+          if details:
+              escaped = [line.replace("%", "%25").replace("\r", "") for line in details[:12]]
+              print("::error title=Failing tests::" + "%0A".join(escaped))
+          PY
+
+      - name: Upload debug APK
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nivara-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # The release variant is built unsigned: no signing material lives in this repository, so the
+      # artifact is inspected and recorded, and signing is applied where the keystore is kept.
+      - name: Upload release APK
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nivara-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # The definitive record of the release artifact: filename, size, SHA-256 and the packaged
+      # identity, surfaced as an annotation so the artifact can be verified without downloading it.
+      - name: Record release APK identity
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          apk="$(ls app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)"
+          if [ -z "$apk" ]; then
+            echo "::error title=Release APK::no release APK was produced"
+            exit 1
+          fi
+          name="$(basename "$apk")"
+          size="$(stat -c %s "$apk")"
+          sha="$(sha256sum "$apk" | cut -d' ' -f1)"
+          aapt="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1 || true)"
+          badging=""
+          if [ -n "$aapt" ]; then
+            badging="$("$aapt" dump badging "$apk" 2>/dev/null \
+              | grep -E "^package:|^application-label:|sdkVersion|targetSdkVersion" \
+              | tr '\n' '; ' || true)"
+          fi
+          echo "::notice title=Release APK $name::size=$size bytes; sha256=$sha; $badging"
+
+      - name: Upload unit test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/testDebugUnitTest
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+          retention-days: 7

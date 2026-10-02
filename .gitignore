@@ -1,0 +1,32 @@
+# Gradle
+.gradle/
+build/
+.kotlin/
+
+# Android SDK / local machine configuration (never commit machine-specific paths)
+local.properties
+
+# IDE
+.idea/
+*.iml
+*.hprof
+captures/
+
+# Build output that is never committed
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+output.json
+
+# Signing material: keystores and credentials must never enter version control
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log

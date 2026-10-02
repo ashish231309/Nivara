@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Calculator identity mark: a keypad body with a display and six keys cut out of it. One path with an
+  even-odd hole, so the mark is a single shape in both the colour and the monochrome layer.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="1.9"
+        android:scaleY="1.9"
+        android:translateX="31.2"
+        android:translateY="31.2">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M6,2 L18,2 A2,2 0 0 1 20,4 L20,20 A2,2 0 0 1 18,22 L6,22 A2,2 0 0 1 4,20 L4,4 A2,2 0 0 1 6,2 Z M7,5 H17 V9 H7 Z M7,12 H10 V14.5 H7 Z M11,12 H14 V14.5 H11 Z M15,12 H18 V14.5 H15 Z M7,16.5 H10 V19 H7 Z M11,16.5 H14 V19 H11 Z M15,16.5 H18 V19 H15 Z" />
+    </group>
+</vector>

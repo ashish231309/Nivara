@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      Nivara asks for as little as it can, and every entry here is tied to a feature that exists.
+      The AndroidX biometric library contributes the platform's biometric permission in the merged
+      manifest, which is why biometric authentication works without a declaration here.
+
+      Two declarations, both capabilities the user grants in Android's own settings, and both
+      required by a feature that exists.
+
+      PACKAGE_USAGE_STATS lets App Lock recognise which application is in the foreground. It is not
+      a runtime permission and Nivara never calls requestPermissions() for it: it makes Nivara
+      visible in Android's Usage Access list, and the preparation screen only reads whether the
+      grant exists and opens that settings screen.
+
+      SYSTEM_ALERT_WINDOW is what allows the App Lock protection surface to be drawn above the
+      application being protected. Android offers no other unprivileged way to do that: a
+      full-screen activity cannot cover another application's window without taking over the task,
+      and since API 29 starting one from the background is refused unless the application holds
+      this very grant. It is not a runtime permission either, it is granted on Android's own
+      overlay screen, and it entitles Nivara to draw a window and nothing else — no accessibility
+      service, no notification and no battery exemption is requested anywhere.
+
+      tools:ignore silences lint's protected-permission warning: these permissions are protected on
+      purpose, and the user — not the application — is the one who grants them.
+    -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.SYSTEM_ALERT_WINDOW"
+        tools:ignore="ProtectedPermissions" />
+
+    <!--
+      Package visibility (API 30+).
+      Installed applications are hidden from a query by default. This declares exactly one intent
+      signature — applications with a launcher entry point — which is the set App Lock offers to
+      lock and the set the device's own launcher shows.
+      QUERY_ALL_PACKAGES is deliberately not requested: it would expose every package on the device
+      to answer a question about launcher entries, and Android treats the installed-application
+      list as personal data.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".NivaraApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Nivara"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Nivara"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Camouflage identities.
+
+          Each alias is a second way of presenting and starting the same activity — the same
+          component, the same task, the same data — under a different label and icon. Selecting an
+          identity enables one of these and disables the others; nothing else about the application
+          changes, and no second activity class exists.
+
+          android:enabled="false" is what makes the shipped default Nivara's own identity: on a fresh
+          install exactly one launcher entry is enabled, and the aliases stay out of the launcher
+          until the user chooses one. The platform reports an untouched component as DEFAULT, so the
+          manifest's declared state is the effective one, and the verifier pins that shape.
+
+          An alias is never a hiding mechanism: the application stays installed under the same
+          package, and Android's settings, the package manager and every management tool still list
+          it. What the alias changes is the name and the icon on the home screen. See
+          docs/camouflage/README.md.
+        -->
+        <activity-alias
+            android:name=".CamouflageNotes"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_camouflage_notes"
+            android:label="@string/camouflage_profile_notes_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".CamouflageCalculator"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_camouflage_calculator"
+            android:label="@string/camouflage_profile_calculator_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".CamouflageWeather"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_camouflage_weather"
+            android:label="@string/camouflage_profile_weather_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!--
+          Nivara as the device's Home application.
+
+          Apart from the application's own entry point below, this is the only exported component in
+          the project, and it is exported for exactly one reason: Android can only start a Home
+          application if it is allowed to start it from outside the application. The intent filter is the standard launcher contract and nothing else —
+          ACTION_MAIN with CATEGORY_HOME and CATEGORY_DEFAULT — so a caller that can start this
+          activity can do only what pressing Home does, which is show Nivara's launcher.
+
+          What is deliberately absent: no custom actions, no data URIs, no permissions on the
+          activity, and no handling of Intent extras. Nothing outside Nivara can ask it to launch an
+          application, reveal a hidden one, or report any state.
+
+          Nivara does not make itself the default Home application and does not change any system
+          setting; the user selects it through Android's own Home settings, as documented in
+          docs/launcher/README.md.
+        -->
+        <activity
+            android:name=".ui.launcher.LauncherActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Nivara">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          App Lock detection and its protection surface.
+          A plain started service — not a foreground service — so it declares no foreground service
+          type and needs no notification. It owns no logic of its own: it starts and stops the
+          application-scoped monitor, which is the only monitoring loop in the process, and the
+          application-scoped surface, which is the only overlay window.
+          android:exported="false" keeps it private to Nivara: nothing outside the application may
+          start it, stop it or observe it. Why a foreground service is not used yet, and what the
+          stage that presents the authentication prompt must decide, are recorded in
+          docs/applock/README.md.
+        -->
+        <service
+            android:name=".data.applock.AppLockDetectionService"
+            android:exported="false" />
+    </application>
+
+</manifest>
