@@ -146,6 +146,30 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # The definitive record of the release artifact: filename, size, SHA-256 and the packaged
+      # identity, surfaced as an annotation so the artifact can be verified without downloading it.
+      - name: Record release APK identity
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          apk="$(ls app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)"
+          if [ -z "$apk" ]; then
+            echo "::error title=Release APK::no release APK was produced"
+            exit 1
+          fi
+          name="$(basename "$apk")"
+          size="$(stat -c %s "$apk")"
+          sha="$(sha256sum "$apk" | cut -d' ' -f1)"
+          aapt="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1 || true)"
+          badging=""
+          if [ -n "$aapt" ]; then
+            badging="$("$aapt" dump badging "$apk" 2>/dev/null \
+              | grep -E "^package:|^application-label:|sdkVersion|targetSdkVersion" \
+              | tr '\n' '; ' || true)"
+          fi
+          echo "::notice title=Release APK $name::size=$size bytes; sha256=$sha; $badging"
+
       - name: Upload unit test report
         if: always()
         uses: actions/upload-artifact@v7
