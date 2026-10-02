@@ -2905,6 +2905,73 @@ for topic in ("recovery", "reinstall", "fingerprint"):
 notes.append(f"vault recovery review: {len(recovery_ui_sources)} presentation sources; "
              f"{recovery_tests} recovery tests")
 
+# ---------------------------------------------------------------- stage 19: ui/ux, themes, motion
+# Stage 19 is presentation: one visual language, one spacing scale, one motion language that
+# respects the device's own animator setting, and the same old security underneath all of it. The
+# checks pin exactly that: the design system exists, colours never leak out of the theme, motion
+# never ignores the user's accessibility setting, and the vault's content stays behind the viewer.
+
+design_spacing_source = ROOT / "app/src/main/java/com/nivara/app/ui/components/NivaraDesign.kt"
+design_motion_source = ROOT / "app/src/main/java/com/nivara/app/ui/components/NivaraMotion.kt"
+design_shape_source = ROOT / "app/src/main/java/com/nivara/app/ui/theme/Shape.kt"
+design_header_source = ROOT / "app/src/main/java/com/nivara/app/ui/components/NivaraSectionHeader.kt"
+for required in (design_spacing_source, design_motion_source, design_shape_source,
+                 design_header_source):
+    if not required.exists():
+        err(f"the design system is missing: {required.relative_to(ROOT)}")
+
+# One visual language: a colour is a role in the theme, never an inline value in a screen.
+for path in sorted((ROOT / "app/src/main/java").rglob("*.kt")):
+    relative = path.relative_to(ROOT).as_posix()
+    if "/ui/theme/" in relative:
+        continue
+    if re.search(r"\bColor\(\s*0x", strip_comments(path.read_text())):
+        err(f"{relative}: colours come from the theme, never inline")
+
+if design_motion_source.exists():
+    motion_code = strip_comments(design_motion_source.read_text())
+    for token, why in (
+        ("ANIMATOR_DURATION_SCALE", "the device's own animator setting"),
+        ("scaledDurationMillis", "the one place durations are scaled"),
+        ("INSTANT_MILLIS", "what remains when the scale is zero"),
+        ("QUICK_MILLIS", "the quick beat of the motion language"),
+        ("STANDARD_MILLIS", "the ordinary beat of the motion language"),
+    ):
+        if token not in motion_code:
+            err(f"the motion language must carry {why} ('{token}')")
+
+if design_spacing_source.exists():
+    spacing_code = strip_comments(design_spacing_source.read_text())
+    for token, why in (
+        ("val tight", "the tight step of the spacing scale"),
+        ("val hairline", "the hairline step of the spacing scale"),
+        ("val small", "the small step of the spacing scale"),
+        ("val row", "the row step of the spacing scale"),
+        ("val screen", "the screen step of the spacing scale"),
+        ("val section", "the section step of the spacing scale"),
+        ("val touchTarget", "the platform's minimum touch target"),
+    ):
+        if token not in spacing_code:
+            err(f"the spacing scale must carry {why} ('{token}')")
+
+if design_header_source.exists():
+    header_code = strip_comments(design_header_source.read_text())
+    if "heading()" not in header_code:
+        err("a section header must announce itself as a heading to a screen reader")
+
+# The vault's content is read only behind the viewer: no list, card or header anywhere else in the
+# presentation layer names the reader, because naming it is one import away from using it.
+for path in sorted((ROOT / "app/src/main/java/com/nivara/app/ui").rglob("*.kt")):
+    relative = path.relative_to(ROOT).as_posix()
+    if "/ui/vault/viewer/" in relative:
+        continue
+    if "VaultContentReader" in strip_comments(path.read_text()):
+        err(f"{relative}: vault content is read only behind the viewer")
+
+motion_suite = ROOT / "app/src/test/java/com/nivara/app/ui/components/NivaraMotionTest.kt"
+if not motion_suite.exists():
+    err("the motion suite is missing: app/src/test/java/com/nivara/app/ui/components/NivaraMotionTest.kt")
+
 # ---------------------------------------------------------------- wrapper / hygiene
 wrapper_props = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()
 if "distributionUrl" not in wrapper_props:
