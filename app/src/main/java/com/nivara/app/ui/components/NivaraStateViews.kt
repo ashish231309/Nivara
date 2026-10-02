@@ -1,5 +1,6 @@
 package com.nivara.app.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +17,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import com.nivara.app.R
 import com.nivara.app.ui.theme.NivaraTheme
+
+/**
+ * Makes a transient message dismissible by touch: it is drawn with the ordinary small gap above the
+ * content beneath it, and tapping it reports that it has been seen.
+ *
+ * The message's own wording stays the screen's decision; this is only the interaction, so every
+ * dismissible message in the application behaves the same way.
+ */
+fun Modifier.dismissibleMessage(onDismiss: () -> Unit): Modifier =
+    this
+        .padding(top = NivaraSpacing.tight)
+        .clickable(onClick = onDismiss)
 
 /**
  * Loading state shown while a screen waits for its first result.

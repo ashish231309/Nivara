@@ -1,7 +1,8 @@
 package com.nivara.app.ui.launcher
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,7 +37,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.NivaraApplication
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraMotion
 import com.nivara.app.ui.components.NivaraSpacing
+import com.nivara.app.ui.components.dismissibleMessage
+import com.nivara.app.ui.components.rememberNivaraMotionScale
+import com.nivara.app.ui.components.scaledDurationMillis
 import com.nivara.app.domain.app.InstalledApplication
 import com.nivara.app.ui.applications.ApplicationIconLoader
 import com.nivara.app.ui.applications.ApplicationSortOrder
@@ -160,6 +165,8 @@ fun LauncherScreen(
     // should do. It is not a trap: with the drawer closed, Back is not intercepted at all.
     BackHandler(enabled = drawerOpen) { onDrawerOpenChange(false) }
 
+    val motionScale = rememberNivaraMotionScale()
+
     when (uiState) {
         LauncherUiState.Loading -> NivaraLoadingState(modifier = modifier)
 
@@ -187,29 +194,40 @@ fun LauncherScreen(
             modifier = modifier,
         )
 
-        is LauncherUiState.Ready -> if (drawerOpen) {
-            DrawerSurface(
-                state = uiState,
-                iconLoader = iconLoader,
-                onClose = { onDrawerOpenChange(false) },
-                onQueryChange = onQueryChange,
-                onSortChange = onSortChange,
-                onSectionChange = onSectionChange,
-                onLaunch = onLaunch,
-                onMessageShown = onMessageShown,
-                modifier = modifier,
-            )
-        } else {
-            HomeSurface(
-                state = uiState,
-                onOpenDrawer = { onDrawerOpenChange(true) },
-                onReveal = onReveal,
-                onConceal = onConceal,
-                onMessageShown = onMessageShown,
-                onOpenSettings = onOpenSettings,
-                onOpenHiddenManagement = onOpenHiddenManagement,
-                modifier = modifier,
-            )
+        is LauncherUiState.Ready -> Crossfade(
+            targetState = drawerOpen,
+            animationSpec = tween(
+                durationMillis = scaledDurationMillis(NivaraMotion.QUICK_MILLIS, motionScale),
+            ),
+            label = "launcher drawer",
+        ) { open ->
+            // A short crossfade between the home surface and the drawer: quick enough that opening
+            // the drawer never feels like waiting, and never in the way of a launch — tapping an
+            // application acts immediately, whatever the fade is doing.
+            if (open) {
+                DrawerSurface(
+                    state = uiState,
+                    iconLoader = iconLoader,
+                    onClose = { onDrawerOpenChange(false) },
+                    onQueryChange = onQueryChange,
+                    onSortChange = onSortChange,
+                    onSectionChange = onSectionChange,
+                    onLaunch = onLaunch,
+                    onMessageShown = onMessageShown,
+                    modifier = modifier,
+                )
+            } else {
+                HomeSurface(
+                    state = uiState,
+                    onOpenDrawer = { onDrawerOpenChange(true) },
+                    onReveal = onReveal,
+                    onConceal = onConceal,
+                    onMessageShown = onMessageShown,
+                    onOpenSettings = onOpenSettings,
+                    onOpenHiddenManagement = onOpenHiddenManagement,
+                    modifier = modifier,
+                )
+            }
         }
     }
 }
@@ -443,11 +461,6 @@ private fun LauncherUnavailableState(
  * A launcher's surface has no dismiss button of its own, and a failure notice that cannot be cleared
  * would sit on the home screen until something else happened to replace it.
  */
-private fun Modifier.dismissibleMessage(onDismiss: () -> Unit): Modifier =
-    this
-        .padding(top = NivaraSpacing.tight)
-        .clickable(onClick = onDismiss)
-
 @Preview(name = "Launcher – home", showBackground = true)
 @Composable
 private fun LauncherHomePreview() {

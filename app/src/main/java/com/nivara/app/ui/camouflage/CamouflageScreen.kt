@@ -37,6 +37,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
 import com.nivara.app.ui.components.NivaraSize
 import com.nivara.app.ui.components.NivaraSpacing
+import com.nivara.app.ui.components.dismissibleMessage
 import com.nivara.app.domain.camouflage.CamouflageProfile
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.components.NivaraMessageText
@@ -314,11 +315,6 @@ private fun IdentityBadge(
 }
 
 /** Makes a message tappable so it can be dismissed, as the launcher's surface does. */
-private fun Modifier.dismissibleMessage(onDismiss: () -> Unit): Modifier =
-    this
-        .padding(top = NivaraSpacing.tight)
-        .clickable(onClick = onDismiss)
-
 @Preview(name = "Identity – authenticated", showBackground = true)
 @Composable
 private fun CamouflageReadyPreview() {
