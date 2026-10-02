@@ -15,7 +15,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.nivara.app.R
 import com.nivara.app.domain.applock.AppLockOverlayState
 import com.nivara.app.domain.applock.AppLockPhase
@@ -25,6 +24,7 @@ import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.domain.security.BiometricStatus
 import com.nivara.app.ui.biometric.toMessage
 import com.nivara.app.ui.components.NivaraMessage
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.ui.components.NivaraMessageText
 import com.nivara.app.ui.credential.CredentialEntry
 import com.nivara.app.ui.credential.credentialTypeNameRes
@@ -104,8 +104,8 @@ private fun RequiredContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(NivaraSpacing.section),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.screen),
     ) {
         Text(
             text = stringResource(id = R.string.applock_overlay_title),
@@ -198,8 +198,8 @@ private fun UnpresentableContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(NivaraSpacing.section),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.screen),
     ) {
         Text(
             text = stringResource(id = R.string.applock_overlay_unpresentable_title),
