@@ -17,6 +17,7 @@ import com.nivara.app.ui.credential.CredentialSetupRoute
 import com.nivara.app.ui.credential.CredentialVerifyRoute
 import com.nivara.app.ui.home.HomeRoute
 import com.nivara.app.ui.vault.VaultRoute
+import com.nivara.app.ui.vault.recovery.VaultRecoveryRoute
 
 /**
  * Navigation graph of the application.
@@ -107,6 +108,16 @@ fun NivaraNavHost(
                 // one, and the vault screen does not reimplement authentication to get it: it sends
                 // the user to the same screen every other configuration change uses.
                 onUnlock = { navController.navigateTo(NivaraDestination.CredentialVerify) },
+                onRecover = { navController.navigateTo(NivaraDestination.VaultRecovery) },
+            )
+        }
+        composable(route = NivaraDestination.VaultRecovery.route) {
+            VaultRecoveryRoute(
+                // A successful reconnection lands back on the vault screen, which re-reads the
+                // vault on resume and shows it as its own. Recovery grants possession of the vault
+                // key, and that is not a session: the usual unlock still stands between the user
+                // and the vault's contents.
+                onRecovered = { navController.popBackStack() },
             )
         }
         composable(route = NivaraDestination.AppLock.route) {

@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import android.text.format.DateUtils
 import android.text.format.Formatter
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -26,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -61,6 +63,7 @@ import com.nivara.app.ui.vault.viewer.VaultViewerViewModel
 @Composable
 fun VaultRoute(
     onUnlock: () -> Unit,
+    onRecover: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: VaultViewModel = viewModel(factory = VaultViewModel.Factory),
 ) {
@@ -112,6 +115,9 @@ fun VaultRoute(
             onReplaceUnreadable = viewModel::replaceUnreadable,
             onRetry = viewModel::refresh,
             onUnlock = onUnlock,
+            onRecover = onRecover,
+            onSetUpRecovery = viewModel::onSetUpRecoveryRequested,
+            onRecoveryCodeAcknowledged = viewModel::onRecoveryCodeAcknowledged,
             onMessageShown = viewModel::onMessageShown,
             onSectionSelected = viewModel::onSectionSelected,
             onSearchQueryChanged = viewModel::onSearchQueryChanged,
@@ -211,6 +217,9 @@ fun VaultScreen(
     onRestoreItem: (VaultItemId) -> Unit = {},
     onTrashSortFieldSelected: (VaultTrashSortField) -> Unit = {},
     onTrashSortDirectionToggled: () -> Unit = {},
+    onRecover: () -> Unit = {},
+    onSetUpRecovery: () -> Unit = {},
+    onRecoveryCodeAcknowledged: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -225,6 +234,9 @@ fun VaultScreen(
             onReplaceUnreadable = onReplaceUnreadable,
             onRetry = onRetry,
             onUnlock = onUnlock,
+            onRecover = onRecover,
+            onSetUpRecovery = onSetUpRecovery,
+            onRecoveryCodeAcknowledged = onRecoveryCodeAcknowledged,
             onMessageShown = onMessageShown,
             onSectionSelected = onSectionSelected,
             onSearchQueryChanged = onSearchQueryChanged,
@@ -262,6 +274,9 @@ private fun VaultContent(
     onReplaceUnreadable: () -> Unit,
     onRetry: () -> Unit,
     onUnlock: () -> Unit,
+    onRecover: () -> Unit,
+    onSetUpRecovery: () -> Unit,
+    onRecoveryCodeAcknowledged: () -> Unit,
     onMessageShown: () -> Unit,
     onSectionSelected: (VaultSection) -> Unit,
     onSearchQueryChanged: (String) -> Unit,
@@ -363,6 +378,55 @@ private fun VaultContent(
                         R.string.vault_change_root_action
                     },
                 ),
+            )
+        }
+
+        // The way back into a vault that outlived this installation. It is offered exactly where an
+        // installation with no memory of a vault would look — no folder chosen, or the record of
+        // the folder unreadable — and it surveys the folder the user picks without adopting it.
+        if (state.vault is VaultState.NotConfigured || state.vault is VaultState.LocationUnknown) {
+            OutlinedButton(
+                onClick = onRecover,
+                enabled = !state.busy && state.sessionAuthenticated,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(text = stringResource(id = R.string.vault_recover_entry_action))
+            }
+        }
+
+        // A connected vault without recovery material has no way back in once this installation's
+        // state is gone; the screen says so and offers setup. A damaged recovery record is offered
+        // the same way, because setting up replaces it.
+        if (state.recoveryCard == VaultRecoveryCard.NotSetUp ||
+            state.recoveryCard == VaultRecoveryCard.Damaged
+        ) {
+            Text(
+                text = stringResource(
+                    id = if (state.recoveryCard == VaultRecoveryCard.Damaged) {
+                        R.string.vault_recovery_setup_damaged
+                    } else {
+                        R.string.vault_recovery_setup_card
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = onSetUpRecovery,
+                enabled = state.canSetUpRecovery,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(text = stringResource(id = R.string.vault_recovery_setup_action))
+            }
+        }
+
+        // The code exists for one moment only: while this dialog is on screen. Acknowledging it is
+        // the act that ends that moment, and nothing keeps a copy afterwards.
+        val recoveryCode = state.recoveryCode
+        if (recoveryCode != null) {
+            VaultRecoveryCodeDialog(
+                code = recoveryCode,
+                onAcknowledged = onRecoveryCodeAcknowledged,
             )
         }
 
@@ -472,6 +536,44 @@ private fun VaultContent(
 
         VaultExplanationCard()
     }
+}
+
+/**
+ * The one moment a recovery code exists on screen.
+ *
+ * The dialog cannot be dismissed by tapping away: the code is shown exactly once, and the only way
+ * past is acknowledging that it has been stored — the act that clears it from the screen's state.
+ * What it draws is the code itself, a string; the key behind it never reaches this layer.
+ */
+@Composable
+private fun VaultRecoveryCodeDialog(
+    code: String,
+    onAcknowledged: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { /* the code is acknowledged, not dismissed */ },
+        title = {
+            Text(text = stringResource(id = R.string.vault_recovery_code_title))
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = stringResource(id = R.string.vault_recovery_code_intro),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = code,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onAcknowledged) {
+                Text(text = stringResource(id = R.string.vault_recovery_code_stored_action))
+            }
+        },
+    )
 }
 
 /**

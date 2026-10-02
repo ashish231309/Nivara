@@ -25,6 +25,29 @@ import com.nivara.app.ui.components.NivaraMessage
  * where the vault stands; it never holds anything that could open it, which is why nothing here can
  * end up in a Compose state, a saved instance or a screenshot.
  */
+/**
+ * Whether the connected vault carries recovery material, as far as the vault screen cares.
+ *
+ * The screen uses this for one thing: offering to set up a recovery code while none exists, and
+ * saying plainly when the record that should hold one cannot be read. The states are never
+ * collapsed — a vault whose recovery record cannot be read is not a vault without one, and neither
+ * is treated as "set up".
+ */
+enum class VaultRecoveryCard {
+
+    /** The vault cannot hold a recovery record right now; the screen shows nothing about recovery. */
+    Hidden,
+
+    /** The vault is connected and has no recovery record. */
+    NotSetUp,
+
+    /** The vault is connected and carries a recovery record. */
+    SetUp,
+
+    /** The vault is connected; its recovery record is present but unreadable. */
+    Damaged,
+}
+
 sealed interface VaultUiState {
 
     /** The first look at the root has not finished. */
@@ -88,6 +111,22 @@ sealed interface VaultUiState {
         val unlockRequired: Boolean = false,
         val failure: NivaraMessage? = null,
         val noticeRes: Int? = null,
+        /**
+         * What the screen says about recovery material, when the vault can hold one.
+         *
+         * Drives the setup prompt: a connected vault without a recovery record has no way back in
+         * once this installation's state is gone, and the screen says so until setup happens.
+         */
+        val recoveryCard: VaultRecoveryCard = VaultRecoveryCard.Hidden,
+        /** `true` while a recovery setup write is running. */
+        val recoverySetupBusy: Boolean = false,
+        /**
+         * The one-time recovery code, present for exactly as long as the screen is showing it.
+         *
+         * Nothing else holds it: it is not persisted, not logged, and leaving the dialog clears
+         * it. It is a code — the shape the user's secret takes on paper — never key material.
+         */
+        val recoveryCode: String? = null,
     ) : VaultUiState {
 
         /**
@@ -143,5 +182,17 @@ sealed interface VaultUiState {
          */
         val canReplaceUnreadable: Boolean
             get() = !busy && sessionAuthenticated && vaultHasUnreadableRecords
+
+        /**
+         * Whether the screen should offer to set up a recovery code right now.
+         *
+         * The vault must be open, the gate open, no change running, and the vault must lack a
+         * readable recovery record — a damaged one included, because setting up replaces it.
+         */
+        val canSetUpRecovery: Boolean
+            get() = !busy && !recoverySetupBusy && sessionAuthenticated &&
+                vault is VaultState.Ready &&
+                (recoveryCard == VaultRecoveryCard.NotSetUp ||
+                    recoveryCard == VaultRecoveryCard.Damaged)
     }
 }

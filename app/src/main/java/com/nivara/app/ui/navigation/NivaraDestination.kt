@@ -114,6 +114,20 @@ sealed interface NivaraDestination {
     }
 
     /**
+     * Vault recovery: reconnecting to a vault that outlived this installation, using the recovery
+     * code the vault was given.
+     *
+     * A destination of its own rather than a mode of the vault screen: the vault screen adopts
+     * folders and shows what is at them, while recovery surveys a folder without adopting it and
+     * asks for the one secret that can open it. Reaching it is ordinary navigation from the vault
+     * screen under the same session rules as every other configuration change.
+     */
+    data object VaultRecovery : NivaraDestination {
+        override val route: String = "vault-recovery"
+        override val titleRes: Int = R.string.vault_recovery_title
+    }
+
+    /**
      * Nivara as the device's Home application: the launcher surface and its app drawer.
      *
      * A destination like any other, so that reaching Nivara's settings from the launcher is ordinary
@@ -145,6 +159,7 @@ sealed interface NivaraDestination {
                 HiddenApps,
                 Camouflage,
                 Vault,
+                VaultRecovery,
             )
 
         /** Resolves a navigation route back to its destination, or `null` when unknown. */

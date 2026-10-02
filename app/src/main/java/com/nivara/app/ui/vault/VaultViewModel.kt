@@ -10,6 +10,7 @@ import com.nivara.app.R
 import com.nivara.app.core.common.NivaraResult
 import com.nivara.app.core.common.isSuccess
 import com.nivara.app.domain.security.SessionManager
+import com.nivara.app.domain.vault.RecoveryStatus
 import com.nivara.app.domain.vault.VaultAlbumContents
 import com.nivara.app.domain.vault.VaultAlbumId
 import com.nivara.app.domain.vault.VaultFailure
@@ -24,6 +25,8 @@ import com.nivara.app.domain.vault.VaultOrdering
 import com.nivara.app.domain.vault.VaultOrganizationFailure
 import com.nivara.app.domain.vault.VaultOrganizationRepository
 import com.nivara.app.domain.vault.VaultOrganizationState
+import com.nivara.app.domain.vault.VaultRecoveryFailure
+import com.nivara.app.domain.vault.VaultRecoveryRepository
 import com.nivara.app.domain.vault.VaultRepository
 import com.nivara.app.domain.vault.VaultSearch
 import com.nivara.app.domain.vault.VaultSearchQuery
@@ -85,6 +88,7 @@ class VaultViewModel(
     private val indexRepository: VaultIndexRepository,
     private val organizationRepository: VaultOrganizationRepository,
     private val trashRepository: VaultTrashRepository,
+    private val recoveryRepository: VaultRecoveryRepository,
     private val locationStore: VaultLocationStore,
     private val sessionManager: SessionManager,
 ) : ViewModel() {
@@ -127,6 +131,16 @@ class VaultViewModel(
     private var failure: NivaraMessage? = null
     private var noticeRes: Int? = null
     private var pendingLocation: VaultLocation? = null
+    private var recoveryCard: VaultRecoveryCard = VaultRecoveryCard.Hidden
+    private var recoverySetupBusy: Boolean = false
+
+    /**
+     * The one-time recovery code, held for exactly as long as the screen is showing it.
+     *
+     * It is set by the setup write, drawn once, and cleared when the user acknowledges it. It is
+     * never persisted, never logged, and never drawn again once cleared.
+     */
+    private var recoveryCode: String? = null
 
     init {
         inspect(showLoading = true)
@@ -330,6 +344,90 @@ class VaultViewModel(
      * Asked at the moment of the action, not from the drawn state, so a session that expired between
      * the render and the tap cannot let a change through.
      */
+    // ------------------------------------------------------------------ recovery
+
+    /**
+     * Reads whether the connected vault carries recovery material.
+     *
+     * The repository reads only the recovery record's clear header here: no key is borrowed, no
+     * envelope opened. A read that fails is reported as damage, never as "not set up".
+     */
+    private suspend fun readRecoveryCard(): VaultRecoveryCard {
+        val status = try {
+            recoveryRepository.recoveryStatus()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            NivaraResult.Failure(error)
+        }
+        return when (status) {
+            is NivaraResult.Success -> when (status.value) {
+                RecoveryStatus.NoVault -> VaultRecoveryCard.Hidden
+                RecoveryStatus.NotSetUp -> VaultRecoveryCard.NotSetUp
+                RecoveryStatus.SetUp -> VaultRecoveryCard.SetUp
+                RecoveryStatus.Damaged -> VaultRecoveryCard.Damaged
+            }
+            is NivaraResult.Failure -> VaultRecoveryCard.Damaged
+        }
+    }
+
+    /**
+     * Sets up the vault's recovery code.
+     *
+     * A durable change like the others on this screen: offered only while the gate is open, and the
+     * write goes through the recovery repository, which seals the vault's existing key under fresh
+     * material and verifies the record before reporting success. The code the write produces is
+     * shown once; acknowledging it clears it from this screen.
+     */
+    fun onSetUpRecoveryRequested() {
+        val current = readyState() ?: return
+        if (current.busy || recoverySetupBusy || recoveryCode != null) return
+        if (!hasSession()) return
+
+        recoverySetupBusy = true
+        failure = null
+        noticeRes = null
+        publish()
+
+        viewModelScope.launch {
+            val result = try {
+                recoveryRepository.setUpRecovery { code ->
+                    // The code arrives here exactly once. It is handed to the screen and nowhere
+                    // else; the repository has already cleared its own copy of the key behind it.
+                    recoveryCode = code
+                    NivaraResult.Success(Unit)
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                NivaraResult.Failure(error)
+            }
+            recoverySetupBusy = false
+            when (result) {
+                is NivaraResult.Success -> {
+                    recoveryCard = VaultRecoveryCard.SetUp
+                    publish()
+                }
+                is NivaraResult.Failure -> {
+                    failure = result.error.asRecoverySetupMessage()
+                    publish()
+                }
+            }
+        }
+    }
+
+    /**
+     * The user has stored the code; the screen forgets it.
+     *
+     * After this, nothing in the process holds the code — the vault holds only the envelope, which
+     * is useless without the secret the code encodes.
+     */
+    fun onRecoveryCodeAcknowledged() {
+        if (recoveryCode == null) return
+        recoveryCode = null
+        publish()
+    }
+
     private fun hasSession(): Boolean {
         if (sessionManager.currentState().isAuthenticated) return true
         unlockRequired = true
@@ -798,11 +896,15 @@ class VaultViewModel(
                 // The trash is a fourth fact, read from a record of its own. It is never inferred
                 // from what the index does or does not list.
                 readTrash()
+                // Whether the vault carries recovery material is a fifth fact, read from the clear
+                // header of the recovery record: it needs no key and opens nothing.
+                recoveryCard = readRecoveryCard()
             } else {
                 domainIndex = VaultIndexState.VaultNotReady(state)
                 indexState = drawnIndex()
                 domainOrganization = VaultOrganizationState.VaultNotReady(state)
                 domainTrash = VaultTrashState.VaultNotReady(state)
+                recoveryCard = VaultRecoveryCard.Hidden
             }
             if (!keepMessages) {
                 failure = null
@@ -1008,6 +1110,9 @@ class VaultViewModel(
             unlockRequired = unlockRequired,
             failure = failure,
             noticeRes = noticeRes,
+            recoveryCard = recoveryCard,
+            recoverySetupBusy = recoverySetupBusy,
+            recoveryCode = recoveryCode,
         )
     }
 
@@ -1128,6 +1233,7 @@ class VaultViewModel(
                     indexRepository = container.vaultIndexRepository,
                     organizationRepository = container.vaultOrganizationRepository,
                     trashRepository = container.vaultTrashRepository,
+                    recoveryRepository = container.vaultRecoveryRepository,
                     locationStore = container.vaultLocationStore,
                     sessionManager = container.sessionManager,
                 )
@@ -1139,3 +1245,15 @@ class VaultViewModel(
 /** Turns a failure into the message the screen shows, defaulting when it is not a vault failure. */
 private fun Throwable?.asMessage(): NivaraMessage =
     (this as? VaultFailure)?.asMessage() ?: vaultSelectionFailedMessage()
+
+/**
+ * Turns a recovery-setup failure into the message the screen shows.
+ *
+ * The two facts a setup can fail with are "the vault is not open for this" and "the write did not
+ * verify"; anything else is reported as the latter rather than inventing a third thing to say.
+ */
+private fun Throwable?.asRecoverySetupMessage(): NivaraMessage = when (this) {
+    VaultRecoveryFailure.VaultNotReady ->
+        NivaraMessage(textRes = R.string.vault_error_recovery_not_ready)
+    else -> NivaraMessage(textRes = R.string.vault_error_recovery_failed)
+}
