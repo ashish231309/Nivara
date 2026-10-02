@@ -4,12 +4,12 @@ This document records what camouflage is, how it is implemented, what it deliber
 and how a user reaches Nivara whatever name it is currently showing. It is the durable reference for
 the feature, not a walkthrough of the screen.
 
-It covers one stage:
+It covers:
 
-* **[Stage 12: application identity](#stage-12-application-identity)** — the name and icon Nivara's
+* **[Application identity](#application-identity)** — the name and icon Nivara's
   launcher entry presents, and the ordinary route back to Nivara's own identity.
 
-# Stage 12: application identity
+# Application identity
 
 ## Purpose
 
@@ -130,7 +130,7 @@ one — enabled for MainActivity, disabled for every alias. An explicit enable o
 it is. `DISABLED_UNTIL_USED` counts as no entry, because it is not one.
 
 Nothing here changes the user's Home selection: no preferred activity is written, no other launcher's
-preference is cleared, and Nivara never selects itself as Home. The Home contract Stage 11 added is
+preference is cleared, and Nivara never selects itself as Home. The Home contract the launcher added is
 untouched by this feature — the alias is never aimed at the Home activity, and the Home activity's
 component state is never changed.
 

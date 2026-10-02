@@ -2,23 +2,23 @@
 
 This document records the decisions behind Nivara's launcher: what it is as an Android component,
 what it draws, what it refuses to draw, how an application is opened, who may see hidden
-applications, and what is deliberately not true about it. It is the durable reference for the stages
+applications, and what is deliberately not true about it. It is the durable reference for what follows
 that follow, not a walkthrough of the screen.
 
-It covers one stage:
+It covers:
 
-* **[Stage 11: the launcher and the app drawer](#stage-11-the-launcher-and-the-app-drawer)** — Nivara
-  as the device's Home application, and what its drawer does with the hidden set Stage 10 records.
+* **[The launcher and the app drawer](#the-launcher-and-the-app-drawer)** — Nivara
+  as the device's Home application, and what its drawer does with the hidden set the hidden-app record keeps.
 
-# Stage 11: the launcher and the app drawer
+# The launcher and the app drawer
 
-## Scope of this stage
+## Scope
 
-The launcher is the surface where Stage 10's hidden set becomes meaningful inside Nivara: the drawer
+The launcher is the surface where the hidden set becomes meaningful inside Nivara: the drawer
 is built from the applications the device can launch, minus the ones marked hidden, with an explicit
 authenticated way to show them for a while.
 
-What the stage delivers:
+What the launcher delivers:
 
 * a Home activity Android accepts and starts as the device's launcher;
 * a home surface with three things on it — the drawer, Nivara's settings, and the control that shows
@@ -35,7 +35,7 @@ What it deliberately does not do:
 * it does not hide anything from Android. Hidden applications stay installed, stay in Android's
   launcher, stay visible in Settings and the package manager, and nothing about them is disabled;
 * it does not add camouflage, a fake name or icon, a secret entry sequence, a calculator or dialer
-  identity: those belong to Stage 12 and none of them exists here;
+  identity: those belong to camouflage and none of them exists here;
 * it does not add a launcher-specific password, session, timeout or failure counter;
 * it does not add widgets, folders, wallpapers, animations, gestures or the final visual design;
 * it does not add a permission of any kind.
@@ -83,7 +83,7 @@ not something that was observed.
 
 ## Application discovery
 
-The drawer draws the catalogue Stage 6 already produces:
+The drawer draws the catalogue discovery already produces:
 
 ```
 ApplicationRepository.installedApplications()   one launcher-intent query, Nivara excluded
@@ -124,7 +124,7 @@ protection. Both dimensions are read from their own repositories during the same
 
 ## Fail-closed behaviour
 
-This is the security-critical part of the stage, and it is a property of the **view model**, not of a
+This is the security-critical part of the launcher, and it is a property of the **view model**, not of a
 view: when the hidden set cannot be read, the launcher produces no `Ready` state at all, so there is
 no list for a screen to draw by accident.
 
@@ -224,7 +224,7 @@ The launcher uses the existing `SessionManager` and nothing else:
   failure counter, no password and no session state of its own;
 * **resuming the launcher does not extend the session.** Coming back from a launched application
   re-reads the device and the hidden set and re-evaluates the gate; it does not refresh the session,
-  which preserves Stage 5's rule that the session begins with an authentication and nothing else.
+  which preserves the rule that the session begins with an authentication and nothing else.
 
 ## App Lock interaction
 
@@ -274,7 +274,7 @@ back to Nivara's settings whatever its launcher entry is currently called.
 ## Security and privacy
 
 * **No new permission.** Displaying applications, opening them, being Home and filtering hidden ones
-  need none. The manifest still declares exactly the two Stage 8 capabilities, both justified by App
+  need none. The manifest still declares exactly the two capabilities, both justified by App
   Lock.
 * **Nothing new is exported.** One Home activity, with one intent filter; the verifier refuses any
   other exported component that is not the application's own launcher entry or a declared

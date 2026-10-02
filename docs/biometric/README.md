@@ -1,11 +1,11 @@
 # Biometric unlock: Android's prompt as a secondary path
 
-This document is the design record for the biometric layer added in Stage 4. It explains what
+This document is the design record for the biometric layer added in this work. It explains what
 Nivara does, what it deliberately delegates to Android, what it stores, how it behaves when the
 platform takes the key away, and what it can never do.
 
 Scope: biometric authentication as a **secondary** convenience beside the primary credential.
-Biometrics do not unlock anything by themselves in this stage — sessions, timeouts and app locking
+Biometrics do not unlock anything by themselves in this work — sessions, timeouts and app locking
 come later and consume the result. Nothing here replaces the PIN, password or pattern.
 
 ## The rule that shapes everything
@@ -175,7 +175,7 @@ platform's own prompt is used.
 - No biometric data of any kind: no templates, no images, no per-finger state.
 - No raw key material in application storage, and no key material in logs.
 - No bypass of Android's lockout, and no claim that one exists.
-- No session, no timeout, no app locking: those are later stages and consume
+- No session, no timeout, no app locking: those are later work and consume
   `BiometricAuthenticationOutcome` rather than re-implementing it.
 
 ## Verification status

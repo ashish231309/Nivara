@@ -4,29 +4,18 @@ Nivara is a native Android application for privacy and security. It is built to 
 person's private space — locked apps, hidden apps, and encrypted files — on their own device,
 under their own control.
 
-The project is developed in the open and in small, reviewable increments. Everything that
-ships is written for the platform: no cross-platform wrappers, no unnecessary third-party UI
-frameworks, and no dependencies that are not justified by code that exists.
+The project is developed in the open. Everything that ships is written for the platform: no
+cross-platform wrappers, no unnecessary third-party UI frameworks, and no dependencies that are
+not justified by code that exists.
 
-## Project status
+## Capabilities
 
-The repository contains the **foundation release**, the **cryptographic core**, **primary
-credential enrolment**, **biometric unlock as a secondary path**, the **session layer**, the
-**App Lock layer** — launcher discovery, the two Android capabilities it needs, foreground
-detection, the protection surface that presents the requirement and routes authentication into the
-session, and the settings screen that chooses which applications are protected — the
-**hidden-app layer**: the record of which applications Nivara keeps out of sight, the screen that
-manages it, the **launcher**: Nivara as the device's Home application, with an app drawer that
-leaves hidden applications out and can show them again for as long as Nivara is unlocked — the
-**application identity**: the name and icon Nivara's launcher entry presents, and the ordinary route
-back to Nivara's own — and the **vault**: the folder the user chooses, the authenticated record that
-says a vault is there, the encrypted store imported files go into, opening one of those files again,
-organising what is in it — albums, search and the order of the list — moving a file out of the
-active collection to trash and back again, with everything about the file kept exactly as it was,
-and reconnecting a vault that outlived the app's own state, with a recovery code the user was
-shown once.
+Nivara protects three things on the device: the applications a person uses, the applications a
+person does not want seen, and the files a person keeps — locked apps, hidden apps, and an
+encrypted vault — all of it offline, under one credential the person chose.
 
-What works today:
+What the application does:
+
 
 - the application shell — home and about screens, navigation, Material 3 light/dark theme;
 - reporting the device's screen-lock status;
@@ -86,7 +75,7 @@ What works today:
   state is ever drawn as "no albums" when it cannot be read. A file can then be moved to **Trash**
   and restored: the move is a state and nothing more — the encrypted file stays where it is with its
   name, its albums and its identity, nothing is deleted, nothing expires, and a trash record that
-  cannot be read is never drawn as an empty trash; sharing is a later stage, so the screen says
+  cannot be read is never drawn as an empty trash; sharing does not exist, so the screen says
   nothing it does not do. And a vault can be **recovered**: the vault's own key is sealed under a
   recovery code the user is shown once, and after a reinstall — when the app's own state is gone
   but the folder is not — the vault screen offers the way back in: choose the folder, confirm the
@@ -108,9 +97,10 @@ one thing with an authentication result — hand it to the session gate. The vau
 [`docs/session/README.md`](docs/session/README.md),
 [`docs/applock/README.md`](docs/applock/README.md),
 [`docs/apphide/README.md`](docs/apphide/README.md),
-[`docs/launcher/README.md`](docs/launcher/README.md) and
-[`docs/camouflage/README.md`](docs/camouflage/README.md) and
-[`docs/vault/README.md`](docs/vault/README.md). Hiding an application means Nivara's own
+[`docs/launcher/README.md`](docs/launcher/README.md),
+[`docs/camouflage/README.md`](docs/camouflage/README.md),
+[`docs/vault/README.md`](docs/vault/README.md) and
+[`docs/ui/README.md`](docs/ui/README.md). Hiding an application means Nivara's own
 drawer leaves it out; Android's launcher still shows every application, and both the screens and the
 documentation say so. Camouflage means Nivara's own launcher entry shows a different name and icon;
 Android still lists Nivara by its package, and the screen that offers it says that too. Vault storage
@@ -119,30 +109,6 @@ location — the folder itself is not a secret, and the screen that configures i
 imported file means reading it back through the same decryption that wrote it, in bounded pieces, with
 no plaintext copy anywhere: what Nivara can actually draw, play or read is listed below, and anything
 else is described rather than guessed at.
-
-## Planned capabilities
-
-These are the areas Nivara is being built for. They are listed here so the direction of the
-project is clear; each one is implemented in its own release and is not present yet.
-
-- Authentication and biometric unlock — delivered
-- App locking — delivered
-- Recording which applications are hidden — delivered
-- An optional home-screen (launcher) experience — delivered, as a launcher Android can be asked to
-  use; choosing it is the user's decision in Android's own Home settings
-- App identity camouflage and a recovery entry point — delivered, as presentation: a benign name and
-  icon for Nivara's launcher entry, with Nivara's own identity one selection away and reachable from
-  Android's application list at any time. Camouflage is not a security boundary, hides nothing from
-  Android, and does not pretend to be a different application: it changes what the home screen shows
-- External encrypted vault storage — delivered
-- Importing files into the vault, and opening them again — delivered
-- Organising an encrypted file vault: albums, search and sorting — delivered
-- A trash for the vault: moving files out of the active collection and restoring them — delivered,
-  as a state change only; permanent deletion is deliberately not part of it
-- Secure recovery: reconnecting a vault after a reinstall with its recovery code — delivered,
-  without creating, replacing, re-encrypting or repairing anything; losing the code loses the way
-  back in, and that is said where the code is shown
-- Security settings, themes and the final visual design
 
 ## Technology stack
 
@@ -188,9 +154,9 @@ app/src/main/java/com/nivara/app/
 │   └── security/               JCA, Android Keystore and device state
 └── ui/                         Compose UI
     ├── NivaraApp.kt            Root composable: app bar + navigation host
-    ├── theme/                  Material 3 colour scheme and typography
+    ├── theme/                  Material 3 colour schemes, typography and shapes
     ├── navigation/             Destinations and the navigation graph
-    ├── components/             Reusable loading and error states
+    ├── components/             Shared design tokens, motion, state views and section headers
     ├── home/                   Home screen, state and view model
     ├── about/                  About screen
     ├── credential/             Enrolment, verification and change screens
@@ -203,6 +169,7 @@ app/src/main/java/com/nivara/app/
     ├── launcher/               The Home activity, the home surface and the app drawer
     ├── camouflage/             Choosing the name and icon Nivara presents under
     ├── vault/                  Choosing the vault folder, importing a file, the list and the viewer
+    │   ├── recovery/           Reconnecting a vault after a reinstall with its recovery code
     │   └── viewer/             The viewer's state, wording and controls
     └── session/                Session text shared by the screens that show it
 ```
@@ -401,7 +368,7 @@ Principles the layer is held to:
 - Unknown versions, schemes, algorithms and purposes are hard failures. There is no fallback to a
   weaker algorithm.
 - Nothing persists secret material: no credential, no raw recovery key, no unprotected key.
-  Persistence decisions belong to the stages that own the data.
+  Persistence decisions belong to the layers that own the data.
 - Erasure is best effort. The code clears live buffers and keeps secret lifetimes short, and the
   documentation says plainly that a managed runtime cannot guarantee zeroisation.
 
@@ -415,13 +382,13 @@ and the threat model are documented in
 | Concern | Implementation |
 | --- | --- |
 | Methods | PIN, password or pattern; exactly one active at a time |
-| Derivation | The Stage 2 PBKDF2-HMAC-SHA-256 service; the derived key is never stored |
+| Derivation | PBKDF2-HMAC-SHA-256; the derived key is never stored |
 | Stored material | Credential type, KDF parameters, random salt and a one-way verifier — `HMAC-SHA-256(derivedKey, label ‖ type)` |
 | Storage | Two small files in the private directory, written atomically; no credential, key or recovery material |
 | Verification | Constant-time comparison; a wrong credential, a wrong type and a tampered record are indistinguishable |
 | Change | Authenticates the current credential first; the previous credential stops working immediately |
 | Attempts | Two free attempts, then a capped exponential delay; reset only on success; never a permanent lock |
-| Reset | Deliberately absent — removal goes through recovery, which is a later stage with its own threat model |
+| Reset | Deliberately absent — vault recovery reconnects a vault after a reinstall, but the credential itself has no reset path; a forgotten credential means enrolling a new one over a fresh installation |
 
 ## Biometric unlock
 
@@ -462,8 +429,7 @@ Quick Lock are documented in [`docs/session/README.md`](docs/session/README.md).
 
 Nivara records which applications the user wants kept out of sight. That record is a set of package
 names and nothing else — no labels, no icons, no timestamps, no UI state — kept by one repository
-that the management screen reads and writes through, and that Nivara's own launcher will read when
-it arrives. The format, the failure cases and the boundary are documented in
+that the management screen reads and writes through, and that Nivara's own launcher reads. The format, the failure cases and the boundary are documented in
 [`docs/apphide/README.md`](docs/apphide/README.md).
 
 | Concern | Behaviour |

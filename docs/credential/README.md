@@ -1,6 +1,6 @@
 # Primary credential: enrolment and verification
 
-This document describes the credential layer added in Stage 3. It is the design record for the
+This document describes the credential layer added in this work. It is the design record for the
 primary authentication credential — how it is chosen, entered, validated, derived from, verified,
 changed, and what is written to disk.
 
@@ -81,7 +81,7 @@ boundary for exactly this reason.
 
 ## Derivation and verification
 
-The layer adds no cryptography of its own. It uses the Stage 2 `KeyDerivationService`
+The layer adds no cryptography of its own. It uses the `KeyDerivationService`
 (PBKDF2-HMAC-SHA-256) with its salt generation and its parameter validation.
 
 **Verifier construction.** The record stores `HMAC-SHA-256(derivedKey, label ‖ 0x00 ‖ typeName)`
@@ -194,7 +194,7 @@ No data is currently protected by the credential-derived key, so a change rewrit
 nothing else. When the vault exists, the credential-derived key will wrap (or be the input to
 wrapping) a random content key. At that point a credential change will have to re-wrap under the
 new derived key while the old key is still in memory — the integration point is
-`ContentKeyWrapper` in the cryptographic layer, and the vault stage owns the decision between
+`ContentKeyWrapper` in the cryptographic layer, and the vault owns the decision between
 re-wrapping the content key during a change and keeping the content key protected by a
 device-bound key with the credential used only for authentication. Either way the contract is the
 same: no plaintext key material is written at any point.
@@ -203,12 +203,12 @@ same: no plaintext key material is written at any point.
 
 - **No reset and no removal path.** `CredentialStore` has no `delete`. Removing the credential
   without authenticating would be a bypass, and an "easy reset" is exactly the convenience that
-  becomes a back door. Recovery is a separate mechanism with its own threat model and is built in a
-  later stage.
+  becomes a back door. Recovery is a separate mechanism with its own threat model: it reconnects a vault after a
+  reinstall, and resetting a credential is not what it does.
 - **No master password, no recovery code, no developer bypass.** There is no value anywhere in the
   code that can produce an accepted credential without knowing it.
 - **No session, no lock, no timeout.** `Succeeded` is where this layer stops; what an accepted
-  credential unlocks — and for how long — belongs to the session stage.
+  credential unlocks — and for how long — belongs to the session layer.
 
 ## Platform limitations, stated plainly
 

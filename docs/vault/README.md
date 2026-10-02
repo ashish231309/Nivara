@@ -4,15 +4,15 @@ This document records what Nivara's vault storage is, where it lives, what is wr
 the user chooses, which key protects it, how a vault is created and reopened, and what every failure
 state means. It is the durable reference for the storage foundation, not a walkthrough of the screen.
 
-It covers three stages:
+It covers, in order:
 
-* **[Stage 13: external encrypted vault storage](#stage-13-external-encrypted-vault-storage)** — the
+* **[External encrypted vault storage](#external-encrypted-vault-storage)** — the
   vault root, its structure, its authenticated metadata record, and creating a vault at a root the
   user selected.
-* **[Stage 14: file import, content encryption and the vault index](#stage-14-file-import-content-encryption-and-the-vault-index)** —
+* **[File import, content encryption and the vault index](#file-import-content-encryption-and-the-vault-index)** —
   choosing one document, encrypting it into the vault as a bounded-memory stream, and recording it in
   an authenticated index that is only ever replaced once its replacement has been read back.
-* **[Stage 15: viewing a stored file](#stage-15-viewing-a-stored-file)** — opening one listed file
+* **[Viewing a stored file](#viewing-a-stored-file)** — opening one listed file
   again: what Nivara can draw, play and read, how the content is decrypted without a plaintext copy
   anywhere, and what happens when a file is unsupported, missing, unreadable, damaged, or opened while
   the session ends.
@@ -21,13 +21,13 @@ Still **not** covered here, because it does not exist yet: albums, search and so
 favourites, trash and restore, permanent deletion, recovery after reinstalling, sharing or exporting —
 and the vault's visual polish. This document describes what is implemented, and nothing else.
 
-# Stage 13: external encrypted vault storage
+# External encrypted vault storage
 
 ## Purpose
 
 A vault is only useful if it lives somewhere the user can see, keep, copy and move — an SD card, a
 synced folder, a folder they back up — and if what sits there is useless to anyone who finds it. This
-stage delivers the smallest thing that makes that true and honest:
+work delivers the smallest thing that makes that true and honest:
 
 * **one root**, chosen by the user, remembered durably, and never replaced or guessed at;
 * **one structure** inside it: an authenticated record of the vault and a place for encrypted content;
@@ -35,7 +35,7 @@ stage delivers the smallest thing that makes that true and honest:
 * **one answer** to "what is at this root?" that distinguishes a folder with no vault from a vault
   that exists and cannot be opened, from a root that cannot be reached at all.
 
-Nothing in this stage stores a file's contents, reads a media item, or lists what the vault holds.
+Nothing in this work stores a file's contents, reads a media item, or lists what the vault holds.
 The screen exists to choose a folder, create a vault in it, and report what is there.
 
 ## Supported mechanism: the Storage Access Framework
@@ -87,11 +87,11 @@ Exactly two directories are created inside the root the user selected, and nothi
 ├── nivara.meta/
 │   ├── vault.0.nvm        the committed metadata record
 │   └── vault.1.nvm        the other slot (present only while a write is being replaced)
-└── nivara.content/        reserved for encrypted content — empty in this stage
+└── nivara.content/        reserved for encrypted content — empty in this work
 ```
 
 A trash area, an album area, a thumbnail area, an index area and a key area are **not** created here.
-They arrive with the stages that use them; creating them now would be inventing structure nothing
+They arrive with the features that use them; creating them now would be inventing structure nothing
 reads.
 
 ### Two slots and a generation
@@ -168,20 +168,20 @@ device key  (Android Keystore, alias nivara.vault.v1, non-exportable)
 | --- | --- | --- |
 | User authentication | the primary credential (PIN, password, pattern) | `docs/credential/README.md` |
 | Session authorization | one in-memory session gate | `docs/session/README.md` |
-| Vault key availability | the device key that wraps the vault key | Android Keystore, this stage |
-| Content storage | the vault key, once a credential-derived and a recovery wrapping of it exist | later stages |
+| Vault key availability | the device key that wraps the vault key | Android Keystore, this work |
+| Content storage | the vault key, once a credential-derived and a recovery wrapping of it exist | later work |
 
 The four are separate on purpose: the session gate says whether a *user* may act; the device key is
 what makes the vault's key material *available to the application*; and neither is the vault key
 itself. Re-wrapping a content key never touches encrypted data, which is why this shape survives a
-credential change and (in a later stage) a credential-based and recovery-based wrapping of the same
+credential change and (in later work) a credential-based and recovery-based wrapping of the same
 key.
 
-What this stage deliberately does **not** do:
+What this work deliberately does **not** do:
 
 * no vault key is derived from the credential, and the credential never reaches the storage layer;
 * no raw vault key is exposed globally: the repository unwraps nothing for inspection, and only this
-  stage's own key-material check ever holds the in-process copy — which is cleared in a `finally`;
+  setup's own key-material check ever holds the in-process copy — which is cleared in a `finally`;
 * no session is created, extended, ended or counted by anything in `data/vault`.
 
 The cryptography is the existing one. `EncryptionService`, `ContentKeyWrapper`, `DeviceKeyStore`,
@@ -230,7 +230,7 @@ still the same vault once its folder is selected again. The reference is the onl
 
 ## Failure states
 
-No state in this stage means "empty vault". Each one means one specific thing, and each is shown with
+No state in this work means "empty vault". Each one means one specific thing, and each is shown with
 its own words:
 
 | State | Means | What the user can do |
@@ -241,7 +241,7 @@ its own words:
 | `Ready` | a valid vault: authenticated metadata and the structure it requires | — |
 | `Unreadable` → `MetadataDamaged` | Nivara's record is there and cannot be opened: damaged, or written under a device key that is no longer the one in use | check the folder; replacing is the explicit, destructive option |
 | `Unreadable` → `StructureIncomplete` | structure without a complete record: an initialization that did not finish | create the vault here, which completes the setup |
-| `Unreadable` → `KeyUnavailable` | the vault is intact and the platform key protecting its key material is gone (removing the screen lock destroys it) | a later stage can re-wrap the vault key; replacing is the explicit option |
+| `Unreadable` → `KeyUnavailable` | the vault is intact and the platform key protecting its key material is gone (removing the screen lock destroys it) | later work can re-wrap the vault key; replacing is the explicit option |
 | `UnsupportedVersion` | a record written by a newer Nivara | update Nivara; nothing here may replace it |
 | `Unavailable` | the storage cannot be reached right now | reconnect the storage and try again |
 | `AccessDenied` | the persisted grant was revoked or the selection cannot be resolved | choose the folder again to restore the grant |
@@ -283,11 +283,11 @@ that possible: the picker grants durable access to exactly one folder.
 * the vault identifier is **not a secret and not a key**: 128 random bits, never displayed and never
   logged, used to recognise the same vault across folders and copies;
 * no URI, path, file name, vault identifier or key is written to a log, a message or a screen;
-* nothing is uploaded, transmitted, measured or reported: there is no network code in this stage and
+* nothing is uploaded, transmitted, measured or reported: there is no network code in this work and
   no analytics anywhere in the application;
 * nothing about the vault is a hidden route: the screen is reached from the home screen like any other
   settings screen, under whatever identity Nivara presents, and it needs no session to *look* at;
-* camouflage, the hidden set, App Lock and the launcher are untouched by this stage in both directions:
+* camouflage, the hidden set, App Lock and the launcher are untouched by this work in both directions:
   the vault neither reads nor changes any of them, and none of them knows the vault exists.
 
 ## Scope
@@ -296,14 +296,14 @@ In scope, and delivered: the root contract, the platform storage seam, the versi
 metadata record, initialization with read-back verification, the state model, the session-gated screen,
 the home entry, the verifier rules and the tests.
 
-Deliberately **not** in this stage, and not documented as if it were:
+Deliberately **not** in this work, and not documented as if it were:
 
-* importing files, encrypting content, chunked encryption and the vault index (Stage 14);
-* media and document handling (Stage 15);
-* albums, search and sorting (Stage 16);
-* trash and restore (Stage 17);
-* recovery and reinstallation beyond the durable-root contracts this stage establishes (Stage 18);
-* the vault's visual polish (Stage 19).
+* importing files, encrypting content, chunked encryption and the vault index;
+* media and document handling;
+* albums, search and sorting;
+* trash and restore;
+* recovery and reinstallation beyond the durable-root contracts this work establishes;
+* the vault's visual polish.
 
 ## Runtime verification status
 
@@ -314,12 +314,12 @@ Framework behaves in a particular way on a particular Android version, that a pr
 write, or that a picker returns a grant — those are platform behaviours that require a device to
 observe, and the code is written to fail safely when they do not hold.
 
-# Stage 14: file import, content encryption and the vault index
+# File import, content encryption and the vault index
 
 ## Purpose
 
 A vault is only worth having if a file can get into it, and it is only trustworthy if that first real
-write cannot half-happen. This stage delivers the smallest honest version of that:
+write cannot half-happen. This work delivers the smallest honest version of that:
 
 * **one document**, picked by the user through Android's own document picker, read once during the
   import and never modified, moved or remembered afterwards;
@@ -332,7 +332,7 @@ write cannot half-happen. This stage delivers the smallest honest version of tha
 
 Video, audio, images and documents are all treated the same way here: a file is a name, a declared
 type, a size, an arrival time and a stream of bytes. Understanding what is inside a file — rendering
-it, extracting a thumbnail, reading its duration — belongs to the stage that presents it.
+it, extracting a thumbnail, reading its duration — belongs to the viewer.
 
 ## The import pipeline, in order
 
@@ -362,7 +362,7 @@ the vault.
 | `mimeType` — the provider's declared type, if usable | A generic kind for the list; a claim, so it is validated and dropped when unusable |
 | `sizeBytes` — the plaintext size | Read from the object that was verified, not from what the provider claimed |
 | `importedAtEpochMillis` | The list's ordering and nothing else |
-| `contentFormatVersion` | Which content format the object is in, so a later stage can migrate deliberately |
+| `contentFormatVersion` | Which content format the object is in, so later work can migrate deliberately |
 | `contentDigest` — SHA-256 of the stored ciphertext | Describes the bytes that are on storage; computed from the read-back, never from the write |
 
 Not in the model, on purpose: albums, tags, favourites, ranking, thumbnails, duration, dimensions,
@@ -466,7 +466,7 @@ session closed before the change was authorized.
 
 ## Which key, and how it is used
 
-Stage 13's hierarchy is unchanged and is the only one: the device key in the platform key store
+the hierarchy is unchanged and is the only one: the device key in the platform key store
 (alias `nivara.vault.v1`) wraps the vault key, which is sealed inside the vault's authenticated
 metadata record. The content path borrows that same vault key for the duration of a call, through the
 smallest contract that does so — `VaultKeyAccess` in the data layer — and the key is cleared when the
@@ -481,7 +481,7 @@ reaches a screen, a saved state, the index, preferences or any output.
 
 | What happened | What the user sees |
 | --- | --- |
-| No vault, or a vault that cannot be opened | The vault's own state, unchanged from Stage 13; the list is not shown as empty |
+| No vault, or a vault that cannot be opened | The vault's own state, unchanged from vault setup; the list is not shown as empty |
 | The index exists and cannot be read | "File list cannot be read" — and importing is refused, because appending to a list Nivara cannot read could replace it |
 | The index was written by a newer Nivara | "File list from a newer Nivara"; nothing is written over |
 | The index is full | The import is refused; the format's bound is reported rather than worked around |
@@ -536,10 +536,10 @@ pipeline with injectable storage failures, the authenticated index and its two-s
 document picker and its adapter, the index state in the vault screen, the verifier rules and the
 tests.
 
-Deliberately **not** in this stage: rendering, opening or playing an imported file, thumbnails, media
+Deliberately **not** in this work: rendering, opening or playing an imported file, thumbnails, media
 metadata, albums, search, sorting, tagging, favourites, trash, restore, permanent deletion,
 deduplicating identical content, rebuilding a damaged index, scanning the content area to reconstruct
-a list, and recovery after reinstalling (Stages 15–18).
+a list, and recovery after reinstalling (each owned by another part of the vault).
 
 ## Runtime verification status
 
@@ -552,17 +552,17 @@ does when the process is killed mid-import — those are platform behaviours tha
 observe, and the code is written to fail safely when they do not hold.
 
 
-# Stage 15: viewing a stored file
+# Viewing a stored file
 
 ## Purpose
 
 An imported file is only worth keeping if it can be opened again, and it is only worth trusting if
-opening it does not undo what the vault is for. This stage delivers the smallest honest version of
+opening it does not undo what the vault is for. This work delivers the smallest honest version of
 that:
 
 * **one classifier** that decides what a file is from the type the index authenticated, never from its
   name;
-* **one content reader** that every viewer reads through — the streaming decryption Stage 14 already
+* **one content reader** that every viewer reads through — the streaming decryption import already
   wrote, served in bounded pieces, with the session asked before each piece;
 * **one viewer per kind** that this build can genuinely show: a picture, the platform's media stack for
   video and audio, bounded text, and PDF pages rendered through a proxy file descriptor;
@@ -571,7 +571,7 @@ that:
   player and every decoder are released, and the screen says the vault is locked.
 
 Nothing here creates a second vault key, a second root, a second index, a second authentication
-prompt or a second encrypted format. A viewer is a *reader* of what Stage 13 and Stage 14 already
+prompt or a second encrypted format. A viewer is a *reader* of what the vault record and the import pipeline already
 write.
 
 ## What a stored file is, and which viewer it gets
@@ -588,7 +588,7 @@ type stored in the authenticated index:
   this build has no viewer for it rather than pretending the file is something else.
 
 Nothing about the classifier is stored. The index keeps what the provider declared and the bytes; the
-classification is presentation, so a later stage can classify something differently without a single
+classification is presentation, so later work can classify something differently without a single
 file being rewritten.
 
 ## Formats: what is shown, played or read, and what is only described
@@ -620,7 +620,7 @@ Two honest qualifications belong here rather than in a later correction:
 ## Reading content: one decryption path, in bounded pieces
 
 Everything a viewer reads comes through one content reader, which is the streaming decryption of
-Stage 14 running as a producer into **one bounded pipe** (128 KiB):
+The import pipeline running as a producer into **one bounded pipe** (128 KiB):
 
 ```
 storage ──ciphertext──▶ existing decryptStream ──▶ one bounded pipe ──read()──▶ decoder
@@ -690,7 +690,7 @@ drawing surface:
   whose contents the application produces on demand — over the same content handle. There is no
   plaintext file to leak: the descriptor is a kernel object that exists for the length of the viewer,
   is served from the decrypted stream in bounded pieces, and disappears when the session is released.
-  This is the stage's whole answer to "a platform API requires seekable access": the safe mechanism
+  This is the viewer's whole answer to "a platform API requires seekable access": the safe mechanism
   the platform provides, rather than a temporary decrypted copy of the file.
 * Pages are rendered one at a time into a bitmap bounded by the same maximum dimension the image
   viewer uses, and released as the reader moves on.
@@ -713,7 +713,7 @@ avoid:
 | Could not be displayed | The bytes authenticated and this device's decoder refused them | The explanation that the file is unaffected, and try again |
 | Locked | The session is not open | The existing unlock action, which leads to the credential screen that already exists |
 
-Missing, unlisted and unfinished content is first class, exactly as Stage 14 made it: a missing object
+Missing, unlisted and unfinished content is first class, exactly as import made it: a missing object
 never empties the vault, never removes the entry and never triggers a "repair", a viewer that cannot
 render a file never mutates the index, and one bad item never takes the list down with it. A viewer
 reads; it never imports, deletes, renames, creates, commits an index or deletes a temporary object.
@@ -750,7 +750,7 @@ that claims to still hold content it has released.
 
 ## The list, and thumbnails
 
-The list is Stage 14's with one addition: each row shows the file's name, its type (as a word, from
+The list is the with one addition: each row shows the file's name, its type (as a word, from
 the one classifier), its size and when it arrived, and a tap opens it. Nothing else was added — no
 sorting controls, no search, no albums, no tags, no trash.
 
@@ -761,7 +761,7 @@ plaintext picture of the vault's contents sitting outside the encryption the vau
 
 ## Permissions and platform boundaries
 
-No permission is added by this stage — no `READ_MEDIA_*`, no `MANAGE_EXTERNAL_STORAGE`, no broad
+No permission is added by this work — no `READ_MEDIA_*`, no `MANAGE_EXTERNAL_STORAGE`, no broad
 storage access, no notification and no foreground service. The vault root's persisted Storage Access
 Framework grant is still the only way anything is reached, and a viewer reads only what the vault's
 own index names.
@@ -795,18 +795,18 @@ source, the image, media and document engines, the viewer's state machine and me
 inside the vault screen (open, controls, close, back, lifecycle), the list's type and open action, the
 verifier rules and the test suites.
 
-Deliberately **not** in this stage: albums, tags, favourites, search, sorting and any other way of
+Deliberately **not** in this work: albums, tags, favourites, search, sorting and any other way of
 organising the list; trash, restore and permanent deletion; recovery after reinstalling, backup and
 cloud sync; sharing, exporting or opening a file in another application; thumbnails and picture
 caching; zoom beyond a double tap, panning, or advanced gestures; a background playback service, a
-notification or a media session; and the vault's visual polish (Stage 16 onward).
+notification or a media session; and the vault's visual polish.
 
 ## Runtime verification status
 
 The classifier, the content reader, the handle's failure vocabulary and bounds, the engines' seams, the
 viewer's state machine, its session behaviour and its wording are verified by local JVM suites — 87
 tests across five suites — together with the static checks, which run on every change. The verifier's
-Stage 15 rules are themselves negative-tested: each one is broken on purpose and seen to fail, and the
+The viewer rules are themselves negative-tested: each one is broken on purpose and seen to fail, and the
 repository is restored byte for byte afterwards.
 
 What is **not** verified by those suites, and is therefore not claimed anywhere: the real image
@@ -817,11 +817,11 @@ composition — each state, its words and its controls — and is **compiled but
 continuous integration, because no device or emulator is attached. Claims about decoding, playback and
 rendering remain claims about code that compiles until a device runs it.
 
-# Stage 16: albums, search and the order of the list
+# Albums, search and the order of the list
 
 ## Purpose
 
-A vault that only appends is a place files go to; this stage is what makes it a place somebody can
+A vault that only appends is a place files go to; this work is what makes it a place somebody can
 find things in. Files are grouped into **albums**, the list is **searched** by the facts Nivara already
 holds about each file, and it can be **ordered** four ways.
 
@@ -1012,7 +1012,7 @@ The index and the album record are two different things and can disagree:
 * An album record that cannot be read is not a vault without albums. Nothing is created, renamed or
   deleted from that state, and the record is left exactly as it was found.
 * Encrypted objects that no index entry names are reported by the list, are never treated as files, and
-  are never deleted by anything in this stage.
+  are never deleted by anything in this work.
 
 ## The screen
 
@@ -1083,7 +1083,7 @@ to read a file.
   envelope, and nowhere else.
 * **No content, ever.** Search, ordering and albums read the index and nothing else. No decryption
   happens for a search, a sort, a membership change or an album title. There are no thumbnails, no
-  previews and no caches anywhere in this stage.
+  previews and no caches anywhere in this work.
 * **No independent item database.** Albums hold identifiers and are resolved against the vault's own
   index; nothing stores a second copy of a file's facts.
 * **No usage history.** Nothing records what was searched, opened, sorted or looked at, and no order or
@@ -1099,7 +1099,7 @@ states, the albums surface inside the vault screen (list, create, rename, delete
 open, add and remove members), the search box and the sort controls, the verifier rules and the test
 suites.
 
-Deliberately **not** in this stage: trash, restore and permanent deletion (Stage 17); recovery after
+Deliberately **not** in this work: trash, restore and permanent deletion; recovery after
 reinstalling, backup and cloud sync; sharing, exporting or opening a file elsewhere; favourites, tags,
 usage history, recently-opened lists and anything else that would have to be recorded to be shown;
 content-based search, OCR and text extraction; thumbnails, previews and persistent caches; background
@@ -1114,7 +1114,7 @@ overlong records, trailing bytes and unsupported versions), the repository (crea
 deletion, membership, two-slot generations, read-back verification, refused and dropped writes,
 authorization before and during a change, and every unreadable state), and the screen's state machine
 and wording are verified by local JVM suites — 199 tests across seven suites — together with the static
-checks, which run on every change. The verifier's Stage 16 rules are themselves negative-tested: each
+checks, which run on every change. The verifier's organisation rules are themselves negative-tested: each
 one is broken on purpose and seen to fail, and the repository is restored byte for byte afterwards.
 
 What is **not** verified by those suites, and is therefore not claimed anywhere: the writing and reading
@@ -1124,7 +1124,7 @@ behaves while it is being drawn. The instrumented suite covers the albums surfac
 state, its words and its controls — and is **compiled but not executed** in continuous integration,
 because no device or emulator is attached.
 
-# Stage 17: trash, restore and what is kept
+# Trash, restore and what is kept
 
 ## Purpose
 
@@ -1293,7 +1293,7 @@ index; the trash ordering; the trash surface inside the vault screen (list, rest
 every state's own words); the active list, the search and the albums drawn with the trash subtracted;
 the verifier rules and the test suites.
 
-Deliberately **not** in this stage: permanent deletion, secure erase, emptying the trash and automatic
+Deliberately **not** in this work: permanent deletion, secure erase, emptying the trash and automatic
 expiry — none of them exists anywhere in Nivara; recovery after reinstalling, backup and cloud sync;
 sharing, exporting or opening a file elsewhere; favourites, tags, usage history and recently-opened
 lists; content-based search, OCR and text extraction; thumbnails, previews and persistent caches;
@@ -1309,7 +1309,7 @@ idempotence, refused sessions, sessions ending mid-change, unreadable records, r
 builds, refused and swallowed writes, read-back verification, two-slot generations and the previous
 record surviving a failed change), and the screen's state machine and wording are verified by local
 JVM suites — 99 tests across six suites — together with the static checks, which run on every change.
-The verifier's Stage 17 rules are themselves negative-tested: each one is broken on purpose and seen
+The verifier's trash rules are themselves negative-tested: each one is broken on purpose and seen
 to fail, and the repository is restored byte for byte afterwards.
 
 What is **not** verified by those suites, and is therefore not claimed anywhere: the writing and
@@ -1319,7 +1319,7 @@ behaves while it is being drawn. The instrumented suite covers the trash card's 
 state, its words and its one action — and is **compiled but not executed** in continuous integration,
 because no device or emulator is attached.
 
-# Stage 18: recovery, reinstall and reconnecting a vault
+# Recovery, reinstall and reconnecting a vault
 
 ## Purpose
 
@@ -1525,7 +1525,7 @@ mistyped material, lockouts on the injected clock and their reset, swapped and f
 damaged records left untouched, refused writes and adoptions, setup, replacement, and the one-time
 hand-over of the code), and the screens' state machines and wording are verified by local JVM
 suites — over a hundred tests across seven suites — together with the static checks, which run on
-every change. The verifier's Stage 18 rules are themselves negative-tested: each one is broken on
+every change. The verifier's recovery rules are themselves negative-tested: each one is broken on
 purpose and seen to fail, and the repository is restored byte for byte afterwards.
 
 What is **not** verified by those suites, and is therefore not claimed anywhere: recovery through

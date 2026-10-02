@@ -2,33 +2,33 @@
 
 This document records the platform decisions behind App Lock: what Nivara asks the system, what it
 declares in the manifest, what it decides, what the user can configure, and what it deliberately
-does not do yet. It is the durable reference for the stages that follow, not a walkthrough of the
+does not do yet. It is the durable reference for what follows, not a walkthrough of the
 screens.
 
-It covers four stages, in order:
+It covers, in order:
 
-* **[Stage 6: discovery, permission setup and preparation](#stage-6-discovery-permission-setup-and-preparation)** —
+* **[Discovery, permission setup and preparation](#discovery-permission-setup-and-preparation)** —
   which applications exist, whether Usage Access is granted, and where the user changes that.
-* **[Stage 7: detection and protection decisions](#stage-7-detection-and-protection-decisions)** —
+* **[Detection and protection decisions](#detection-and-protection-decisions)** —
   which application is in front, whether it needs authentication, and how that is published.
-* **[Stage 8: the protection surface and authentication flow](#stage-8-the-protection-surface-and-authentication-flow)** —
+* **[The protection surface and authentication flow](#the-protection-surface-and-authentication-flow)** —
   how a requirement is presented above another application, why that needs a declared permission,
   and how the authentication it asks for reaches the existing session.
-* **[Stage 9: choosing which applications are protected](#stage-9-choosing-which-applications-are-protected)** —
+* **[Choosing which applications are protected](#choosing-which-applications-are-protected)** —
   the settings screen: the applications the device has, what the stored set says about each of
   them, search, ordering, and the rules under which the set may be changed.
 
-Stages 6 and 7 draw nothing. The surface that presents a requirement is neither the first nor the
+Discovery and detection draw nothing. The surface that presents a requirement is neither the first nor the
 last chapter to touch the screen, and it remains the only place Nivara asks Android for a way to
 appear above another application.
 
-The document ends with the boundary between App Lock and hidden applications (Stage 10): the two
+The document ends with the boundary between App Lock and hidden applications: the two
 features share the discovery catalogue, the session gate and the screen conventions, and share no
 stored state at all.
 
-# Stage 6: discovery, permission setup and preparation
+# Discovery, permission setup and preparation
 
-## Scope of this stage
+## Scope
 
 The preparation screen answers three questions and nothing more:
 
@@ -36,7 +36,7 @@ The preparation screen answers three questions and nothing more:
 2. Has the user granted Nivara Usage Access?
 3. What is missing, and where does the user change it?
 
-Choosing applications and locking them arrives later. Nothing in this stage blocks, hides, monitors
+Choosing applications and locking them arrives later. Nothing in this work blocks, hides, monitors
 or records an application, and nothing in it reads usage history.
 
 ## Application discovery
@@ -49,7 +49,7 @@ or records an application, and nothing in it reads usage history.
   application and appear once.
 * **Nivara excludes itself.** Nivara has a launcher entry point, so it would otherwise appear in
   its own list. A lock that locked its own launcher would be a support call rather than a feature,
-  and Stage 7 needs Nivara to stay reachable while another application is locked. If a later stage
+  and detection needs Nivara to stay reachable while another application is locked. If later work
   chooses to show Nivara in the list, the exclusion is one comparison in
   `AndroidApplicationRepository` and this paragraph must change with it.
 * **Identity is the package name.** The label is only what is drawn. Two applications can share a
@@ -59,7 +59,7 @@ or records an application, and nothing in it reads usage history.
   own label, then the package name. Nothing is invented, and a blank label is never shown.
 * **Ordering.** Label, case-insensitively, then package name as the tie-breaker — a total order, so
   an unchanged device produces the same list in the same sequence. The App Lock screen's sorting
-  options are that stage's work and build on the same identity rule.
+  options are that work's and build on the same identity rule.
 * **Search-ready, not search.** The package name and label are both searchable through
   `ApplicationSearch`, an Android-free helper with plain substring matching: no ranking, no fuzzy
   matching, no index. There is no search field yet.
@@ -99,7 +99,7 @@ Two deliberate consequences:
 * The settings entry point does not need visibility. Nivara starts Android's Usage Access screen as
   an implicit intent and handles the case where nothing can handle it (see below); it never calls
   `resolveActivity` for it, which would require adding the settings package to `<queries>`.
-* If a future stage genuinely needs visibility of a specific package (for example a system
+* If future work genuinely needs visibility of a specific package (for example a system
   component it must bind to), the narrow additions are a `<queries>` entry for that package name or
   another intent signature — never `QUERY_ALL_PACKAGES`.
 
@@ -109,13 +109,13 @@ Nivara declares one permission: `android.permission.PACKAGE_USAGE_STATS`.
 
 | Question | Answer |
 | --- | --- |
-| Why does it exist? | It makes Nivara visible in Android's Usage Access list and allows a later stage to read usage statistics. The preparation screen only reads whether the grant exists. |
-| Which feature requires it? | App Lock. The detection service that recognises the foreground application (next stage) is what actually consumes usage data. |
+| Why does it exist? | It makes Nivara visible in Android's Usage Access list and allows later work to read usage statistics. The preparation screen only reads whether the grant exists. |
+| Which feature requires it? | App Lock. The detection service that recognises the foreground application (detection) is what actually consumes usage data. |
 | How is it granted? | It is **not** a runtime permission. The user grants it in Android's Usage Access settings; it is checked as an application operation. |
 | Is it requested at runtime? | No. `requestPermissions` is never called for it, and no code path in Nivara can grant it. |
 | Does it need to be declared? | Yes — without the declaration the app-op can never be granted and Nivara does not appear in the Usage Access list. |
 | Is it needed on Android 9+? | Yes, on every supported version. The `PACKAGE_USAGE_STATS` app-op exists from API 21 and the modern check (`checkOpNoThrow`) is available from API 19. |
-| Does it expose user data by itself? | No. The grant is a capability. Nothing in this stage reads statistics, and there is no usage-history feature. |
+| Does it expose user data by itself? | No. The grant is a capability. Nothing in this work reads statistics, and there is no usage-history feature. |
 
 The declaration carries `tools:ignore="ProtectedPermissions"`: the permission is protected on
 purpose, and the user — not the application — is the one who grants it.
@@ -149,14 +149,14 @@ The user changes the grant in Android's own screen, opened with
 * The state is re-read when the screen is resumed, which is how a return from Android's settings is
   noticed. There is no polling and no automation of the settings screen.
 
-## Overlay permission: deferred here, decided in Stage 8
+## Overlay permission: deferred here, decided in this work
 
-`SYSTEM_ALERT_WINDOW` was **not** declared in this stage, and no overlay capability was checked.
+`SYSTEM_ALERT_WINDOW` was **not** declared in this work, and no overlay capability was checked.
 
-The reason was that nothing in Stage 6 draws above another application, and the permission is only
-meaningful when something does. Stage 8 revisited the decision when it built the surface that
+The reason was that nothing in this work draws above another application, and the permission is only
+meaningful when something does. The protection surface revisited the decision when it built the surface that
 presents an authentication requirement over a protected application, and declared the permission
-there, with the evidence and the reasoning recorded in that stage's section below.
+there, with the evidence and the reasoning recorded in the protection-surface section below.
 
 Keeping the two apart matters. Usage Access *observes* which application is in the foreground;
 overlay permission *draws* above another application. They are different capabilities, granted in
@@ -176,7 +176,7 @@ declared, and none is needed by the current architecture:
 * Nivara does not promise reliable background execution on every device, because no application can
   make that promise across every vendor's power management.
 
-If a later stage demonstrates on real devices that locking fails while Nivara is stopped, that
+If later work demonstrates on real devices that locking fails while Nivara is stopped, that
 finding — with the device and the reproduction — is what should justify a narrow capability check.
 
 ## Session and screenshots
@@ -186,14 +186,14 @@ finding — with the device and the reproduction — is what should justify a na
   anyone holding the phone. Requiring a credential here would also put the prerequisite screen
   behind the very credential a first-time user may not have set up yet. App Lock itself — the
   prompt that opens another application — is the surface that must consult the existing
-  `SessionManager` gate and `lockNow()`, and that is the next stages' requirement.
+  `SessionManager` gate and `lockNow()`, and that is the next step's requirement.
 * **The screen uses the existing screenshot protection.** `SecureScreenEffect` (the single
   `FLAG_SECURE` implementation) is applied where the screen lists applications, because Android
   treats the installed-application list as personal data. No second implementation exists and none
   is introduced.
 
 
-## What is not verified here (Stage 6)
+## What is not verified here
 
 Discovery, the Usage Access app-op check and the settings intent have not been executed on a
 physical device or emulator. Compilation in CI is not device verification. The JVM
@@ -203,12 +203,12 @@ exercise the platform are compiled, not run, unless a device is attached. In par
 particular device's Usage Access screen is reachable and whether its app-op reports `MODE_ALLOWED`
 after a grant remain unverified until they are observed on hardware.
 
-# Stage 7: detection and protection decisions
+# Detection and protection decisions
 
-Stage 6 established what App Lock needs; this stage establishes what it concludes. It watches which
+The preparation work established what App Lock needs; detection establishes what it concludes. It watches which
 application is in the foreground, decides whether that application needs authentication, and
 publishes both — and it stops there. No overlay, no prompt, no blocking: the presentation layer is
-Stage 8's work.
+the work.
 
 ## Protected applications and their identity
 
@@ -370,7 +370,7 @@ protected application may be used is *only* the session's answer, read again on 
 * **Quick Lock** remains `SessionManager.lockNow()`. Detection observes the resulting
   `Unauthenticated` on its next look and re-raises the requirement; it never locks anything itself,
   never touches the credential, the biometric key or either failure counter, and a cancelled or
-  failed authentication is not a case it invents policy for — Stage 3/4 outcomes stay where they
+  failed authentication is not a case it invents policy for — credential and biometric outcomes stay where they
   are, and the next decision simply still requires authentication.
 
 ## Service architecture and lifecycle
@@ -382,7 +382,7 @@ process. Starting it twice leaves one loop; destroying it stops the loop and ret
 generation that only the current one may write under. The service is not exported and declares no
 permissions or service type.
 
-**Why not a foreground service yet.** It is the mechanism a later stage will need once something is
+**Why not a foreground service yet.** It is the mechanism later work will need once something is
 actually presented on screen, and it is not added now because:
 
 * nothing consumes a protection decision yet, so a permanent notification would be a cost with no
@@ -390,7 +390,7 @@ actually presented on screen, and it is not added now because:
 * it needs permissions and a service type (`FOREGROUND_SERVICE` plus a declared type, and a
   notification the user must be able to see) that must be justified by the feature they serve, not
   by the fact that background work exists;
-* a plain started service already covers what this stage can honestly claim.
+* a plain started service already covers what this work can honestly claim.
 
 **What is honestly claimed.** Android stops a background service some minutes after the application
 leaves the foreground, and a process that is killed takes detection with it: `START_NOT_STICKY` means
@@ -398,13 +398,13 @@ Android will not recreate it on its own. Detection therefore runs while Nivara i
 as long as the platform keeps the service alive afterwards — and *reliable* protection of
 applications opened much later is not claimed, not verified, and not promised on any device or OEM.
 The verifier refuses `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`, `POST_NOTIFICATIONS`
-and `BIND_ACCESSIBILITY_SERVICE` until a stage documents why it needs them.
+and `BIND_ACCESSIBILITY_SERVICE` until the documentation records why it needs them.
 
-## Overlay decision: carried forward to Stage 8
+## Overlay decision: carried forward to the protection surface
 
-`SYSTEM_ALERT_WINDOW` was still **not** declared at the end of this stage, and no overlay capability
+`SYSTEM_ALERT_WINDOW` was still **not** declared at the end of the detection work, and no overlay capability
 was checked. Detection produced an internal requirement and nothing drew above another application,
-so the permission would have entitled Nivara to something it did not do yet. Stage 8 owns the
+so the permission would have entitled Nivara to something it did not do yet. The protection surface owns the
 capability check, the settings entry point, the explanation and the presentation, and added all of
 them together with this documentation and the verifier's allow-list entry.
 
@@ -416,7 +416,7 @@ overlay permission locks nothing by itself.
 
 Nothing added, and no reliability promised. Detection is driven by reading usage events while the
 process is alive; no exemption is requested, no manufacturer auto-start screen is opened, no
-undocumented intent is used. If a later stage demonstrates on real devices that protection fails
+undocumented intent is used. If later work demonstrates on real devices that protection fails
 because Nivara is stopped in the background — with the device and the reproduction — that finding is
 what should justify a narrowly scoped capability check. Until then, the honest statement is:
 detection uses the supported Android mechanisms, and OEM-specific reliability has neither been
@@ -433,7 +433,7 @@ of staleness; the file is a few hundred bytes.
 
 ## What is not verified here
 
-Stage 7 adds its own gaps to Stage 6's:
+Detection adds its own gaps to the:
 
 * **No foreground observation has been verified on a device.** The rule that says
   `com.example.camera` needs authentication is exercised on the JVM with values a test supplies.
@@ -448,20 +448,20 @@ Stage 7 adds its own gaps to Stage 6's:
 * **A cold start inside an already-open protected application** reports no foreground application
   until the next transition, and a window skipped while the process was suspended can only be
   recovered from the lookback slice. Both are accepted limits of a polling detector with no
-  privileged callback; they matter to the stage that presents a prompt and are recorded here so that
-  stage can decide whether a wider window is worth its cost.
+  privileged callback; they matter to the surface that presents a prompt and are recorded here so that
+  surface can decide whether a wider window is worth its cost.
 * **The storage format is verified on the JVM**, with real files and real atomic writes, but not on
   a device's storage stack.
 
-# Stage 8: the protection surface and authentication flow
+# The protection surface and authentication flow
 
-Stage 7 detects that a protected application is in front and publishes an internal requirement. This
-stage is what turns that requirement into something the user sees, and what carries their answer back
+Detection sees that a protected application is in front and publishes an internal requirement. This
+surface is what turns that requirement into something the user sees, and what carries their answer back
 into the session layer that already exists. It adds no new authentication mechanism, no new session
 and no per-application unlock: it is the missing link between a decision and the credential chain
-built in earlier stages.
+built in earlier work.
 
-## Scope of this stage
+## Scope
 
 * Deciding whether a surface above another application is genuinely required, and adding the
   smallest capability that makes it possible if it is.
@@ -475,8 +475,8 @@ built in earlier stages.
 
 Explicitly out of scope: App Lock's settings, search and sorting; hiding applications; a custom
 launcher; camouflage; a vault; scheduled locking; battery or OEM workarounds; and visual design,
-which a later stage owns. Everything on that list that touches the protected set will use the
-repository introduced in Stage 7.
+which later work owns. Everything on that list that touches the protected set will use the
+repository introduced in this work.
 
 ## Why a surface is required at all
 
@@ -526,7 +526,7 @@ Access is.
 The verifier keeps the permission on an explicit allow-list and requires this document to justify
 it. The remaining permissions this project deliberately does not hold — `FOREGROUND_SERVICE`,
 `FOREGROUND_SERVICE_SPECIAL_USE`, `POST_NOTIFICATIONS`, `BIND_ACCESSIBILITY_SERVICE`,
-`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` and `QUERY_ALL_PACKAGES` — stay refused until a stage
+`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` and `QUERY_ALL_PACKAGES` — stay refused until the documentation records
 documents a demonstrated need.
 
 ## The surface
@@ -576,7 +576,7 @@ There is exactly one window, owned by one component, and its state is an explici
   which is the honest side of that trade.
 * When detection is running but cannot decide anything (`AppLockState.Unavailable`), a surface that
   is already up stays up. Removing it would turn "Nivara cannot see" into "everything is fine",
-  which is the one reading this stage must never produce; and no surface is created, because Nivara
+  which is the one reading this work must never produce; and no surface is created, because Nivara
   cannot name an application it cannot see.
 
 The window-owning component is behind a small seam (`OverlaySurface`) so the lifecycle rules above
@@ -642,7 +642,7 @@ The identity lives in memory only, is never persisted and is never written anywh
 ## The preparation screen's protection switch
 
 The App Lock preparation screen gains a switch that starts and stops protection, and a card for the
-overlay capability alongside the ones Stage 6 introduced. The switch only calls the component that
+overlay capability alongside the ones preparation introduced. The switch only calls the component that
 owns detection; the state it displays is read back from that component's own state, never assumed
 from the tap. A platform refusal — a restricted background start, a component an OEM build has
 disabled — is reported as a failure and the switch keeps showing that protection is not running,
@@ -654,12 +654,12 @@ until every prerequisite is satisfied, and stopping is always available, because
 off never needs a permission. A missing prerequisite is never presented as an empty device or as
 "nothing to protect".
 
-## What is not verified here (Stage 8)
+## What is not verified here
 
 Every platform claim in this chapter is a claim about Android, verified by reading the platform
 documentation and by compiling against it — not by running it:
 
-* **No device or emulator was available.** Nothing in this stage was executed on Android hardware.
+* **No device or emulator was available.** Nothing in this work was executed on Android hardware.
   The instrumented tests that can only run on a device are compiled in CI, which is not the same as
   running them.
 * **`Settings.canDrawOverlays` was not executed**, and no grant, revocation or Settings round-trip
@@ -672,20 +672,20 @@ documentation and by compiling against it — not by running it:
   compiled-only.
 * **Authentication through the overlay was not performed.** The JVM tests prove routing, request
   identity, staleness, de-duplication, session outcomes and overlay state transitions with fakes; no
-  fingerprint, PIN or system prompt was shown by this code on a device, and Stage 4's own device gaps
+  fingerprint, PIN or system prompt was shown by this code on a device, and the own device gaps
   are unchanged.
 * **The behaviour of the surface while the process is killed, and across OEM power management, is
   not verified and not claimed.** The service that owns the surface remains stop-and-forget
   (`START_NOT_STICKY`); if the process is gone, nothing is drawing, and no mechanism available to
   Nivara changes that.
 
-# Stage 9: choosing which applications are protected
+# Choosing which applications are protected
 
-## Scope of this stage
+## Scope
 
 App Lock already discovers applications, decides what needs authenticating, and presents the
 requirement. What was missing is the user's half: seeing the applications the device has, seeing
-which of them are protected, and changing that. This stage adds one screen — reachable from home,
+which of them are protected, and changing that. This work adds one screen — reachable from home,
 one tap from where App Lock's state is described — and nothing else. App hiding, a vault, scheduled
 locking, camouflage, usage statistics and OEM power workarounds are not part of it and are not
 described here.
@@ -703,7 +703,7 @@ It shows no usage information, no timings and no history, because none is collec
 
 ## The list comes from the existing discovery
 
-Rows are built from `ApplicationRepository`, the same launcher query Stage 6 introduced, with the
+Rows are built from `ApplicationRepository`, the same launcher query discovery introduced, with the
 same `<queries>` declaration and the same package-name identity rule. A label is what a row prints;
 a package name is what it acts on. A search matches what the domain's `ApplicationSearch` contract
 already says it matches — the label, or the package name — and nothing else.
@@ -716,8 +716,8 @@ left as a quiet disagreement between the list and the stored set.
 
 ## One owner for the protected set
 
-The set of protected applications is stored in exactly one place: the repository Stage 7 introduced,
-which the detection service reads. This stage adds no `SettingsRepository`, no second protected-set
+The set of protected applications is stored in exactly one place: the repository detection introduced,
+which the detection service reads. This work adds no `SettingsRepository`, no second protected-set
 file, no cache of ticked rows and no parallel state in the view model. The screen's list is a
 rendering of the last read; every change goes to the repository, and every change is followed by a
 fresh read, so the row shows what is stored rather than what was asked for. A repository that
@@ -753,7 +753,7 @@ label, so no state depends on colour.
 
 ## Search
 
-Searching is `ApplicationSearch`, unchanged from Stage 6: the query is trimmed and matched
+Searching is `ApplicationSearch`, unchanged from discovery: the query is trimmed and matched
 case-insensitively against the label and the package name, an empty query returns everything, and a
 query that matches nothing is its own answer — not an empty device. Filtering happens in the view
 model over the last read; it performs no repository call, writes nothing, uses no network and never
@@ -779,7 +779,7 @@ it into one flag:
 
 * **which capabilities are missing**, named individually, from the same aggregate
   (`AppLockSetupState`) and the same `UsageAccessRepository`/`OverlayCapabilityRepository` answers
-  Stage 6 and Stage 8 introduced. The screen checks no permission itself, and opens no settings
+  discovery and the protection surface introduced. The screen checks no permission itself, and opens no settings
   screen itself: the preparation screen is one tap away and remains the place where a grant is
   explained and requested.
 * **whether protection is running**, read from the component that owns protection
@@ -811,7 +811,7 @@ This is the whole policy, and it is deliberately not more than this:
   never touch the session's expiry. The gate closes on its own terms; the screen's controls follow
   it, including while it is open.
 * **no per-application unlock state.** Whether an application may be opened is decided by detection
-  from the foreground application and the session, exactly as before this stage.
+  from the foreground application and the session, exactly as before.
 
 A write is rejected while one is already in flight, so two rapid taps cannot produce two writes, and
 a refusal is reported in words rather than in a control that appears to have worked.
@@ -844,11 +844,11 @@ which application ("Protect Camera", "Stop protecting Camera") rather than only 
 whose state cannot be read says so and offers no action, so nothing can be confirmed that Nivara
 cannot confirm.
 
-## What is not verified here (Stage 9)
+## What is not verified here
 
-The same boundary as every earlier stage applies, and this chapter is honest about it:
+The same boundary applies, and this chapter is honest about it:
 
-* **No device or emulator was available.** Nothing in this stage ran on Android. The claims about
+* **No device or emulator was available.** Nothing in this work ran on Android. The claims about
   icons, lists and settings are claims about the platform's documented behaviour, asserted by
   compilation.
 * **The instrumented tests are compiled, not executed.** The suites that need a device are built by
@@ -860,7 +860,7 @@ The same boundary as every earlier stage applies, and this chapter is honest abo
 * **Navigation, layout and talkback behaviour were not seen.** The composition of the screen runs
   only when the application is launched on a device.
 
-# App Lock and hidden applications (the Stage 10 boundary)
+# App Lock and hidden applications (the hidden-app boundary)
 
 Locking an application and keeping it out of sight are **different decisions**, made on different
 screens, stored in different records, and neither one implies the other. All four combinations are
@@ -875,7 +875,7 @@ The consequences for App Lock are narrow and deliberate:
 
 * **Detection and the protection surface never read the hidden record.** Whether an application is
   in front, whether the protected set requires authentication for it and whether the surface is
-  drawn are decided from the protected set, the session and the platform, exactly as Stages 7 and 8
+  drawn are decided from the protected set, the session and the platform, exactly as detection and the protection surface
   describe. Hiding cannot change what App Lock does, and un-hiding cannot either.
 * **Hiding never locks and locking never hides.** A hidden, unprotected application opens freely
   when something else launches it — hiding is not a protection mechanism, and the management screen

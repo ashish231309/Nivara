@@ -135,6 +135,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # The release variant is built unsigned: no signing material lives in this repository, so the
+      # artifact is inspected and recorded, and signing is applied where the keystore is kept.
+      - name: Upload release APK
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nivara-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload unit test report
         if: always()
         uses: actions/upload-artifact@v7

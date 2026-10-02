@@ -2,19 +2,19 @@
 
 This document records the decisions behind hidden-application management: what Nivara stores, what
 it refuses to store, what the management screen may claim, who may change the record, and what a
-launcher will be allowed to do with it. It is the durable reference for the stage that follows, not
+launcher will be allowed to do with it. It is the durable reference for what follows, not
 a walkthrough of the screen.
 
-It covers one stage:
+It covers:
 
-* **Stage 10: hidden applications and their management** — the record of which applications the user
+* **hidden applications and their management** — the record of which applications the user
   wants kept out of sight, the repository that owns it, and the screen that shows and changes it.
 
-# Stage 10: hidden applications and their management
+# Hidden applications and their management
 
-## Scope of this stage
+## Scope
 
-The stage answers one question — *which applications did the user ask Nivara to keep out of sight?* —
+This work answers one question — *which applications did the user ask Nivara to keep out of sight?* —
 and gives the user a screen to answer it on:
 
 * the applications the device can launch, with what the record says about each of them;
@@ -22,7 +22,7 @@ and gives the user a screen to answer it on:
 * search and ordering over the same catalogue the App Lock screen uses;
 * one stored record, owned by one repository, that Nivara's own launcher will read later.
 
-What the stage deliberately does not do:
+What it deliberately does not do:
 
 * it does not change anything on the device — no application's components, enabled state or
   package-manager record is touched;
@@ -38,7 +38,7 @@ What the stage deliberately does not do:
 ## What "hidden" means here
 
 Hiding is **Nivara's own preference**. Nivara records that the user does not want to see an
-application in Nivara's own launcher, and it is that launcher — a later stage — that will act on the
+application in Nivara's own launcher, and it is that launcher — later work — that will act on the
 record. Every application in the record stays installed, stays launchable, keeps its data, and keeps
 appearing in Android's launcher, in Settings, in the package manager, in a storage analyser and to
 anything privileged enough to ask.
@@ -201,8 +201,8 @@ before writing, the name is checked against the catalogue that was read:
 The list is composed at read time from two sources, and neither is persisted as part of the other:
 
 ```
-ApplicationRepository  →  what the device can launch        (Stage 6, unchanged)
-HiddenApplicationRepository →  what the user hid            (this stage)
+ApplicationRepository  →  what the device can launch        (unchanged)
+HiddenApplicationRepository →  what the user hid            (this record)
                     ↘         ↙
               ManagedHiddenApplication (row: application + visibility)
 ```
@@ -216,8 +216,8 @@ side by side with real files:
 | **hidden** | locked and out of sight | out of sight, opens freely |
 | **visible** | locked, on screen | ordinary |
 
-Nothing in hiding reads, writes or depends on the protected set, and nothing in Stage 7's detection
-or Stage 8's protection flow reads the hidden set. The repository verifier refuses any reference
+Nothing in hiding reads, writes or depends on the protected set, and nothing in the detection
+or the protection flow reads the hidden set. The repository verifier refuses any reference
 from `domain/apphide`, `data/apphide` or `ui/apphide` to the App Lock types.
 
 ## The management screen
@@ -302,7 +302,7 @@ concurrent hides cannot lose each other's entry, which the repository's JVM test
 with two dozen concurrent changes. There is no transaction manager, no queue and no retry policy:
 neither is needed for a set of names, and both would be more moving parts than the problem has.
 
-## What Nivara's launcher does with this (the Stage 11 boundary)
+## What Nivara's launcher does with this (the launcher boundary)
 
 Nivara now has its own launcher, and it consumes the repository contract exactly as this document
 required — no more and no less:
@@ -342,7 +342,7 @@ The one thing the launcher adds is a way to see what is hidden, and it is delibe
 Nothing about the session changes because Nivara's launcher is involved. The launcher never
 establishes, extends or ends a session; it asks the gate for its current answer at the moment it needs
 one. Resuming the launcher — including coming back from an application it opened — re-reads the device
-and the hidden set and re-evaluates the gate; it does not refresh the session, so Stage 5's rule that
+and the hidden set and re-evaluates the gate; it does not refresh the session, so the rule that
 a session begins with an authentication and nothing else still holds. Quick Lock keeps working from
 anywhere: the gate closes, the reveal ends with it, and the drawer is filtered again.
 
@@ -375,7 +375,7 @@ activity, discovery, launching, the reveal policy, lifecycle and the runtime ver
   this feature, and no cryptography appears in it at all.
 * **No logging and no transmission.** Not a package name, not a file name, not an exception. There is
   no network code in the feature, no analytics and no usage history.
-* **No new permission.** Reading the launcher catalogue uses the `<queries>` signature Stage 6
+* **No new permission.** Reading the launcher catalogue uses the `<queries>` signature discovery
   already needed; the feature adds nothing to the manifest. No accessibility service, no device
   administrator, no `QUERY_ALL_PACKAGES`.
 * **No exported surface.** The feature adds no activity, service, provider or receiver, and stores

@@ -6,12 +6,12 @@ it explicitly does not protect against. It is the reference for reviewing the co
 
 ## Scope
 
-This layer provides the primitives later stages build on: authenticated encryption, a versioned
+This layer provides the primitives later work build on: authenticated encryption, a versioned
 envelope format, secure randomness, keys in the platform key store, key wrapping, credential-based
 key derivation and the recovery foundation.
 
 It does **not** include enrolment screens, credential verification, biometric authentication,
-session policy, app locking or the vault. Those stages consume what is described here; they do not
+session policy, app locking or the vault. Those layers consume what is described here; they do not
 extend it.
 
 ## Building blocks
@@ -110,7 +110,7 @@ can be raised for new data while old data stays readable.
 Why PBKDF2 and not Argon2id: PBKDF2 is part of the platform provider, so it behaves identically from
 API 28 to current Android with no native library, no NDK dependency and no additional attack
 surface. Argon2id would resist GPU attacks better but requires bundling a native implementation,
-which is a deliberate decision for a later stage if the threat model calls for it — not something to
+which is a deliberate decision for later work if the threat model calls for it — not something to
 smuggle into a foundation release.
 
 Derivation always runs on `Dispatchers.Default`: the configured cost is deliberately hundreds of
@@ -128,7 +128,7 @@ milliseconds.
   biometric enrolled) reports `KeyUnavailable` or `KeyInvalidated`, and `isKeyUsable` detects
   invalidation by attempting a cipher initialisation — the only supported way to tell.
 
-**Documented limitation.** Nivara does not *require* hardware-backed keys at this stage. Some API 28
+**Documented limitation.** Nivara does not *require* hardware-backed keys at this time. Some API 28
 devices and most emulators cannot provide a hardware-backed AES key, and requiring it would make the
 app refuse to run rather than degrade predictably. Nivara also does not request StrongBox: it exists
 on only some API 28 hardware, and an automatic fallback would make the guarantee unreportable. Both
@@ -175,7 +175,7 @@ It does not protect against:
 - coercion, physical extraction or hardware attacks on the secure element beyond its own guarantees;
 - a weak user credential — PBKDF2 slows guessing, it does not make a four-digit PIN strong. That is
   why the credential only protects a wrapping, and why attempt limits and lockout policy belong to
-  the authentication stage.
+  the authentication layer.
 
 ## Android 9 (API 28) compatibility
 
@@ -188,12 +188,12 @@ It does not protect against:
 ## What this layer deliberately does not do
 
 - No credential verification: `KeyDerivationService` derives keys, it does not decide whether a
-  credential is correct. Comparison belongs to the authentication stage.
+  credential is correct. Comparison belongs to the authentication layer.
 - No persistence of any cryptographic material: no preferences, no database, no files. Storing
-  parameters (salt, iteration count, wrapped keys) is a storage decision for the stages that own the
+  parameters (salt, iteration count, wrapped keys) is a storage decision for the layers that own the
   data, and the raw recovery key must never be stored at all.
 - No streaming/chunked file encryption: `EncryptionService` is for small payloads (it refuses
-  envelopes larger than 32 MiB). The vault stage will chunk files and reuse this interface per chunk.
+  envelopes larger than 32 MiB). The vault chunks files and reuse this interface per chunk.
 - No PIN enrolment, biometric prompts, lockout policy or session handling.
 
 ## Verification

@@ -1,11 +1,11 @@
 # Sessions: the in-memory authorization state
 
-This document is the design record for the session layer added in Stage 5. It explains what a
+This document is the design record for the session layer added in this work. It explains what a
 Nivara session is, when it exists, how it ends, and — just as importantly — what it deliberately
 is not.
 
 Scope: one authorization state, held in memory, that later features can ask before they show
-anything protected. App Lock, the vault and hidden apps are *not* part of this stage; they will
+anything protected. App Lock, the vault and hidden apps are *not* part of this document; they
 consume this layer, not reimplement it.
 
 ## The model
@@ -58,7 +58,7 @@ touches the credential, the biometric key or any counter.
 > A session expires a fixed interval after it is established. Nothing extends it.
 
 The default is five minutes, as a value (`SessionTimeoutPolicy.Default`) rather than a number
-compiled into screens, so a later stage can make it configurable without touching any UI.
+compiled into screens, so later work can make it configurable without touching any UI.
 
 - **Valid before, invalid at.** The interval is half-open: a session is valid strictly before its
   expiry instant and invalid at it. "Has this session expired?" therefore has exactly one answer at
@@ -120,11 +120,11 @@ The session layer duplicates none of them, and shares no state with any of them.
 
 | Concern | Owner | Relationship to the session |
 | --- | --- | --- |
-| Primary credential policy | Stage 3 | Authoritative for credential attempts; a success is *input* to the gate |
-| Biometric policy and lockout | Stage 4 | Authoritative for biometric attempts; a success is *input* to the gate |
+| Primary credential policy | The credential layer | Authoritative for credential attempts; a success is *input* to the gate |
+| Biometric policy and lockout | The biometric layer | Authoritative for biometric attempts; a success is *input* to the gate |
 | Android's biometric lockout | Android | Never touched, never shortened, never claimed as clearable |
-| Session timeout | Stage 5 | This document |
-| Quick Lock | Stage 5 | Explicit invalidation; not a failure, not a lockout |
+| Session timeout | This document | This document |
+| Quick Lock | This document | Explicit invalidation; not a failure, not a lockout |
 
 Neither throttling counter is advanced, reset or read by anything in the session layer — a
 consequence of the manager's dependencies, verified by a test that drives the real trackers and the
@@ -164,7 +164,7 @@ The session is *observed* from one place and *read* from others — no screen ev
   the screen returns to asking for the credential with a short notice explaining why.
 - **Biometric settings** hands a successful authentication to the gate too, so a biometric success
   is a session factor exactly like a credential success, and nothing more.
-- Screens keep `SecureScreenEffect`, unchanged from Stage 3.
+- Screens keep `SecureScreenEffect`, unchanged from the credential screens.
 
 ## Verification status
 
@@ -179,8 +179,8 @@ What is verified automatically, on the JVM, against the real implementation:
 
 What is **not** verified:
 
-- the real-device biometric flow that Stage 4 already documented as unverified. Nothing in this
-  stage changes that: Android's prompt, the Keystore key's per-use authorization, enrolment
+- the real-device biometric flow that the biometric document already recorded as unverified. Nothing in this
+  work changes that: Android's prompt, the Keystore key's per-use authorization, enrolment
   invalidation and a full enable → authenticate → disable pass still require a device with an
   enrolled biometric, and the instrumented tests that touch them remain **compiled but not
   executed** in this environment.
