@@ -102,7 +102,7 @@ class RecoveryCodeCodecTest {
         val failure = decodeOf(code.drop(7))
 
         assertTrue(failure is NivaraResult.Failure)
-        assertEquals(RecoveryCodeCodec.DecodeFailure.Malformed, failure.error)
+        assertEquals(RecoveryCodeCodec.DecodeFailure.Malformed, (failure as NivaraResult.Failure).error)
     }
 
     @Test
@@ -166,9 +166,10 @@ class RecoveryCodeCodecTest {
         // The chance of an arbitrary string matching its own checksum is one in 65536; the test
         // deliberately builds one that does not by checking the outcome either way.
         assertTrue(failure is NivaraResult.Failure)
+        val failureError = (failure as NivaraResult.Failure).error
         assertTrue(
-            (failure as NivaraResult.Failure).error == RecoveryCodeCodec.DecodeFailure.ChecksumMismatch ||
-                failure.error == RecoveryCodeCodec.DecodeFailure.Malformed,
+            failureError == RecoveryCodeCodec.DecodeFailure.ChecksumMismatch ||
+                failureError == RecoveryCodeCodec.DecodeFailure.Malformed,
         )
     }
 
