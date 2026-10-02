@@ -189,7 +189,7 @@ class VaultRecoveryViewModel(
 }
 
 /** Turns a recovery failure into the message the screen shows, defaulting when it is not one. */
-private fun Throwable?.asRecoveryMessage(): NivaraMessage = when (this) {
+internal fun Throwable?.asRecoveryMessage(): NivaraMessage = when (this) {
     VaultRecoveryFailure.NotAVault ->
         NivaraMessage(textRes = R.string.vault_recovery_not_a_vault)
     VaultRecoveryFailure.RecoveryNotSetUp ->

@@ -27,6 +27,7 @@ import com.nivara.app.testing.testItem
 import com.nivara.app.testing.testItemId
 import com.nivara.app.testing.testSessionManager
 import com.nivara.app.testing.testTrashEntry
+import com.nivara.app.testing.FakeVaultRecoveryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -92,6 +93,7 @@ class VaultTrashViewModelTest {
         indexRepository = FixedIndexRepository { index },
         organizationRepository = albums,
         trashRepository = trash,
+        recoveryRepository = FakeVaultRecoveryRepository(),
         locationStore = FakeVaultLocationStore(),
         sessionManager = session,
     )

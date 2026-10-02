@@ -23,6 +23,7 @@ import com.nivara.app.domain.vault.VaultUnreadableReason
 import com.nivara.app.testing.FakeVaultOrganizationRepository
 import com.nivara.app.testing.FakeVaultTrashRepository
 import com.nivara.app.testing.testSessionManager
+import com.nivara.app.testing.FakeVaultRecoveryRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -292,6 +293,7 @@ class VaultImportTest {
         indexRepository = index,
         organizationRepository = FakeVaultOrganizationRepository(),
         trashRepository = FakeVaultTrashRepository(),
+        recoveryRepository = FakeVaultRecoveryRepository(),
         locationStore = FakeVaultLocationStore(),
         sessionManager = session,
     )

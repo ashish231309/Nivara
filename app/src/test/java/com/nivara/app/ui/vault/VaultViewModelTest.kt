@@ -27,6 +27,7 @@ import com.nivara.app.testing.FakeVaultOrganizationRepository
 import com.nivara.app.testing.FakeVaultTrashRepository
 import com.nivara.app.testing.TEST_SESSION_TIMEOUT_MILLIS
 import com.nivara.app.testing.testSessionManager
+import com.nivara.app.testing.FakeVaultRecoveryRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -528,6 +529,7 @@ class VaultViewModelTest {
         indexRepository = index,
         organizationRepository = albums,
         trashRepository = trash,
+        recoveryRepository = FakeVaultRecoveryRepository(),
         locationStore = locations,
         sessionManager = session,
     )

@@ -1252,7 +1252,7 @@ private fun Throwable?.asMessage(): NivaraMessage =
  * The two facts a setup can fail with are "the vault is not open for this" and "the write did not
  * verify"; anything else is reported as the latter rather than inventing a third thing to say.
  */
-private fun Throwable?.asRecoverySetupMessage(): NivaraMessage = when (this) {
+internal fun Throwable?.asRecoverySetupMessage(): NivaraMessage = when (this) {
     VaultRecoveryFailure.VaultNotReady ->
         NivaraMessage(textRes = R.string.vault_error_recovery_not_ready)
     else -> NivaraMessage(textRes = R.string.vault_error_recovery_failed)

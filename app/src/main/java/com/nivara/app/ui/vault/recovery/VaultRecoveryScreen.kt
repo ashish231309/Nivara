@@ -62,7 +62,7 @@ fun VaultRecoveryRoute(
 }
 
 @Composable
-private fun VaultRecoveryScreen(
+internal fun VaultRecoveryScreen(
     uiState: VaultRecoveryUiState,
     onChooseLocation: () -> Unit,
     onCodeChanged: (String) -> Unit,
