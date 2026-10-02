@@ -2083,13 +2083,13 @@ if viewer_view_model_code:
             err(f"the viewer view model is missing {why} ('{token}')")
 
 # Nothing that belongs to a later stage, or to a feature the vault does not have at all: organising a
-# vault is albums, ordering and search, and it is not deletion, recovery, backup, export or a record of
-# what somebody looked at.
+# vault is albums, ordering and search, and it is not backup, export or a record of what somebody
+# looked at. Recovery is the vault's own feature now; the viewer still has no part in it, because
+# viewing a file and reconnecting a vault stay separate acts.
 vault_sources = vault_domain_sources + vault_data_sources + vault_ui_sources + viewer_sources
 for path in vault_sources:
     code = strip_comments(path.read_text())
     for pattern, why in (
-        (r"\bRecovery\w*|\bReinstall\w*", "recovery"),
         (r"\bBackup\w*|\bCloudSync\w*", "backup"),
         (r"\bExport\w*|\bShareAction\b|\bShareSheet\b", "export"),
         (r"\bFavorite\w*|\bFavourite\w*", "favourites"),
@@ -2098,6 +2098,11 @@ for path in vault_sources:
     ):
         if re.search(pattern, code):
             err(f"{path.relative_to(ROOT)}: the vault must not contain {why} ('{pattern}')")
+for path in viewer_sources:
+    code = strip_comments(path.read_text())
+    if re.search(r"\bRecovery\w*|\bReinstall\w*", code):
+        err(f"{path.relative_to(ROOT)}: the viewer must not contain recovery "
+            r"('\bRecovery\w*|\bReinstall\w*')")
 
 # The viewing suites: classification, the content handle, the engines, the viewer's state machine and
 # its wording, and the screen itself where a device can run it.
@@ -2687,6 +2692,218 @@ for topic in ("Trash", "restore", "not deleted"):
 
 notes.append(f"vault trash review: {len(trash_domain_sources)} domain, {len(trash_data_sources)} data "
              f"and {len(trash_ui_sources)} presentation sources; {trash_tests} trash tests")
+
+# ---------------------------------------------------------------- stage 18: secure recovery
+# Recovery is the vault's way of surviving its own installation: the envelope is Stage 2's, the key
+# hierarchy is Stage 13's, and this feature adds where the envelope lives and how the key it yields
+# is proven to belong to the vault it was shown for. The checks pin exactly that: no second
+# mechanism, no second key, no content touched, no credential or session in the path, and no
+# reconnection without proof.
+
+recovery_domain_source = ROOT / "app/src/main/java/com/nivara/app/domain/vault/VaultRecovery.kt"
+recovery_code_codec_source = ROOT / "app/src/main/java/com/nivara/app/domain/security/RecoveryCodeCodec.kt"
+recovery_record_codec_source = ROOT / "app/src/main/java/com/nivara/app/data/vault/VaultRecoveryCodec.kt"
+recovery_repository_source = ROOT / "app/src/main/java/com/nivara/app/data/vault/NivaraVaultRecoveryRepository.kt"
+recovery_ui_dir = ROOT / "app/src/main/java/com/nivara/app/ui/vault/recovery"
+recovery_ui_sources = sorted(recovery_ui_dir.glob("*.kt")) if recovery_ui_dir.is_dir() else []
+
+for required in (recovery_domain_source, recovery_code_codec_source, recovery_record_codec_source,
+                 recovery_repository_source):
+    if not required.exists():
+        err(f"the recovery layer is missing: {required.relative_to(ROOT)}")
+for name in ("VaultRecoveryUiState.kt", "VaultRecoveryViewModel.kt", "VaultRecoveryScreen.kt"):
+    if not (recovery_ui_dir / name).exists():
+        err(f"the recovery presentation layer is missing {name}")
+
+recovery_domain_code = strip_comments(recovery_domain_source.read_text()) \
+    if recovery_domain_source.exists() else ""
+for token, why in (
+    ("surveyRecovery(", "the survey of a candidate folder"),
+    ("recover(", "the reconnection with recovery material"),
+    ("setUpRecovery(", "the writing of recovery material"),
+    ("recoveryStatus(", "the vault screen's question about recovery material"),
+    ("displayFingerprint", "a fingerprint a person can compare, never raw bytes"),
+    ("RecoveryNotSetUp", "a vault that was never given recovery material"),
+    ("WrongMaterial", "a wrong secret's own refusal"),
+    ("KeyMismatch", "a key that does not belong to the vault"),
+    ("Locked", "the lockout after too many failed attempts"),
+):
+    if token not in recovery_domain_code:
+        err(f"the recovery contract is missing {why} ('{token}')")
+
+recovery_repository_code = strip_comments(recovery_repository_source.read_text()) \
+    if recovery_repository_source.exists() else ""
+
+# The envelope is Stage 2's: recovery opens it and seals it with the existing service, computes the
+# key proof with the project's existing HMAC, and validates the sealed records under their own
+# purposes. Nothing here may be a second mechanism.
+for token, why in (
+    ("RecoveryKeyEnvelopeService", "the Stage 2 recovery envelope service"),
+    ("unsealContentKey(", "the Stage 2 opening of the envelope"),
+    ("sealContentKey(", "the Stage 2 sealing of the envelope"),
+    ("generateRecoveryKey()", "the Stage 2 generation of the recovery key"),
+    ("Hkdf.hmac", "the project's existing HMAC for the key proof"),
+    ("EncryptionContext.VaultIndex", "the index validated under its own purpose"),
+    ("EncryptionContext.VaultOrganization", "the album record validated under its own purpose"),
+    ("EncryptionContext.VaultTrash", "the trash record validated under its own purpose"),
+    ("NivaraVaultRepository.WRAPPING_KEY_ALIAS", "the vault's own wrapping alias, not a new one"),
+    ("locationStore.storeLocation", "the existing adoption of a durable reference"),
+    ("timeProvider.nowMillis()", "the throttling clock, injected and deterministic"),
+    ("blockedUntilMillis = 0L", "the lockout reset on success"),
+    ("consecutiveFailures = 0", "the failure count reset on success"),
+):
+    if token not in recovery_repository_code:
+        err(f"the recovery repository must use {why} ('{token}')")
+
+for pattern, why in (
+    (r"\bjavax\.crypto\b|\bjava\.security\b|\bCipher\b|\bMessageDigest\b|\bSecretKeySpec\b|"
+     r"\bKeyGenerator\b|\bSecureRandom\b", "a cryptographic primitive of its own"),
+    (r"\bnextKeyBytes\s*\(", "a second vault key"),
+    (r"\bCredentialManager\b|\bKeyDerivationService\b|\bPbkdf2\w*", "the credential layer"),
+    (r"\bSessionManager\b|\bBiometricAuthenticator\b|\bestablish\s*\(", "a session or a biometric"),
+    (r"\bdeleteObject\s*\(|\bdeleteDocument\s*\(|\bdeleteContent\b", "a deletion of content"),
+    (r"\blistFiles\s*\(|\bwalk\w*\s*\(|\bscan\w*\s*\(", "a rescan of storage"),
+    (r"\breencrypt\w*|\breEncrypt\w*", "a re-encryption of content"),
+    (r"\bLog\.\w|println\s*\(", "a log"),
+):
+    if re.search(pattern, recovery_repository_code):
+        err(f"the recovery repository must not introduce {why} ('{pattern}')")
+
+# The recovery record: its own markers, the key proof's domain, and the same strictness the vault's
+# other records are held to.
+recovery_record_codec_code = strip_comments(recovery_record_codec_source.read_text()) \
+    if recovery_record_codec_source.exists() else ""
+for token, why in (
+    ("\"NVRC\"", "the recovery record's own marker"),
+    ("\"NVRP\"", "the recovery payload's own marker"),
+    ("PROOF_INFO", "the domain the key proof is computed in"),
+    ("generation != expectedGeneration", "a payload that disagrees with its own header"),
+    ("MAXIMUM_ENVELOPE_LENGTH", "the bound on the envelope's size"),
+    ("bytes.size != PAYLOAD_HEADER_LENGTH + declaredLength", "trailing bytes refused rather than ignored"),
+    ("reserved", "a reserved byte that must be zero"),
+    ("VERSION", "a version this build does not know"),
+):
+    if token not in recovery_record_codec_code:
+        err(f"the recovery record codec is missing {why} ('{token}')")
+
+vault_root_storage_code = (ROOT / "app/src/main/java/com/nivara/app/data/vault/VaultRootStorage.kt").read_text()
+if "RECOVERY_SLOT_NAMES: List<String> = listOf(\"recovery.0.nvr\", \"recovery.1.nvr\")" not in \
+        vault_root_storage_code:
+    err("the recovery record must have its own dedicated pair of slots")
+
+# Reconnection re-commits the vault's own record with the vault's own identity: no new identity, no
+# new key, and the commit is the vault repository's own verified two-slot write.
+vault_repository_code = strip_comments(
+    (ROOT / "app/src/main/java/com/nivara/app/data/vault/NivaraVaultRepository.kt").read_text())
+if "internal suspend fun reconnectRecord(" not in vault_repository_code:
+    err("the vault repository must offer reconnection a record with a recovered key")
+if "identity: VaultIdentity," not in vault_repository_code:
+    err("reconnection must recommit the record with the vault's own identity")
+
+# The human-facing code: 256 bits in base32 with a checksum group, strict on the way in.
+recovery_code_codec_code = strip_comments(recovery_code_codec_source.read_text()) \
+    if recovery_code_codec_source.exists() else ""
+for token, why in (
+    ("KEY_BYTES: Int = 32", "a 256-bit recovery key"),
+    ("CHECKSUM", "error detection on the way in"),
+    ("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", "an explicit base32 alphabet"),
+    ("ChecksumMismatch", "a checksum failure of its own"),
+    ("Malformed", "a malformed code of its own"),
+):
+    if token not in recovery_code_codec_code:
+        err(f"the recovery code codec is missing {why} ('{token}')")
+
+# The presentation carries no key material and no platform handle, and the screen never reaches for
+# a session of its own.
+for path in recovery_ui_sources:
+    code = strip_comments(path.read_text())
+    for pattern, why in (
+        (r"\bByteArray\b", "raw bytes"),
+        (r"\bEncryptionKey\b", "key material"),
+        (r"\bSensitiveBytes\b", "raw secret bytes"),
+        (r"\bandroid\.net\.Uri\b", "a platform URI"),
+        (r"\bSessionManager\b|\bBiometricAuthenticator\b|\bCredentialManager\b",
+         "a second session or credential path"),
+    ):
+        if re.search(pattern, code):
+            err(f"{path.relative_to(ROOT)}: the recovery presentation must not carry {why} ('{pattern}')")
+
+recovery_strings = (ROOT / "app/src/main/res/values/strings.xml").read_text()
+for token, why in (
+    ("vault_recover_entry_action", "the way into recovery from the vault screen"),
+    ("vault_recovery_setup_card", "the explanation of setting recovery up"),
+    ("vault_recovery_code_title", "the one moment the code is shown"),
+    ("vault_recovery_not_set_up", "a vault that was never given recovery material"),
+    ("vault_recovery_wrong_material", "a wrong secret's own words"),
+    ("vault_recovery_locked", "the lockout's own words"),
+    ("vault_recovery_success", "the reconnected vault's own words"),
+    ("vault_recovery_done_action", "the way back to the vault"),
+):
+    if token not in recovery_strings:
+        err(f"the recovery wording is missing {why} ('{token}')")
+
+recovery_success_match = re.search(r'name="vault_recovery_success">([^<]*)<', recovery_strings)
+if not recovery_success_match or "Unlock Nivara" not in recovery_success_match.group(1):
+    err("the reconnected vault must say that the usual unlock still applies ('vault_recovery_success')")
+recovery_setup_match = re.search(r'name="vault_recovery_setup_card">([^<]*)<', recovery_strings)
+if not recovery_setup_match or "does not change the vault" not in recovery_setup_match.group(1):
+    err("recovery setup must say the vault and its key are not changed ('vault_recovery_setup_card')")
+
+# The suites: the code codec, the record codec, the repository, the screen's state machine and its
+# wording, and one instrumented suite that compiles wherever there is no device to run it.
+recovery_jvm_suites = (
+    "app/src/test/java/com/nivara/app/domain/security/RecoveryCodeCodecTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/VaultRecoveryCodecTest.kt",
+    "app/src/test/java/com/nivara/app/data/vault/NivaraVaultRecoveryRepositoryTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/recovery/VaultRecoveryViewModelTest.kt",
+    "app/src/test/java/com/nivara/app/ui/vault/recovery/VaultRecoveryPresentationTest.kt",
+)
+for suite in recovery_jvm_suites:
+    if not (ROOT / suite).exists():
+        err(f"the recovery test suite is missing: {suite}")
+instrumented_recovery_suite = \
+    "app/src/androidTest/java/com/nivara/app/ui/vault/recovery/VaultRecoveryScreenTest.kt"
+if not (ROOT / instrumented_recovery_suite).exists():
+    err(f"the recovery instrumented suite is missing: {instrumented_recovery_suite}")
+
+repository_suite_code = (ROOT / recovery_jvm_suites[2]).read_text() \
+    if (ROOT / recovery_jvm_suites[2]).exists() else ""
+for rule, why in (
+    ("surveyRecovery(", "the survey of a candidate folder must be exercised"),
+    ("recover(", "reconnection must be exercised"),
+    ("setUpRecovery(", "setup must be exercised"),
+    ("WrongMaterial", "a wrong secret must be refused"),
+    ("KeyMismatch", "a key that does not belong to the vault must be refused"),
+    ("Locked", "the lockout must be exercised on the injected clock"),
+    ("RecoveryNotSetUp", "a vault without recovery material must be said"),
+    ("NotAVault", "a folder that is not a vault must be refused"),
+    ("VaultDamaged", "a damaged record must be refused and repaired by nothing"),
+    ("identity", "the recovered vault must keep its own identity"),
+):
+    if rule not in repository_suite_code:
+        err(f"the recovery repository suite must check that {why} ('{rule}')")
+
+code_codec_suite_code = (ROOT / recovery_jvm_suites[0]).read_text() \
+    if (ROOT / recovery_jvm_suites[0]).exists() else ""
+for rule, why in (
+    ("encode(", "a code must round-trip through its own encoding"),
+    ("ChecksumMismatch", "a mistyped code must be caught by its checksum"),
+    ("Malformed", "a non-code must be refused as itself"),
+):
+    if rule not in code_codec_suite_code:
+        err(f"the recovery code codec suite must check that {why} ('{rule}')")
+
+recovery_tests = sum(len(re.findall(r"@Test\b", (ROOT / suite).read_text()))
+                     for suite in recovery_jvm_suites if (ROOT / suite).exists())
+if recovery_tests < 60:
+    err(f"the recovery suites are too thin: {recovery_tests} tests")
+
+for topic in ("recovery", "reinstall", "fingerprint"):
+    if topic not in (ROOT / "docs/vault/README.md").read_text():
+        err(f"docs/vault/README.md does not describe {topic}")
+
+notes.append(f"vault recovery review: {len(recovery_ui_sources)} presentation sources; "
+             f"{recovery_tests} recovery tests")
 
 # ---------------------------------------------------------------- wrapper / hygiene
 wrapper_props = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()

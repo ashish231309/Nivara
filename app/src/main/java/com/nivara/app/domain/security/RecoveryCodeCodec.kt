@@ -1,7 +1,6 @@
-package com.nivara.app.domain.vault
+package com.nivara.app.domain.security
 
 import com.nivara.app.core.common.NivaraResult
-import com.nivara.app.domain.security.SensitiveBytes
 import java.security.MessageDigest
 
 /**

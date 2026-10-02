@@ -11,7 +11,7 @@ import com.nivara.app.domain.security.EncryptionContext
 import com.nivara.app.domain.security.EncryptionKey
 import com.nivara.app.domain.security.EncryptionService
 import com.nivara.app.domain.security.RecoveryKeyEnvelopeService
-import com.nivara.app.domain.vault.RecoveryCodeCodec
+import com.nivara.app.domain.security.RecoveryCodeCodec
 import com.nivara.app.domain.vault.RecoveryStatus
 import com.nivara.app.domain.vault.VaultIdentity
 import com.nivara.app.domain.vault.VaultLocation
