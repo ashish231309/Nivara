@@ -2740,7 +2740,7 @@ recovery_repository_code = strip_comments(recovery_repository_source.read_text()
 for token, why in (
     ("RecoveryKeyEnvelopeService", "the Stage 2 recovery envelope service"),
     ("unsealContentKey(", "the Stage 2 opening of the envelope"),
-    ("sealContentKey(", "the Stage 2 sealing of the envelope"),
+    (".sealContentKey(", "the Stage 2 sealing of the envelope"),
     ("generateRecoveryKey()", "the Stage 2 generation of the recovery key"),
     ("Hkdf.hmac", "the project's existing HMAC for the key proof"),
     ("EncryptionContext.VaultIndex", "the index validated under its own purpose"),
