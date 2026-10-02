@@ -405,13 +405,21 @@ class NivaraVaultRecoveryRepositoryTest {
             VaultRecoveryFailure.LocationUnavailable,
             (refused as NivaraResult.Failure).error,
         )
-        assertTrue(locationStore.adopted.isEmpty())
+        assertEquals(
+            "a failed adoption is not persisted",
+            VaultLocationRead.None,
+            locationStore.stored,
+        )
 
         locationStore.storeResult = NivaraResult.Success(Unit)
         val retried = repository.recover(location = location, code = code)
 
         assertEquals(ready.identity, retried.valueOrNull())
-        assertEquals(1, locationStore.adopted.size)
+        assertEquals(
+            "the retry adopts the reference durably",
+            VaultLocationRead.Present(location),
+            locationStore.stored,
+        )
     }
 
     @Test
