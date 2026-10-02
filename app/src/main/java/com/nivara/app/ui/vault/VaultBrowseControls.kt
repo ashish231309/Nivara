@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.vault.VaultOrdering
 import com.nivara.app.domain.vault.VaultSortDirection
 import com.nivara.app.domain.vault.VaultSortField
@@ -52,9 +53,9 @@ internal fun VaultBrowseControls(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
             SectionButton(
                 selected = section == VaultSection.AllItems,
                 labelRes = R.string.vault_section_all_items,
@@ -134,7 +135,7 @@ private fun TrashSortControls(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
     ) {
         Text(
             text = stringResource(id = R.string.vault_sort_field_label),
@@ -145,7 +146,7 @@ private fun TrashSortControls(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             VaultTrashSortField.entries.forEach { field ->
                 val selected = ordering.field == field
@@ -159,7 +160,7 @@ private fun TrashSortControls(
                     }
                 }
             }
-            OutlinedButton(onClick = onSortDirectionToggled, enabled = !busy, modifier = Modifier.padding(start = 8.dp)) {
+            OutlinedButton(onClick = onSortDirectionToggled, enabled = !busy, modifier = Modifier.padding(start = NivaraSpacing.small)) {
                 Text(text = stringResource(id = ordering.direction.labelRes()))
             }
         }
@@ -216,7 +217,7 @@ private fun SortControls(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
     ) {
         Text(
             text = stringResource(id = R.string.vault_sort_field_label),
@@ -227,7 +228,7 @@ private fun SortControls(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             VaultSortField.entries.forEach { field ->
                 val selected = ordering.field == field
@@ -243,7 +244,7 @@ private fun SortControls(
             }
             // One control, labelled with the direction it is currently drawing: tapping it reverses
             // the order, and the label says which way that is before the tap, not after it.
-            OutlinedButton(onClick = onSortDirectionToggled, enabled = !busy, modifier = Modifier.padding(start = 8.dp)) {
+            OutlinedButton(onClick = onSortDirectionToggled, enabled = !busy, modifier = Modifier.padding(start = NivaraSpacing.small)) {
                 Text(text = stringResource(id = ordering.direction.labelRes()))
             }
         }
@@ -294,8 +295,8 @@ internal fun VaultSearchResultCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
         ) {
             when (search) {
                 VaultSearchUiState.Matches -> if (matchCount != null && totalCount != null) {

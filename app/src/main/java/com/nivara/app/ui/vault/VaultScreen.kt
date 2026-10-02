@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.vault.VaultAlbumId
 import com.nivara.app.domain.vault.VaultImportProgress
 import com.nivara.app.domain.vault.VaultItemId
@@ -305,8 +306,8 @@ private fun VaultContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         VaultStateCard(state = state.vault)
 
@@ -556,7 +557,7 @@ private fun VaultRecoveryCodeDialog(
             Text(text = stringResource(id = R.string.vault_recovery_code_title))
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row)) {
                 Text(
                     text = stringResource(id = R.string.vault_recovery_code_intro),
                     style = MaterialTheme.typography.bodyMedium,
@@ -599,8 +600,8 @@ private fun VaultStateCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             Text(
                 text = stringResource(id = titleRes),
@@ -636,8 +637,8 @@ private fun VaultIndexCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             Text(
                 text = if (index is VaultIndexUiState.Indexed) {
@@ -693,8 +694,8 @@ internal fun VaultItemRow(
             .clickable(
                 onClickLabel = stringResource(id = R.string.vault_item_open_action),
             ) { onOpen(item) }
-            .padding(top = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(top = NivaraSpacing.tight),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.hairline),
     ) {
         Text(text = item.name, style = MaterialTheme.typography.bodyLarge)
         Text(
@@ -738,8 +739,8 @@ private fun ImportProgressCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             Text(
                 text = stringResource(id = R.string.vault_import_progress_title),
@@ -787,8 +788,8 @@ private fun VaultExplanationCard(modifier: Modifier = Modifier) {
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             Text(
                 text = stringResource(id = R.string.vault_explanation_title),
@@ -805,7 +806,7 @@ private fun VaultExplanationCard(modifier: Modifier = Modifier) {
 /** Makes a message tappable so it can be dismissed, as the other screens do. */
 private fun Modifier.dismissibleMessage(onDismiss: () -> Unit): Modifier =
     this
-        .padding(top = 4.dp)
+        .padding(top = NivaraSpacing.tight)
         .clickable(onClick = onDismiss)
 
 @Preview(name = "Vault – no root chosen", showBackground = true)

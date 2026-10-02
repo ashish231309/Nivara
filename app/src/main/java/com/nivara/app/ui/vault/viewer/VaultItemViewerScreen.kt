@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.text.format.Formatter
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 
 /**
  * The viewer: one imported file, drawn from the vault, with a way back.
@@ -87,8 +88,8 @@ internal fun VaultItemViewerScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(NivaraSpacing.screen),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         state.item?.let { shown -> ViewerHeader(item = shown) }
 
@@ -148,7 +149,7 @@ private fun ViewerHeader(item: VaultViewerItem, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.hairline),
     ) {
         Text(text = item.name, style = MaterialTheme.typography.titleMedium)
         Text(
@@ -216,8 +217,8 @@ private fun NivaraExplanationCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             titleRes?.let { title ->
                 Text(text = stringResource(id = title), style = MaterialTheme.typography.titleMedium)
@@ -249,8 +250,8 @@ private fun ImageViewer(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
-            modifier = Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             if (image == null) {
                 Text(
@@ -318,8 +319,8 @@ private fun VideoViewer(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
-            modifier = Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             AndroidView(
                 factory = { context ->
@@ -377,7 +378,7 @@ private fun PlaybackCard(
     val seekDescription = stringResource(id = R.string.vault_viewer_seek_description)
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
     ) {
         Text(
             text = if (durationMillis > 0L) {
@@ -443,8 +444,8 @@ private fun TextViewer(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.row),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             Text(
                 text = stringResource(
@@ -486,8 +487,8 @@ private fun DocumentViewer(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
-            modifier = Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.small),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             Text(text = pageLabel, style = MaterialTheme.typography.bodyMedium)
             page?.let { rendered ->
@@ -500,7 +501,7 @@ private fun DocumentViewer(
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
             ) {
                 TextButton(onClick = onPreviousPage, enabled = state.page > 0) {
                     Text(text = stringResource(id = R.string.vault_viewer_previous_page))

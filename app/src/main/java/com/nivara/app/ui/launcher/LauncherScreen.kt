@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.NivaraApplication
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.app.InstalledApplication
 import com.nivara.app.ui.applications.ApplicationIconLoader
 import com.nivara.app.ui.applications.ApplicationSortOrder
@@ -236,8 +237,8 @@ private fun HomeSurface(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         Text(text = stringResource(id = R.string.launcher_home_summary), style = MaterialTheme.typography.bodyMedium)
 
@@ -294,8 +295,8 @@ private fun HiddenApplicationsCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             Text(
                 text = stringResource(id = R.string.launcher_hidden_card_title),
@@ -359,9 +360,9 @@ private fun DrawerSurface(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 8.dp, end = 16.dp, top = 8.dp),
+                .padding(start = NivaraSpacing.small, end = NivaraSpacing.screen, top = NivaraSpacing.small),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             IconButton(onClick = onClose) {
                 Icon(
@@ -379,7 +380,7 @@ private fun DrawerSurface(
             NivaraMessageText(
                 message = message,
                 modifier = Modifier
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = NivaraSpacing.screen)
                     .dismissibleMessage(onMessageShown),
             )
         }
@@ -415,8 +416,8 @@ private fun LauncherUnavailableState(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row, Alignment.CenterVertically),
     ) {
         Text(
             text = stringResource(id = titleRes),
@@ -444,7 +445,7 @@ private fun LauncherUnavailableState(
  */
 private fun Modifier.dismissibleMessage(onDismiss: () -> Unit): Modifier =
     this
-        .padding(top = 4.dp)
+        .padding(top = NivaraSpacing.tight)
         .clickable(onClick = onDismiss)
 
 @Preview(name = "Launcher – home", showBackground = true)

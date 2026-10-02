@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.app.ApplicationDiscoveryState
 import com.nivara.app.domain.app.InstalledApplication
 import com.nivara.app.domain.permissions.AppLockSetupState
@@ -116,8 +117,8 @@ private fun AppLockSetupContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.screen),
     ) {
         Text(
             text = stringResource(id = R.string.applock_setup_intro),
@@ -202,7 +203,7 @@ private fun DiscoveryCard(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         when (discovery) {
             is ApplicationDiscoveryState.Available -> {
                 SetupCard(
@@ -245,7 +246,7 @@ private fun ApplicationPreview(
 ) {
     val preview = applications.take(PREVIEW_LIMIT)
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight)) {
         Text(
             text = stringResource(id = R.string.applock_setup_discovery_preview_title),
             style = MaterialTheme.typography.titleSmall,
@@ -290,7 +291,7 @@ private fun UsageAccessCard(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         SetupCard(
             title = stringResource(id = R.string.applock_setup_usage_access_title),
             body = stringResource(id = usageAccessStatusRes(status)) + " — " +
@@ -330,7 +331,7 @@ private fun OverlayCard(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         SetupCard(
             title = stringResource(id = R.string.applock_setup_overlay_title),
             body = stringResource(id = overlayStatusRes(capability)) + " — " +
@@ -382,7 +383,7 @@ private fun ProtectionCard(
             stringResource(id = R.string.applock_setup_protection_unavailable)
     }
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         SetupCard(
             title = stringResource(id = R.string.applock_setup_protection_title),
             body = body,
@@ -433,8 +434,8 @@ private fun SetupCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
         ) {
             Text(text = title, style = MaterialTheme.typography.titleMedium)
             Text(text = body, style = MaterialTheme.typography.bodyMedium)

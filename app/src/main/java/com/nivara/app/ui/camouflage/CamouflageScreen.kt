@@ -35,6 +35,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSize
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.camouflage.CamouflageProfile
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.components.NivaraMessageText
@@ -135,8 +137,8 @@ private fun CamouflageContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         Text(
             text = stringResource(id = R.string.camouflage_summary),
@@ -224,12 +226,12 @@ private fun IdentityCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
             ) {
                 profile?.let { identity -> IdentityBadge(identity) }
                 Text(
@@ -266,9 +268,9 @@ private fun IdentityRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onSelect)
-            .padding(vertical = 8.dp),
+            .padding(vertical = NivaraSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         IdentityBadge(profile)
         Text(
@@ -298,7 +300,7 @@ private fun IdentityBadge(
 ) {
     Box(
         modifier = modifier
-            .size(40.dp)
+            .size(NivaraSize.rowIcon)
             .background(color = colorResource(id = profile.backgroundRes()), shape = CircleShape),
         contentAlignment = Alignment.Center,
     ) {
@@ -314,7 +316,7 @@ private fun IdentityBadge(
 /** Makes a message tappable so it can be dismissed, as the launcher's surface does. */
 private fun Modifier.dismissibleMessage(onDismiss: () -> Unit): Modifier =
     this
-        .padding(top = 4.dp)
+        .padding(top = NivaraSpacing.tight)
         .clickable(onClick = onDismiss)
 
 @Preview(name = "Identity – authenticated", showBackground = true)

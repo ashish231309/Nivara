@@ -16,6 +16,9 @@ object NivaraSpacing {
     /** The smallest gap in use: related pieces, like a checkbox and its label. */
     val tight: Dp = 4.dp
 
+    /** The hairline gap: a title and the subtitle that belongs to it. */
+    val hairline: Dp = 2.dp
+
     /** The ordinary small gap: icon to text, rows inside a dense group. */
     val small: Dp = 8.dp
 

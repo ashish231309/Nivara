@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.vault.VaultAlbumId
 import com.nivara.app.domain.vault.VaultItemId
 
@@ -142,8 +143,8 @@ private fun VaultAlbumListCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             if (titleRes != null) {
                 Text(text = stringResource(id = titleRes), style = MaterialTheme.typography.titleMedium)
@@ -217,7 +218,7 @@ private fun AlbumRow(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
     ) {
         if (!renaming) {
             Text(
@@ -255,7 +256,7 @@ private fun AlbumRow(
                 onCancel = onRenameCancelled,
             )
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
                 OutlinedButton(
                     onClick = { onRenameStarted(album.id) },
                     enabled = !busy,
@@ -277,7 +278,7 @@ private fun AlbumRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
                 Button(
                     onClick = { onDeleteConfirmed(album.id) },
                     enabled = !busy,
@@ -325,8 +326,8 @@ private fun VaultAlbumDetailCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             OutlinedButton(onClick = onClose, enabled = !busy) {
                 Text(text = stringResource(id = R.string.vault_album_back_action))
@@ -435,7 +436,7 @@ private fun StaleAlbumItem(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.hairline),
     ) {
         Text(
             text = stringResource(id = R.string.vault_album_stale_title),
@@ -468,7 +469,7 @@ private fun VaultAlbumItemEditor(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = item.name, style = MaterialTheme.typography.bodyLarge)
@@ -513,7 +514,7 @@ private fun AlbumNameForm(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
     ) {
         if (labelRes != null) {
             Text(
@@ -529,7 +530,7 @@ private fun AlbumNameForm(
             label = { Text(text = stringResource(id = fieldLabelRes)) },
             modifier = Modifier.fillMaxWidth(),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
             Button(
                 onClick = {
                     val title = name

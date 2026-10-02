@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.vault.VaultItemId
 import com.nivara.app.domain.vault.VaultTrashItemStatus
 
@@ -51,8 +52,8 @@ internal fun VaultTrashCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             val count = (trash as? VaultTrashUiState.Trashed)?.items?.size
             Text(
@@ -132,8 +133,8 @@ private fun VaultTrashRow(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(top = NivaraSpacing.tight),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.hairline),
     ) {
         Text(
             text = item.item?.name ?: stringResource(id = R.string.vault_trash_row_unknown_title),

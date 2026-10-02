@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.domain.credential.PatternCanonicalizer
 import com.nivara.app.domain.credential.PrimaryCredentialType
@@ -93,7 +94,7 @@ private fun PinEntry(
     val buffer = remember { PinBuffer(MAXIMUM_PIN_DIGITS) }
     var entered by remember { mutableStateOf(0) }
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row)) {
         PinDots(filled = entered, modifier = Modifier.align(Alignment.CenterHorizontally))
 
         PinKeypad(
@@ -131,7 +132,7 @@ private fun PinDots(filled: Int, modifier: Modifier = Modifier) {
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Decorative on purpose: the number of dots is shown, the digits never are, and no
@@ -154,9 +155,9 @@ private fun PinKeypad(
     onBackspace: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         KEYPAD_ROWS.forEach { row ->
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
                 row.forEach { label ->
                     if (label.isEmpty()) {
                         Spacer(modifier = Modifier.weight(1f))
@@ -193,7 +194,7 @@ private fun PasswordEntry(
 ) {
     var text by remember { mutableStateOf("") }
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row)) {
         OutlinedTextField(
             value = text,
             onValueChange = { updated -> text = updated },

@@ -6,8 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSize
 
 /**
  * The icon a row draws for an application, or a neutral placeholder when the device could not
@@ -26,7 +26,7 @@ fun NivaraApplicationIcon(
     modifier: Modifier = Modifier,
 ) {
     // Drawn slightly smaller than it is loaded, so the bitmap is never scaled up and never blurry.
-    val iconSize = Modifier.size(40.dp)
+    val iconSize = Modifier.size(NivaraSize.rowIcon)
     if (icon != null) {
         Image(
             bitmap = icon,

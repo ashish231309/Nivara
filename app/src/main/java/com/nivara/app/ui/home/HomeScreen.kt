@@ -29,6 +29,8 @@ import com.nivara.app.domain.security.BiometricStatus
 import com.nivara.app.domain.security.SessionState
 import com.nivara.app.ui.biometric.biometricStatusRes
 import com.nivara.app.ui.components.NivaraErrorState
+import com.nivara.app.ui.components.NivaraSectionHeader
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.credential.credentialTypeNameRes
 import com.nivara.app.ui.session.sessionStatusRes
@@ -137,12 +139,12 @@ private fun HomeContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         Text(
             text = stringResource(id = R.string.home_tagline),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
@@ -150,6 +152,8 @@ private fun HomeContent(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        NivaraSectionHeader(title = stringResource(id = R.string.home_section_security))
 
         DeviceSecurityCard(deviceLockConfigured = deviceLockConfigured)
 
@@ -177,6 +181,8 @@ private fun HomeContent(
             onOpenBiometric = onOpenBiometric,
         )
 
+        NivaraSectionHeader(title = stringResource(id = R.string.home_section_protection))
+
         AppLockCard(onOpenAppLock = onOpenAppLock)
 
         HiddenAppsCard(onOpenHiddenApps = onOpenHiddenApps)
@@ -188,9 +194,11 @@ private fun HomeContent(
 
         CamouflageCard(onOpenCamouflage = onOpenCamouflage)
 
+        NivaraSectionHeader(title = stringResource(id = R.string.home_section_vault))
+
         VaultCard(onOpenVault = onOpenVault)
 
-        Button(onClick = onOpenAbout) {
+        OutlinedButton(onClick = onOpenAbout, modifier = Modifier.fillMaxWidth()) {
             Text(text = stringResource(id = R.string.home_about_action))
         }
     }
@@ -243,7 +251,7 @@ private fun CredentialCard(
         ) + " — " + stringResource(id = R.string.home_credential_configured_summary)
     }
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         InfoCard(title = stringResource(id = R.string.home_credential_title), body = body)
 
         if (credentialType == null) {
@@ -251,7 +259,7 @@ private fun CredentialCard(
                 Text(text = stringResource(id = R.string.home_credential_setup_action))
             }
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
                 Button(onClick = onOpenCredentialVerify, modifier = Modifier.weight(1f)) {
                     Text(text = stringResource(id = R.string.home_credential_verify_action))
                 }
@@ -277,7 +285,7 @@ private fun BiometricCard(
     onOpenBiometric: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         InfoCard(
             title = stringResource(id = R.string.home_biometric_title),
             body = stringResource(id = biometricStatusRes(biometricStatus)),
@@ -309,7 +317,7 @@ private fun SessionCard(
     onLockNow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         InfoCard(
             title = stringResource(id = R.string.session_title),
             body = "${stringResource(id = sessionStatusRes(session))} — " +
@@ -351,7 +359,7 @@ private fun HiddenAppsCard(
     onOpenHiddenApps: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         InfoCard(
             title = stringResource(id = R.string.home_apphide_title),
             body = stringResource(id = R.string.home_apphide_summary),
@@ -375,7 +383,7 @@ private fun CamouflageCard(
     onOpenCamouflage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         InfoCard(
             title = stringResource(id = R.string.home_camouflage_title),
             body = stringResource(id = R.string.home_camouflage_summary),
@@ -398,7 +406,7 @@ private fun VaultCard(
     onOpenVault: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         InfoCard(
             title = stringResource(id = R.string.home_vault_title),
             body = stringResource(id = R.string.home_vault_summary),
@@ -422,7 +430,7 @@ private fun AppLockCard(
     onOpenAppLock: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         InfoCard(
             title = stringResource(id = R.string.home_applock_title),
             body = stringResource(id = R.string.home_applock_summary),
@@ -447,8 +455,8 @@ private fun InfoCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
         ) {
             Text(text = title, style = MaterialTheme.typography.titleMedium)
             Text(text = body, style = MaterialTheme.typography.bodyMedium)

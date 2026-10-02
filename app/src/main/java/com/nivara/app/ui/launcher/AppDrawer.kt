@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.app.InstalledApplication
 import com.nivara.app.ui.applications.ApplicationIconLoader
 import com.nivara.app.ui.applications.ApplicationSortOrder
@@ -69,8 +70,8 @@ fun AppDrawer(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = NivaraSpacing.screen),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
     ) {
         OutlinedTextField(
             value = state.query,
@@ -125,7 +126,7 @@ fun AppDrawer(
                     text = stringResource(id = emptyMessageRes),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp),
+                    modifier = Modifier.padding(vertical = NivaraSpacing.small),
                 )
             }
         }
@@ -135,8 +136,8 @@ fun AppDrawer(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
+            horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
         ) {
             items(items = state.entries, key = { application -> application.packageName }) { application ->
                 ApplicationCell(
@@ -171,9 +172,9 @@ private fun ApplicationCell(
             .fillMaxWidth()
             .clickable(role = Role.Button, onClickLabel = label, onClick = onLaunch)
             .semantics { contentDescription = label }
-            .padding(vertical = 8.dp),
+            .padding(vertical = NivaraSpacing.small),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
     ) {
         NivaraApplicationIcon(icon = icon)
         Text(

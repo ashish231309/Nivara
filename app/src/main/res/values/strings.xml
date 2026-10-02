@@ -5,6 +5,9 @@
     <!-- Home -->
     <string name="home_tagline">Privacy. Security. Control.</string>
     <string name="home_intro">Nivara keeps your private space on this device, under your control.</string>
+    <string name="home_section_security">Security</string>
+    <string name="home_section_protection">Protection</string>
+    <string name="home_section_vault">Vault</string>
     <string name="home_status_title">Device security</string>
     <string name="home_status_lock_configured">Screen lock configured</string>
     <string name="home_status_lock_configured_summary">A screen lock is set on this device.</string>

@@ -26,7 +26,7 @@ fun NivaraSectionHeader(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = NivaraSpacing.section, bottom = NivaraSpacing.row),
+            .padding(top = NivaraSpacing.row),
         verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
     ) {
         Text(

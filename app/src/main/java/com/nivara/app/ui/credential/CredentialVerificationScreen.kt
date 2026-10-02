@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.ui.components.NivaraLoadingState
 import com.nivara.app.ui.components.NivaraMessageText
@@ -76,8 +77,8 @@ fun CredentialVerificationScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         when (uiState.step) {
             CredentialVerificationStep.Loading -> NivaraLoadingState(

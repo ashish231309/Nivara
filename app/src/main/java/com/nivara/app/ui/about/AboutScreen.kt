@@ -21,6 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nivara.app.BuildConfig
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.ui.theme.NivaraTheme
 
 /**
@@ -53,8 +54,8 @@ fun AboutScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         Text(
             text = stringResource(id = R.string.app_name),
@@ -69,8 +70,8 @@ fun AboutScreen(
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(NivaraSpacing.screen),
+                verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small),
             ) {
                 InfoRow(label = stringResource(id = R.string.about_version_label), value = appVersion)
                 InfoRow(label = stringResource(id = R.string.about_build_type_label), value = buildType)
@@ -90,8 +91,8 @@ fun AboutScreen(
             ),
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(NivaraSpacing.screen),
+                verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
             ) {
                 Text(
                     text = stringResource(id = R.string.about_privacy_title),
@@ -114,7 +115,7 @@ private fun InfoRow(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         Text(
             text = label,

@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.NivaraApplication
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.app.InstalledApplication
 import com.nivara.app.domain.apphide.ApplicationVisibility
 import com.nivara.app.ui.applications.ApplicationIconLoader
@@ -162,8 +163,8 @@ private fun HiddenManagementContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         SummaryCard(state = state)
 
@@ -223,8 +224,8 @@ private fun SummaryCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
         ) {
             Text(
                 text = stringResource(id = R.string.apphide_manage_summary),
@@ -281,7 +282,7 @@ private fun LockedCard(
     onUnlock: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         Text(
             text = stringResource(id = R.string.apphide_manage_locked),
             style = MaterialTheme.typography.bodyMedium,
@@ -307,7 +308,7 @@ private fun SectionSelector(
     onSectionChange: (HiddenSection) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight)) {
         Text(
             text = stringResource(id = R.string.apphide_manage_section_label),
             style = MaterialTheme.typography.labelLarge,
@@ -332,7 +333,7 @@ private fun SortSelector(
     onSortChange: (ApplicationSortOrder) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight)) {
         Text(
             text = stringResource(id = R.string.apphide_manage_sort_label),
             style = MaterialTheme.typography.labelLarge,
@@ -408,7 +409,7 @@ private fun HiddenApplicationList(
                     text = stringResource(id = emptyMessageRes),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 16.dp),
+                    modifier = Modifier.padding(vertical = NivaraSpacing.screen),
                 )
             }
         }
@@ -463,12 +464,12 @@ private fun HiddenApplicationRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = NivaraSpacing.small),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         NivaraApplicationIcon(icon = icon)
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NivaraSpacing.hairline)) {
             Text(text = row.label, style = MaterialTheme.typography.bodyLarge)
             Text(
                 text = stringResource(id = stateRes),

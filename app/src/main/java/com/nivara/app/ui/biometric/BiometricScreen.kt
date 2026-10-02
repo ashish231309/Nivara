@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.domain.credential.PrimaryCredentialType
 import com.nivara.app.domain.security.BiometricStatus
@@ -108,8 +109,8 @@ private fun BiometricContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.screen),
     ) {
         Text(
             text = stringResource(id = R.string.biometric_screen_intro),
@@ -194,8 +195,8 @@ private fun StatusCard(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
         ) {
             Text(
                 text = stringResource(id = biometricStatusRes(state.status)),
@@ -224,7 +225,7 @@ private fun StatusActions(
     onOpenCredentialSetup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         when (state.status) {
             BiometricStatus.Enabled -> {
                 Button(
@@ -280,7 +281,7 @@ private fun NoCredential(
     onOpenCredentialSetup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         Text(
             text = stringResource(id = R.string.biometric_fallback_no_credential),
             style = MaterialTheme.typography.bodyMedium,
@@ -306,7 +307,7 @@ private fun ChangeConfirmation(
     onSubmit: (CredentialInput) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         Text(
             text = stringResource(id = R.string.biometric_approval_message),
             style = MaterialTheme.typography.bodyMedium,

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.ui.components.NivaraMessageText
 
 /**
@@ -75,8 +76,8 @@ internal fun VaultRecoveryScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         Text(
             text = stringResource(id = R.string.vault_recovery_intro),
@@ -158,7 +159,7 @@ private fun VaultRecoveryRefusal(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         Text(
             text = stringResource(id = messageRes),
@@ -186,7 +187,7 @@ private fun VaultRecoveryCodeEntry(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         Text(
             text = stringResource(id = R.string.vault_recovery_identity_label),
@@ -235,7 +236,7 @@ private fun VaultRecoverySuccess(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         Text(
             text = stringResource(id = R.string.vault_recovery_success_title),

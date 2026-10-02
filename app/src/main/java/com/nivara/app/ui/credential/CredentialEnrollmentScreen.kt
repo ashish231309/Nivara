@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nivara.app.R
+import com.nivara.app.ui.components.NivaraSpacing
 import com.nivara.app.domain.credential.CredentialInput
 import com.nivara.app.domain.credential.PrimaryCredentialType
 import com.nivara.app.ui.components.NivaraLoadingState
@@ -96,8 +97,8 @@ fun CredentialEnrollmentScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
     ) {
         when (uiState.step) {
             CredentialEnrollmentStep.ChooseType -> {
@@ -198,7 +199,7 @@ private fun CredentialTypeOptions(
     selected: PrimaryCredentialType,
     onSelect: (PrimaryCredentialType) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
         PrimaryCredentialType.entries.forEach { type ->
             CredentialTypeOption(
                 type = type,
@@ -221,8 +222,8 @@ private fun CredentialTypeOption(
             .clickable(onClick = onSelect),
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(NivaraSpacing.screen),
+            horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RadioButton(selected = selected, onClick = onSelect)
