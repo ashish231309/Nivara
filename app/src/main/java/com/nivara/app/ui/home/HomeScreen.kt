@@ -329,14 +329,17 @@ private fun SecurityCheckCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
         ) {
-            Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = Color.White.copy(alpha = 0.2f)) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(color = Color.White.copy(alpha = 0.2f), shape = CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_shield_check),
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .align(Alignment.Center),
+                    modifier = Modifier.size(24.dp),
                 )
             }
             Column(modifier = Modifier.weight(1f)) {

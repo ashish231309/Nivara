@@ -66,7 +66,7 @@ class AndroidBatteryOptimizationRepository(
             )
         } catch (missingScreen: ActivityNotFoundException) {
             context.startActivity(
-                Intent(Settings.SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
         }
     }

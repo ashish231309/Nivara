@@ -24,7 +24,7 @@ class ProtectionRunStateStore(context: Context) {
 
     /** `true` when the user last left protection running. Missing or corrupt reads as `false`. */
     fun isEnabled(): Boolean = runCatching {
-        AtomicFiles.readOrNull(file)?.decodeToString(Charsets.US_ASCII)?.trim() == ON
+        AtomicFiles.readOrNull(file)?.decodeToString()?.trim() == ON
     }.getOrDefault(false)
 
     /** Records the user's decision. Called only by the protection runner, never inferred. */
