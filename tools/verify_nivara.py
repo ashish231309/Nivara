@@ -2948,8 +2948,8 @@ if design_spacing_source.exists():
         ("val small", "the small step of the spacing scale"),
         ("val row", "the row step of the spacing scale"),
         ("val screen", "the screen step of the spacing scale"),
-        ("val section", "the section step of the spacing scale"),
-        ("val touchTarget", "the platform's minimum touch target"),
+        ("val section: Dp =", "the section step of the spacing scale"),
+        ("val touchTarget: Dp = 48.dp", "the platform's minimum touch target"),
     ):
         if token not in spacing_code:
             err(f"the spacing scale must carry {why} ('{token}')")
