@@ -113,13 +113,16 @@ class NivaraVaultRecoveryRepositoryTest {
      */
     private suspend fun simulateReinstall() {
         deviceKeyStore.replaceKey(randomKey("fresh-device-key"))
-        locationStore.stored = VaultLocationRead.None
-        locationStore.adopted.clear()
+        // While the folder is still remembered, the repository must prove the old record genuinely
+        // cannot open under the new device key — that is the reinstall the rest of the test plays.
         assertEquals(
             "a fresh installation cannot open the old record",
             true,
             vaultRepository.inspect() is VaultState.Unreadable,
         )
+        // Only then does the reference go away, as it does on a real reinstall.
+        locationStore.stored = VaultLocationRead.None
+        locationStore.adopted.clear()
     }
 
     /** Writes a sealed index record naming [items], as the index repository would. */
@@ -433,16 +436,14 @@ class NivaraVaultRecoveryRepositoryTest {
         setUpRecovery()
         val wrongCode = (RecoveryCodeCodec.encode(random.nextKeyBytes()) as NivaraResult.Success).value
         simulateReinstall()
+        val before = storage.snapshot()
 
         val result = repository.recover(location = location, code = wrongCode)
 
         assertEquals(VaultRecoveryFailure.WrongMaterial, (result as NivaraResult.Failure).error)
         assertTrue(locationStore.adopted.isEmpty())
         assertEquals(VaultLocationRead.None, locationStore.stored)
-        assertTrue(
-            "the vault record is untouched",
-            vaultRepository.inspect() is VaultState.Unreadable,
-        )
+        assertEquals("the vault is untouched by a refused recovery", before, storage.snapshot())
     }
 
     @Test

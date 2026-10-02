@@ -157,10 +157,18 @@ internal class NivaraVaultRecoveryRepository(
             }
             is NivaraResult.Failure -> {
                 recoveryKey.clear()
+                // Only a genuine authentication failure on a well-formed envelope means the secret
+                // was wrong. Anything else — truncation, foreign magic, a version or scheme this
+                // build cannot process — is a problem with the record, not with the user, and is
+                // never counted against the lockout.
                 return when (opened.error) {
-                    CryptographicFailure.UnsupportedEnvelope ->
-                        NivaraResult.Failure(VaultRecoveryFailure.VaultDamaged)
-                    else -> failureAfterWrongMaterial(now, VaultRecoveryFailure.WrongMaterial)
+                    CryptographicFailure.AuthenticationFailed ->
+                        failureAfterWrongMaterial(now, VaultRecoveryFailure.WrongMaterial)
+                    CryptographicFailure.UnsupportedVersion,
+                    CryptographicFailure.UnsupportedKeyScheme,
+                    CryptographicFailure.UnsupportedAlgorithm,
+                    -> NivaraResult.Failure(VaultRecoveryFailure.VaultUnsupported)
+                    else -> NivaraResult.Failure(VaultRecoveryFailure.VaultDamaged)
                 }
             }
         }

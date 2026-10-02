@@ -131,6 +131,6 @@ class VaultRecoveryPresentationTest {
             com.nivara.app.domain.vault.VaultIdentity("00112233445566778899aabbccddeeff")
                 .displayFingerprint()
 
-        assertEquals("0011 2233 4455 6677 8899 aabb ccddeeff", fingerprint)
+        assertEquals("0011 2233 4455 6677 8899 aabb ccdd eeff", fingerprint)
     }
 }
