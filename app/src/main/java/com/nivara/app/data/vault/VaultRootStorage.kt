@@ -138,4 +138,20 @@ internal object VaultStructure {
      * of the others even if one were moved onto the other's name.
      */
     val TRASH_SLOT_NAMES: List<String> = listOf("trash.0.nvt", "trash.1.nvt")
+
+    /**
+     * The two recovery-record slots — the vault's way back in after this installation's state is gone.
+     *
+     * A fifth pair, written exactly like the other four and for exactly the same reason: a new
+     * recovery generation goes into the slot that is not the current one, so the record a reader
+     * would pick is never the record being written. They live in the metadata area with the rest
+     * because they *are* metadata — a small record about the vault — and because recovery must find
+     * them by looking where every other fact about the vault already lives.
+     *
+     * The marker inside them is `NVRC` rather than any of the others', and the envelope they carry
+     * is sealed under the recovery purpose of the Stage 2 envelope service — so a recovery record can
+     * never be mistaken for a vault record, an index, an album record or a trash record, even if one
+     * were moved onto the other's name.
+     */
+    val RECOVERY_SLOT_NAMES: List<String> = listOf("recovery.0.nvr", "recovery.1.nvr")
 }

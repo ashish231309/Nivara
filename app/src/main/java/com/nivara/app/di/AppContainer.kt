@@ -24,6 +24,7 @@ import com.nivara.app.data.vault.FileVaultLocationStore
 import com.nivara.app.data.vault.NivaraVaultIndexRepository
 import com.nivara.app.data.vault.NivaraVaultOrganizationRepository
 import com.nivara.app.data.vault.NivaraVaultTrashRepository
+import com.nivara.app.data.vault.NivaraVaultRecoveryRepository
 import com.nivara.app.data.vault.NivaraVaultRepository
 import com.nivara.app.data.vault.SafDocumentSourceOpener
 import com.nivara.app.data.vault.SafVaultContentStorage
@@ -66,6 +67,7 @@ import com.nivara.app.domain.vault.VaultIndexRepository
 import com.nivara.app.domain.vault.VaultOrganizationRepository
 import com.nivara.app.domain.vault.VaultTrashRepository
 import com.nivara.app.domain.vault.VaultLocationStore
+import com.nivara.app.domain.vault.VaultRecoveryRepository
 import com.nivara.app.domain.vault.VaultRepository
 import com.nivara.app.ui.applications.ApplicationIconLoader
 import com.nivara.app.ui.applock.overlay.AppLockSurfaceController
@@ -244,6 +246,16 @@ interface AppContainer {
      * user granted is the only thing Nivara keeps. See docs/vault/README.md.
      */
     val vaultRepository: VaultRepository
+
+    /**
+     * The vault's way back in: surveying a folder for recovery, reconnecting to a vault with the
+     * user's recovery code, and writing recovery material into a connected vault.
+     *
+     * Recovery leans entirely on the Stage 2 recovery envelope and the vault's existing key
+     * hierarchy; this contract adds where the envelope lives and how the key it yields is proven to
+     * belong to the vault it was shown for. See docs/vault/README.md.
+     */
+    val vaultRecoveryRepository: VaultRecoveryRepository
 
     /**
      * The one owner of the durable reference to the user's chosen vault folder.
@@ -519,6 +531,30 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     override val vaultRepository: VaultRepository get() = nivaraVaultStorage
+
+    /**
+     * Recovery and reconnection for a vault that outlived this installation.
+     *
+     * One object owns all three acts — surveying a candidate folder, reconnecting to it with a
+     * recovery code, and writing the recovery record — because they share one lock and one view of
+     * the recovery slots, and because reconnection must not race setup for the same slots.
+     */
+    private val nivaraVaultRecovery: NivaraVaultRecoveryRepository by lazy {
+        NivaraVaultRecoveryRepository(
+            vaultRepository = nivaraVaultStorage,
+            locationStore = vaultLocationStore,
+            storageFactory = { location ->
+                SafVaultRootStorage(context = applicationContext, location = location)
+            },
+            deviceKeyStore = deviceKeyStore,
+            contentKeyWrapper = contentKeyWrapper,
+            encryptionService = encryptionService,
+            recoveryKeyEnvelopeService = recoveryKeyEnvelopeService,
+            timeProvider = timeProvider,
+        )
+    }
+
+    override val vaultRecoveryRepository: VaultRecoveryRepository get() = nivaraVaultRecovery
 
     /**
      * The vault's content path: the index, and importing a file into it.

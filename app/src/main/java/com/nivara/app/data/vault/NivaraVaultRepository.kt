@@ -419,10 +419,44 @@ internal class NivaraVaultRepository(
                 return NivaraResult.Failure(VaultFailure.CryptographyFailed)
             }
 
-            return commitRecord(storage, survey, wrappedKey, wrappingKey)
+            return commitRecord(
+                storage = storage,
+                survey = survey,
+                wrappedKey = wrappedKey,
+                wrappingKey = wrappingKey,
+                identity = VaultIdentity.create(random),
+            )
         } finally {
             (vaultKey as? EncryptionKey.InProcess)?.clear()
         }
+    }
+
+    /**
+     * Recommits the vault's own record for a vault whose key was recovered, not created.
+     *
+     * Recovery after a reinstall yields the vault's existing key and its existing identity, but the
+     * record that held them was sealed under the installation that is gone. This writes the next
+     * generation of that same record — the same identity, the key re-wrapped under this
+     * installation's device key — through the exact two-slot, read-back-verified commit the vault's
+     * creation uses. It creates nothing: no key, no identity, no content. It re-expresses the
+     * installation-local wrapping of what is already there, which is what reconnecting *is*.
+     */
+    internal suspend fun reconnectRecord(
+        location: VaultLocation,
+        identity: VaultIdentity,
+        wrappedKey: ByteArray,
+        wrappingKey: EncryptionKey,
+    ): NivaraResult<Unit> = lock.withLock {
+        val storage = storageFactory(location)
+        val survey = survey(location)
+        if (survey is Survey.Problem) return NivaraResult.Failure(survey.failure)
+        commitRecord(
+            storage = storage,
+            survey = survey,
+            wrappedKey = wrappedKey,
+            wrappingKey = wrappingKey,
+            identity = identity,
+        )
     }
 
     private suspend fun wrappedKeyCanBeRecovered(
@@ -457,8 +491,8 @@ internal class NivaraVaultRepository(
         survey: Survey,
         wrappedKey: ByteArray,
         wrappingKey: EncryptionKey,
+        identity: VaultIdentity,
     ): NivaraResult<Unit> {
-        val identity = VaultIdentity.create(random)
         val existing = (survey as? Survey.Seen)?.records.orEmpty()
         val generation = (existing.maxOfOrNull { record -> record.generation } ?: 0L) +
             VaultRecordCodec.FIRST_GENERATION
@@ -528,13 +562,15 @@ internal class NivaraVaultRepository(
             payload.wrappedKey.isNotEmpty()
     }
 
-    private companion object {
+    internal companion object {
 
         /**
          * The platform key that protects the vault's key material.
          *
          * Versioned like every other alias in the project, so a future change of key-material
          * semantics becomes a new alias rather than a silent reinterpretation of an existing one.
+         * Reconnection re-wraps the recovered vault key under exactly this alias — the hierarchy is
+         * not extended, only re-established for a fresh installation.
          */
         const val WRAPPING_KEY_ALIAS = "nivara.vault.v1"
 
