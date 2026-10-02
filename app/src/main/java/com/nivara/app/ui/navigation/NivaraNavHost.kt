@@ -24,6 +24,7 @@ import com.nivara.app.ui.credential.CredentialChangeRoute
 import com.nivara.app.ui.credential.CredentialSetupRoute
 import com.nivara.app.ui.credential.CredentialVerifyRoute
 import com.nivara.app.ui.home.HomeRoute
+import com.nivara.app.ui.settings.AllFeaturesRoute
 import com.nivara.app.ui.vault.VaultRoute
 import com.nivara.app.ui.vault.recovery.VaultRecoveryRoute
 
@@ -82,15 +83,23 @@ fun NivaraNavHost(
         }
         composable(route = NivaraDestination.Home.route) {
             HomeRoute(
-                onOpenAbout = { navController.navigateTo(NivaraDestination.About) },
-                onOpenCredentialSetup = { navController.navigateTo(NivaraDestination.CredentialSetup) },
-                onOpenCredentialVerify = { navController.navigateTo(NivaraDestination.CredentialVerify) },
-                onOpenCredentialChange = { navController.navigateTo(NivaraDestination.CredentialChange) },
-                onOpenBiometric = { navController.navigateTo(NivaraDestination.Biometric) },
-                onOpenAppLock = { navController.navigateTo(NivaraDestination.AppLock) },
+                onOpenVault = { navController.navigateTo(NivaraDestination.Vault) },
                 onOpenHiddenApps = { navController.navigateTo(NivaraDestination.HiddenApps) },
                 onOpenCamouflage = { navController.navigateTo(NivaraDestination.Camouflage) },
-                onOpenVault = { navController.navigateTo(NivaraDestination.Vault) },
+                onOpenAppLock = { navController.navigateTo(NivaraDestination.AppLock) },
+                onOpenAllFeatures = { navController.navigateTo(NivaraDestination.AllFeatures) },
+                onOpenUnlock = { navController.navigateTo(NivaraDestination.CredentialVerify) },
+            )
+        }
+        composable(route = NivaraDestination.AllFeatures.route) {
+            AllFeaturesRoute(
+                onOpenCredentialSetup = { navController.navigateTo(NivaraDestination.CredentialSetup) },
+                onOpenCredentialVerify = { navController.navigateTo(NivaraDestination.CredentialVerify) },
+                onOpenBiometric = { navController.navigateTo(NivaraDestination.Biometric) },
+                onOpenPreparation = { navController.navigateTo(NivaraDestination.AppLockSetup) },
+                onOpenCamouflage = { navController.navigateTo(NivaraDestination.Camouflage) },
+                onOpenRecovery = { navController.navigateTo(NivaraDestination.VaultRecovery) },
+                onOpenAbout = { navController.navigateTo(NivaraDestination.About) },
             )
         }
         composable(route = NivaraDestination.About.route) {

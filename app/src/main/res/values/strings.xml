@@ -4,26 +4,6 @@
 
     <!-- Home -->
     <string name="home_tagline">Privacy. Security. Control.</string>
-    <string name="home_intro">Nivara keeps your private space on this device, under your control.</string>
-    <string name="home_section_security">Security</string>
-    <string name="home_section_protection">Protection</string>
-    <string name="home_section_vault">Vault</string>
-    <string name="home_status_title">Device security</string>
-    <string name="home_status_lock_configured">Screen lock configured</string>
-    <string name="home_status_lock_configured_summary">A screen lock is set on this device.</string>
-    <string name="home_status_lock_missing">No screen lock</string>
-    <string name="home_status_lock_missing_summary">Set a screen lock in system settings to protect this device.</string>
-    <string name="home_foundation_title">Foundation release</string>
-    <string name="home_foundation_summary">This build contains the application shell only. Security modules are added in the releases that follow.</string>
-    <string name="home_about_action">About Nivara</string>
-    <string name="home_launcher_title">Nivara launcher</string>
-    <string name="home_launcher_summary">Nivara includes a Home application: an app drawer that leaves out the applications you hid. Select it in Android\'s Home settings, and switch back at any time. Nothing is hidden from Android itself.</string>
-    <string name="home_apphide_title">Hidden applications</string>
-    <string name="home_apphide_summary">Mark applications Nivara should keep out of sight. Android\'s launcher still shows them.</string>
-    <string name="home_apphide_action">Choose hidden applications</string>
-    <string name="home_applock_title">App Lock</string>
-    <string name="home_applock_summary">Choose which applications need your credential, and check what App Lock still needs.</string>
-    <string name="home_applock_action">Choose protected applications</string>
 
     <!-- About -->
     <string name="about_title">About</string>
@@ -109,18 +89,8 @@
     <string name="credential_error_generic">Nivara could not complete that. Try again.</string>
 
     <!-- Home: primary credential -->
-    <string name="home_credential_title">Primary credential</string>
-    <string name="home_credential_none">Not set up</string>
-    <string name="home_credential_none_summary">Choose a PIN, password or pattern to protect your private space.</string>
-    <string name="home_credential_configured">Set up: %1$s</string>
-    <string name="home_credential_configured_summary">Nivara asks for this credential before it opens protected content.</string>
-    <string name="home_credential_setup_action">Set up credential</string>
-    <string name="home_credential_verify_action">Verify credential</string>
-    <string name="home_credential_change_action">Change credential</string>
 
     <!-- Home: biometric unlock -->
-    <string name="home_biometric_title">Biometric unlock</string>
-    <string name="home_biometric_action">Open biometric settings</string>
 
     <!-- Biometric authentication (secondary to the primary credential) -->
     <string name="biometric_screen_title">Biometric unlock</string>
@@ -181,7 +151,6 @@
     <string name="biometric_prompt_negative">Cancel</string>
 
     <!-- Session: the in-memory authorization state, its timeout and Quick Lock. -->
-    <string name="session_title">Nivara session</string>
     <string name="session_status_authenticated">Unlocked — session active</string>
     <string name="session_status_locked">Locked — authentication required</string>
     <string name="session_summary_locked">Nivara locks itself after a period of inactivity, and whenever you lock it. Nothing is kept on disk, so closing the app ends the session too.</string>
@@ -190,7 +159,6 @@
     <string name="session_action_lock">Lock now</string>
     <string name="session_notice_locked">Nivara is locked. Authenticate again to continue.</string>
     <string name="session_notice_ended">The session ended. Authenticate again to continue.</string>
-    <string name="session_locked_note">This is Nivara\'s own session, not the device\'s screen lock: locking it does not touch your credential, your biometric enrolment or any stored file.</string>
 
     <!-- App Lock preparation: discovery, Usage Access and the setup state -->
     <string name="applock_setup_title">App Lock preparation</string>
@@ -223,7 +191,6 @@
     <string name="applock_setup_usage_access_granted_notice">Usage Access is on.</string>
     <string name="applock_setup_settings_unavailable">Nivara could not open Android\'s settings screen on this device.</string>
 
-    <string name="applock_setup_scope_note">App Lock itself — choosing applications and locking them — arrives in a later release. This screen only checks what it needs.</string>
 
     <!-- App Lock protection surface (Stage 8) -->
     <string name="applock_overlay_title">App Lock</string>
@@ -375,9 +342,6 @@
       renaming the launcher entry changes presentation, is not a security boundary, and does not
       remove Nivara from Android's own lists. Recovery is described as the ordinary thing it is.
     -->
-    <string name="home_camouflage_title">Application identity</string>
-    <string name="home_camouflage_summary">Choose the name and icon Nivara\'s launcher entry shows. Presentation only: Android still lists Nivara, and this is not a way to hide it.</string>
-    <string name="home_camouflage_action">Choose an application identity</string>
     <string name="camouflage_title">Application identity</string>
     <string name="camouflage_summary">Choose the name and icon Nivara\'s launcher entry shows. Nivara\'s package, data, protection and settings are unchanged.</string>
     <string name="camouflage_current_title">Shown now</string>
@@ -402,8 +366,6 @@
       that a vault Nivara cannot read has not been deleted, because "the vault is empty" is the one
       reading this screen must never invite.
     -->
-    <string name="home_vault_title">Vault storage</string>
-    <string name="home_vault_summary">Choose the folder Nivara keeps its encrypted vault in. Nivara only touches the folder you pick.</string>
     <string name="home_vault_action">Set up vault storage</string>
     <string name="vault_title">Vault storage</string>
     <string name="vault_state_not_configured_title">No vault folder chosen</string>
@@ -686,4 +648,75 @@
     <string name="vault_trash_error_failed">The change to the trash failed.</string>
     <string name="vault_album_member_count_trashed_format">%1$d items, %2$d of them in Trash</string>
     <string name="vault_album_member_count_partial_trashed_format">%1$d items, %2$d no longer in the vault, %3$d in Trash</string>
+
+    <!-- Onboarding: the first-run permission gate. -->
+    <string name="onboarding_title">Welcome to Nivara</string>
+    <string name="onboarding_intro">Nivara needs three permissions to protect your apps. Each one is granted in Android\'s own screen, and Nivara checks again every time you return.</string>
+    <string name="onboarding_usage_title">Usage access</string>
+    <string name="onboarding_usage_summary">Lets App Lock see which app is open, so it can lock it.</string>
+    <string name="onboarding_usage_action">Enable</string>
+    <string name="onboarding_overlay_title">Display over other apps</string>
+    <string name="onboarding_overlay_summary">Lets App Lock draw its lock screen above the app it protects.</string>
+    <string name="onboarding_overlay_action">Allow</string>
+    <string name="onboarding_battery_title">Run in background</string>
+    <string name="onboarding_battery_summary">Stops Android from pausing App Lock when you leave Nivara.</string>
+    <string name="onboarding_battery_action">Allow</string>
+    <string name="onboarding_notifications_title">Notifications</string>
+    <string name="onboarding_notifications_summary">Optional. Shows a quiet notice while App Lock is running.</string>
+    <string name="onboarding_notifications_action">Allow</string>
+    <string name="onboarding_optional">optional</string>
+    <string name="onboarding_status_granted">Granted</string>
+    <string name="onboarding_status_not_granted">Not granted</string>
+    <string name="onboarding_status_unavailable">Could not be checked</string>
+    <string name="onboarding_ready">All set. Nivara is ready to protect your apps.</string>
+    <string name="onboarding_settings_unavailable">Nivara could not open Android\'s settings screen on this device.</string>
+
+    <!-- App Lock protection notification. -->
+    <string name="protection_channel_name">App Lock running</string>
+    <string name="protection_channel_description">A quiet notice shown while App Lock protection is on.</string>
+    <string name="protection_notification_title">App Lock is on</string>
+    <string name="protection_notification_text">Nivara is watching your protected apps.</string>
+
+    <!-- Redesigned home. -->
+    <string name="home_tile_vault">Vault</string>
+    <string name="home_tile_applock">App Lock</string>
+    <string name="home_tile_hide">Hide apps</string>
+    <string name="home_tile_all">All features</string>
+    <string name="home_scan_title">Security check</string>
+    <string name="home_scan_action">Check</string>
+    <string name="home_scan_running">Protection is running</string>
+    <string name="home_scan_stopped">Protection is off</string>
+    <string name="home_scan_no_credential">No credential set</string>
+    <string name="home_sheet_unlocked">Unlocked</string>
+    <string name="home_sheet_locked">Locked</string>
+    <string name="home_unlock_title">Unlock to change locks</string>
+    <string name="home_unlock_summary">Your credential is needed before apps can be locked or unlocked.</string>
+    <string name="home_unlock_action">Unlock</string>
+    <string name="home_cd_hide_apps">Hide apps</string>
+    <string name="home_cd_camouflage">App disguise</string>
+    <string name="home_cd_all_features">All features</string>
+    <string name="home_lock_cd_lock">Lock this app</string>
+    <string name="home_lock_cd_unlock">Unlock this app</string>
+
+    <!-- All features screen. -->
+    <string name="all_features_title">All features</string>
+    <string name="all_features_security_header">Security</string>
+    <string name="all_features_protection_header">Protection</string>
+    <string name="all_features_privacy_header">Privacy</string>
+    <string name="all_features_info_header">About</string>
+    <string name="all_features_credential_title">App lock credential</string>
+    <string name="all_features_credential_summary_none">Set a PIN, password or pattern</string>
+    <string name="all_features_credential_summary_some">Protected by your %1$s</string>
+    <string name="all_features_biometric_title">Biometric unlock</string>
+    <string name="all_features_biometric_summary">Unlock with fingerprint or face</string>
+    <string name="all_features_prep_title">App Lock preparation</string>
+    <string name="all_features_prep_summary">Permissions and checks App Lock needs</string>
+    <string name="all_features_launcher_title">Nivara launcher</string>
+    <string name="all_features_launcher_summary">Use Nivara as your home screen</string>
+    <string name="all_features_camouflage_title">App disguise</string>
+    <string name="all_features_camouflage_summary">Change Nivara\'s name and icon</string>
+    <string name="all_features_recovery_title">Vault recovery</string>
+    <string name="all_features_recovery_summary">Reconnect a vault after reinstall</string>
+    <string name="all_features_about_title">About Nivara</string>
+    <string name="all_features_about_summary">Version and privacy defaults</string>
 </resources>

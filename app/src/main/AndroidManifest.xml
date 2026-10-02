@@ -7,12 +7,9 @@
       The AndroidX biometric library contributes the platform's biometric permission in the merged
       manifest, which is why biometric authentication works without a declaration here.
 
-      Two declarations, both capabilities the user grants in Android's own settings, and both
-      required by a feature that exists.
-
       PACKAGE_USAGE_STATS lets App Lock recognise which application is in the foreground. It is not
       a runtime permission and Nivara never calls requestPermissions() for it: it makes Nivara
-      visible in Android's Usage Access list, and the preparation screen only reads whether the
+      visible in Android's Usage Access list, and the onboarding screen only reads whether the
       grant exists and opens that settings screen.
 
       SYSTEM_ALERT_WINDOW is what allows the App Lock protection surface to be drawn above the
@@ -20,8 +17,26 @@
       full-screen activity cannot cover another application's window without taking over the task,
       and since API 29 starting one from the background is refused unless the application holds
       this very grant. It is not a runtime permission either, it is granted on Android's own
-      overlay screen, and it entitles Nivara to draw a window and nothing else — no accessibility
-      service, no notification and no battery exemption is requested anywhere.
+      overlay screen, and it entitles Nivara to draw a window and nothing else.
+
+      REQUEST_IGNORE_BATTERY_OPTIMIZATIONS lets the onboarding screen show Android's own
+      "ignore battery optimizations" confirmation for Nivara, so App Lock's service is not
+      deferred while the user is inside a protected application. It only entitles Nivara to ask;
+      the exemption itself is granted by the user, in Android's dialog or settings.
+
+      FOREGROUND_SERVICE and FOREGROUND_SERVICE_SPECIAL_USE let the App Lock detection service
+      keep running while Nivara is not on screen — the only situation in which protection means
+      anything — announced by one quiet notification. The special-use type is declared with its
+      subtype property on the service below, because no standard type describes an application
+      lock, and nothing broader (accessibility, device admin) is used instead.
+
+      RECEIVE_BOOT_COMPLETED lets the boot receiver read the user's stored "protection on"
+      decision and restore the detection service after a restart. The receiver can do exactly
+      that one thing and nothing else.
+
+      POST_NOTIFICATIONS is the runtime permission for the one notification App Lock shows while
+      protection runs. It is optional: when it is not granted, the service still runs and Android
+      simply silences the notification.
 
       tools:ignore silences lint's protected-permission warning: these permissions are protected on
       purpose, and the user — not the application — is the one who grants them.
@@ -32,6 +47,13 @@
     <uses-permission
         android:name="android.permission.SYSTEM_ALERT_WINDOW"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
       Package visibility (API 30+).
@@ -163,18 +185,45 @@
 
         <!--
           App Lock detection and its protection surface.
-          A plain started service — not a foreground service — so it declares no foreground service
-          type and needs no notification. It owns no logic of its own: it starts and stops the
-          application-scoped monitor, which is the only monitoring loop in the process, and the
+
+          A foreground service of type specialUse: protection has to keep running while the user is
+          inside the protected application, which is exactly when Nivara is not on screen, and the
+          platform stops a plain background service within minutes of that. The type is specialUse
+          because no standard foreground-service type describes an application lock, and the subtype
+          property below states what the use actually is. The service shows one quiet, low
+          -importance notification while it runs; it owns no logic of its own — it starts and stops
+          the application-scoped monitor, which is the only monitoring loop in the process, and the
           application-scoped surface, which is the only overlay window.
           android:exported="false" keeps it private to Nivara: nothing outside the application may
-          start it, stop it or observe it. Why a foreground service is not used yet, and what the
-          stage that presents the authentication prompt must decide, are recorded in
-          docs/applock/README.md.
+          start it, stop it or observe it.
         -->
         <service
             android:name=".data.applock.AppLockDetectionService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="app-lock protection: watches the foreground application and presents the lock surface above protected applications" />
+        </service>
+
+        <!--
+          Restores App Lock protection after a restart, when the user had left it on.
+
+          Not exported: BOOT_COMPLETED and MY_PACKAGE_REPLACED are protected broadcasts that only
+          the platform itself delivers, and the platform delivers them to non-exported receivers,
+          while exported=false keeps every other application from talking to this component at
+          all. The receiver reads the stored run-state and starts Nivara's own private service,
+          and can do nothing else. See docs/applock/README.md.
+        -->
+        <receiver
+            android:name=".data.applock.BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

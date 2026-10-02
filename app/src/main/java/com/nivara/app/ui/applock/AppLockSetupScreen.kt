@@ -157,12 +157,6 @@ private fun AppLockSetupContent(
         }
 
         state.failure?.let { failure -> NivaraMessageText(message = failure) }
-
-        Text(
-            text = stringResource(id = R.string.applock_setup_scope_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

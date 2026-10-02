@@ -38,6 +38,16 @@ class MainActivity : FragmentActivity(), BiometricPromptHost {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // If the user left protection on, a restart or a platform restriction may have ended the
+        // service; returning to Nivara is a foreground path, so restoring it here is always
+        // permitted and makes a refused boot start a delay rather than a loss.
+        if (container.protectionRunStateStore.isEnabled()) {
+            container.appLockProtectionRunner.start()
+        }
+    }
+
     override fun onDestroy() {
         // The authenticator keeps the host only while this activity is alive, so shutting down or
         // being recreated cannot leave a stale screen behind.

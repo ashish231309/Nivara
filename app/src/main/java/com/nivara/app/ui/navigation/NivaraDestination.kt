@@ -128,6 +128,16 @@ sealed interface NivaraDestination {
     }
 
     /**
+     * The simplified home's drawer: every feature that is not one of the home's four tiles —
+     * credential, biometric, preparation, launcher choice, camouflage, recovery and about — in
+     * one plain list of one-tap rows.
+     */
+    data object AllFeatures : NivaraDestination {
+        override val route: String = "all-features"
+        override val titleRes: Int = R.string.all_features_title
+    }
+
+    /**
      * Nivara as the device's Home application: the launcher surface and its app drawer.
      *
      * A destination like any other, so that reaching Nivara's settings from the launcher is ordinary
@@ -160,6 +170,7 @@ sealed interface NivaraDestination {
                 Camouflage,
                 Vault,
                 VaultRecovery,
+                AllFeatures,
             )
 
         /** Resolves a navigation route back to its destination, or `null` when unknown. */

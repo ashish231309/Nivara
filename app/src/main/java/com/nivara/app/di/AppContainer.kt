@@ -7,6 +7,7 @@ import com.nivara.app.data.credential.NivaraCredentialManager
 import com.nivara.app.data.credential.PersistedAttemptTracker
 import com.nivara.app.data.biometric.AndroidBiometricAuthenticator
 import com.nivara.app.data.biometric.BiometricTokenStore
+import com.nivara.app.data.app.AndroidHomeSettingsOpener
 import com.nivara.app.data.app.AndroidApplicationIconLoader
 import com.nivara.app.data.app.AndroidApplicationLauncher
 import com.nivara.app.data.app.AndroidApplicationRepository
@@ -17,6 +18,9 @@ import com.nivara.app.data.apphide.FileHiddenApplicationRepository
 import com.nivara.app.data.applock.FileProtectedApplicationRepository
 import com.nivara.app.data.applock.NivaraAppLockMonitor
 import com.nivara.app.data.camouflage.AndroidCamouflageRepository
+import com.nivara.app.data.applock.ProtectionRunStateStore
+import com.nivara.app.data.permissions.AndroidBatteryOptimizationRepository
+import com.nivara.app.data.permissions.AndroidNotificationCapabilityRepository
 import com.nivara.app.data.permissions.AndroidOverlayCapabilityRepository
 import com.nivara.app.data.permissions.AndroidUsageAccessRepository
 import com.nivara.app.data.session.InMemorySessionManager
@@ -30,6 +34,7 @@ import com.nivara.app.data.vault.SafDocumentSourceOpener
 import com.nivara.app.data.vault.SafVaultContentStorage
 import com.nivara.app.data.vault.SafVaultRootStorage
 import com.nivara.app.domain.app.ApplicationLauncher
+import com.nivara.app.domain.app.HomeSettingsOpener
 import com.nivara.app.domain.app.ApplicationRepository
 import com.nivara.app.domain.applock.AppLockMonitor
 import com.nivara.app.domain.applock.AppLockOverlayHost
@@ -40,6 +45,8 @@ import com.nivara.app.domain.applock.ProtectedApplicationRepository
 import com.nivara.app.domain.apphide.HiddenApplicationRepository
 import com.nivara.app.domain.applock.ProtectionDecisionEngine
 import com.nivara.app.domain.camouflage.CamouflageRepository
+import com.nivara.app.domain.permissions.BatteryOptimizationRepository
+import com.nivara.app.domain.permissions.NotificationCapabilityRepository
 import com.nivara.app.domain.permissions.OverlayCapabilityRepository
 import com.nivara.app.domain.permissions.UsageAccessRepository
 import com.nivara.app.data.security.AndroidBiometricKeyStore
@@ -159,6 +166,12 @@ interface AppContainer {
     val applicationLauncher: ApplicationLauncher
 
     /**
+     * Opens Android's Home settings, where the user chooses the device's default Home
+     * application. Nivara never chooses for them.
+     */
+    val homeSettingsOpener: HomeSettingsOpener
+
+    /**
      * Which applications the user asked Nivara to keep out of sight.
      *
      * The one owner of hidden-application state, exposed here so the management screen and — in a
@@ -237,6 +250,32 @@ interface AppContainer {
      * on screen is the implementation's business.
      */
     val appLockProtectionRunner: AppLockProtectionRunner
+
+    /**
+     * Android's battery-optimization exemption for Nivara: whether it exists, and the platform
+     * surface where the user grants it.
+     *
+     * App Lock's service only survives the device being otherwise busy with this exemption, so
+     * the onboarding screen reports it beside Usage Access and overlay, and asks for it through
+     * Android's own confirmation. Nothing here grants it; only the user does.
+     */
+    val batteryOptimizationRepository: BatteryOptimizationRepository
+
+    /**
+     * The state of the one runtime permission Nivara may ask for: notifications.
+     *
+     * Optional and honest: protection works without it, and the onboarding screen only offers
+     * it on devices where the permission exists.
+     */
+    val notificationCapabilityRepository: NotificationCapabilityRepository
+
+    /**
+     * The durable record of whether the user left App Lock protection on.
+     *
+     * The runner writes it when the decision is made; the boot receiver and the activity's
+     * resume path read it to restore protection. One boolean, nothing else.
+     */
+    val protectionRunStateStore: ProtectionRunStateStore
 
     /**
      * The vault: which folder holds it, and what is at that folder.
@@ -440,8 +479,24 @@ class DefaultAppContainer(context: Context) : AppContainer {
         )
     }
 
+    override val protectionRunStateStore: ProtectionRunStateStore by lazy {
+        ProtectionRunStateStore(applicationContext)
+    }
+
     override val appLockProtectionRunner: AppLockProtectionRunner by lazy {
-        AndroidAppLockProtectionRunner(applicationContext)
+        AndroidAppLockProtectionRunner(applicationContext, protectionRunStateStore)
+    }
+
+    override val batteryOptimizationRepository: BatteryOptimizationRepository by lazy {
+        AndroidBatteryOptimizationRepository(applicationContext)
+    }
+
+    override val notificationCapabilityRepository: NotificationCapabilityRepository by lazy {
+        AndroidNotificationCapabilityRepository(applicationContext)
+    }
+
+    override val homeSettingsOpener: HomeSettingsOpener by lazy {
+        AndroidHomeSettingsOpener(applicationContext)
     }
 
     override val applicationIconLoader: ApplicationIconLoader by lazy {

@@ -1,6 +1,5 @@
 package com.nivara.app.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -57,14 +56,19 @@ private val DarkColorScheme = darkColorScheme(
 /**
  * Material 3 theme for Nivara.
  *
- * Follows the system light/dark setting. The colour scheme, the type scale and the shape family
- * are the application's one visual language: every screen takes its colours, text styles and
- * corner radii from here, and motion is scaled by the device's own animator setting wherever it
- * appears.
+ * The product's visual language is the light white-and-blue scheme: it is what every entry
+ * point uses by default, regardless of the system's light/dark setting, because a bright,
+ * uncluttered surface is what makes the application readable at a glance. [darkTheme] remains
+ * for the few surfaces that may deliberately opt into the navy variant; nothing follows the
+ * system setting on its own any more.
+ *
+ * The colour scheme, the type scale and the shape family are the application's one visual
+ * language: every screen takes its colours, text styles and corner radii from here, and motion
+ * is scaled by the device's own animator setting wherever it appears.
  */
 @Composable
 fun NivaraTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
@@ -74,3 +78,12 @@ fun NivaraTheme(
         content = content,
     )
 }
+
+/** The two brand blues a header gradient is drawn with, for the current scheme. */
+@Composable
+fun nivaraHeaderGradientColors(darkTheme: Boolean = false): Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color> =
+    if (darkTheme) {
+        NivaraColors.HeaderGradientStartDark to NivaraColors.HeaderGradientEndDark
+    } else {
+        NivaraColors.HeaderGradientStartLight to NivaraColors.HeaderGradientEndLight
+    }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Adaptive launcher icon background. -->
-    <color name="ic_launcher_background">#0B3B36</color>
+    <!-- Adaptive launcher icon background: the brand blue. -->
+    <color name="ic_launcher_background">#2456E5</color>
 
     <!--
       Adaptive launcher icon backgrounds for the camouflage identities. Ordinary colours on purpose:
@@ -12,6 +12,9 @@
     <color name="ic_camouflage_calculator_background">#455A64</color>
     <color name="ic_camouflage_weather_background">#C77800</color>
 
-    <!-- Window background used before the Compose UI draws its first frame. -->
-    <color name="window_background">#FFFBFF</color>
+    <!--
+      Window background used before the Compose UI draws its first frame. It matches the home
+      header's blue so the very first paint already reads as the product, not as a blank page.
+    -->
+    <color name="window_background">#2B4BFF</color>
 </resources>

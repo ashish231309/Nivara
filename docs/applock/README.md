@@ -891,3 +891,39 @@ The consequences for App Lock are narrow and deliberate:
 The hidden record, its format, its fail-closed behaviour, the management screen and the contract
 Nivara's own launcher will consume are documented in
 [`docs/apphide/README.md`](../apphide/README.md).
+
+## Survival: keeping protection alive away from Nivara
+
+Detection only protects while it runs, and the user is inside the protected application exactly
+when Nivara is not on screen. The platform stops a plain background service within minutes of
+the application leaving the foreground, and always on a restart, so protection is carried by a
+foreground service, kept exempt from battery deferral, and restored after a restart. Each piece
+is a deliberate, declared permission, and each is granted by the user, never by Nivara:
+
+* **android.permission.FOREGROUND_SERVICE** and
+  **android.permission.FOREGROUND_SERVICE_SPECIAL_USE**: the detection service promotes itself
+  to the foreground with one quiet, low-importance notification ("App Lock is on"), because no
+  standard foreground-service type describes an application lock. The `specialUse` type is
+  declared on the service together with the
+  `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE` property stating the use. If the platform
+  refuses the promotion, the service degrades to the plain started service rather than taking
+  protection down, and the next foreground start promotes it again. The notification permission
+  for that one notice is **android.permission.POST_NOTIFICATIONS**, a runtime permission the
+  onboarding offers as optional: protection runs without it, Android simply silences the notice.
+* **android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS**: the onboarding gate shows
+  Android's own "ignore battery optimizations" confirmation for Nivara so the platform does not
+  defer the service while it is doing its job. The permission only entitles Nivara to ask; the
+  exemption is granted by the user in Android's dialog or settings, and the gate re-reads the
+  exemption on every return to the foreground.
+* **android.permission.RECEIVE_BOOT_COMPLETED**: a non-exported boot receiver reads the durable
+  run-state — one atomic file holding the user's on/off decision, written by the protection
+  runner and read by nobody else — and, only when it says "on", starts the service again after
+  `ACTION_BOOT_COMPLETED` or `ACTION_MY_PACKAGE_REPLACED`. A missing or corrupt record is
+  "off", and a platform refusal at boot is a delay, not a loss: the activity's resume path
+  restarts protection from the foreground on the next open.
+
+Together these answer the question the earlier stage deferred — what keeps protection running
+when Nivara is gone — without an accessibility service, a device-admin claim, a battery
+exemption Nivara grants itself, or any second session gate. The onboarding gate asks for Usage
+Access, overlay and the battery exemption before anything else, on every entry, until all three
+are granted; once granted it never appears again.

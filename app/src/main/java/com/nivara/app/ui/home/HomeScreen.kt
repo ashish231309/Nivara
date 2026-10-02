@@ -1,564 +1,563 @@
 package com.nivara.app.ui.home
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nivara.app.NivaraApplication
 import com.nivara.app.R
-import com.nivara.app.domain.credential.PrimaryCredentialType
-import com.nivara.app.domain.security.AuthenticationSource
-import com.nivara.app.domain.security.BiometricStatus
+import com.nivara.app.domain.app.InstalledApplication
 import com.nivara.app.domain.security.SessionState
-import com.nivara.app.ui.biometric.biometricStatusRes
-import com.nivara.app.ui.components.NivaraErrorState
-import com.nivara.app.ui.components.NivaraMotion
-import com.nivara.app.ui.components.NivaraSectionHeader
+import com.nivara.app.ui.applications.ApplicationIconLoader
+import com.nivara.app.ui.applications.NivaraApplicationIcon
+import com.nivara.app.ui.applock.ProtectionRunState
+import com.nivara.app.ui.applock.management.AppLockManagementUiState
+import com.nivara.app.ui.applock.management.AppLockManagementViewModel
+import com.nivara.app.ui.applock.management.ApplicationSection
+import com.nivara.app.ui.applock.management.ManagedApplication
 import com.nivara.app.ui.components.NivaraSpacing
-import com.nivara.app.ui.components.rememberNivaraMotionScale
-import com.nivara.app.ui.components.scaledDurationMillis
-import com.nivara.app.ui.components.NivaraLoadingState
-import com.nivara.app.ui.credential.credentialTypeNameRes
-import com.nivara.app.ui.session.sessionStatusRes
-import com.nivara.app.ui.session.sessionSummaryRes
-import com.nivara.app.ui.theme.NivaraTheme
+import com.nivara.app.ui.credential.SecureScreenEffect
+import com.nivara.app.ui.theme.NivaraColors
+import com.nivara.app.ui.theme.nivaraHeaderGradientColors
 
 /**
- * Stateful entry point of the home screen: creates the view model and observes its state.
+ * Stateful entry point of the home screen.
+ *
+ * The home is the product's front door: a blue header with the four main rooms — Vault, App
+ * Lock, Hide apps and everything else — a one-line security check, and the application list
+ * with its lock toggles, exactly like the management screen but without its power tools. The
+ * power tools (search ordering, preparation, counts) stay one tap away on the App Lock screen.
  */
 @Composable
 fun HomeRoute(
-    onOpenAbout: () -> Unit,
-    onOpenCredentialSetup: () -> Unit,
-    onOpenCredentialVerify: () -> Unit,
-    onOpenCredentialChange: () -> Unit,
-    onOpenBiometric: () -> Unit,
-    onOpenAppLock: () -> Unit,
+    onOpenVault: () -> Unit,
     onOpenHiddenApps: () -> Unit,
     onOpenCamouflage: () -> Unit,
-    onOpenVault: () -> Unit,
+    onOpenAppLock: () -> Unit,
+    onOpenAllFeatures: () -> Unit,
+    onOpenUnlock: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
+    homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
+    lockViewModel: AppLockManagementViewModel = viewModel(factory = AppLockManagementViewModel.Factory),
+    iconLoader: ApplicationIconLoader = rememberHomeIconLoader(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
+    val lockState by lockViewModel.uiState.collectAsStateWithLifecycle()
+
+    // The home lists the device's applications, which Android treats as personal data, so the
+    // same window flag every other application list uses keeps it out of screenshots and the
+    // recents thumbnail.
+    SecureScreenEffect()
+
+    // A return from Android's settings, from the credential screen or from a grant in the
+    // onboarding gate is noticed here: everything visible is re-read on every resume.
+    LifecycleResumeEffect(Unit) {
+        homeViewModel.refresh()
+        lockViewModel.onResumed()
+        onPauseOrDispose { }
+    }
 
     HomeScreen(
-        uiState = uiState,
-        onRetry = viewModel::refresh,
-        onLockNow = viewModel::lockNow,
-        onOpenAbout = onOpenAbout,
-        onOpenCredentialSetup = onOpenCredentialSetup,
-        onOpenCredentialVerify = onOpenCredentialVerify,
-        onOpenCredentialChange = onOpenCredentialChange,
-        onOpenBiometric = onOpenBiometric,
-        onOpenAppLock = onOpenAppLock,
+        homeState = homeState,
+        lockState = lockState,
+        iconLoader = iconLoader,
+        onScan = {
+            homeViewModel.refresh()
+            lockViewModel.refresh()
+        },
+        onSectionChange = lockViewModel::onSectionChange,
+        onQueryChange = lockViewModel::onQueryChange,
+        onProtect = lockViewModel::protect,
+        onUnprotect = lockViewModel::unprotect,
+        onOpenVault = onOpenVault,
         onOpenHiddenApps = onOpenHiddenApps,
         onOpenCamouflage = onOpenCamouflage,
-        onOpenVault = onOpenVault,
+        onOpenAppLock = onOpenAppLock,
+        onOpenAllFeatures = onOpenAllFeatures,
+        onOpenUnlock = onOpenUnlock,
         modifier = modifier,
     )
 }
 
+/** The container's icon loader, read the way the view-model factories read the container. */
+@Composable
+private fun rememberHomeIconLoader(): ApplicationIconLoader {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return remember(context) {
+        (context.applicationContext as NivaraApplication).container.applicationIconLoader
+    }
+}
+
 /**
- * Stateless home screen: renders [HomeUiState] and reports user actions upwards.
+ * Stateless home screen: the blue header with its tiles and security check, then the white
+ * sheet with the Unlocked/Locked list.
  */
 @Composable
 fun HomeScreen(
-    uiState: HomeUiState,
-    onRetry: () -> Unit,
-    onLockNow: () -> Unit,
-    onOpenAbout: () -> Unit,
-    onOpenCredentialSetup: () -> Unit,
-    onOpenCredentialVerify: () -> Unit,
-    onOpenCredentialChange: () -> Unit,
-    onOpenBiometric: () -> Unit,
-    onOpenAppLock: () -> Unit,
+    homeState: HomeUiState,
+    lockState: AppLockManagementUiState,
+    iconLoader: ApplicationIconLoader,
+    onScan: () -> Unit,
+    onSectionChange: (ApplicationSection) -> Unit,
+    onQueryChange: (String) -> Unit,
+    onProtect: (InstalledApplication) -> Unit,
+    onUnprotect: (InstalledApplication) -> Unit,
+    onOpenVault: () -> Unit,
     onOpenHiddenApps: () -> Unit,
     onOpenCamouflage: () -> Unit,
-    onOpenVault: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val motionScale = rememberNivaraMotionScale()
-
-    // The one transition this screen animates is progress giving way to what was found. The
-    // crossfade targets the kind of state, not the state itself: a Ready value is rebuilt on
-    // every refresh, and a refresh is not an arrival.
-    Crossfade(
-        targetState = uiState is HomeUiState.Ready,
-        animationSpec = tween(
-            durationMillis = scaledDurationMillis(NivaraMotion.STANDARD_MILLIS, motionScale),
-        ),
-        label = "home state",
-    ) { ready ->
-    when {
-        !ready && uiState is HomeUiState.Error ->
-            NivaraErrorState(onRetry = onRetry, modifier = modifier)
-        !ready -> NivaraLoadingState(modifier = modifier)
-        uiState is HomeUiState.Ready -> HomeContent(
-            deviceLockConfigured = uiState.deviceLockConfigured,
-            credentialType = uiState.credentialType,
-            biometricStatus = uiState.biometricStatus,
-            session = uiState.session,
-            sessionNoticeRes = uiState.sessionNoticeRes,
-            onLockNow = onLockNow,
-            onOpenAbout = onOpenAbout,
-            onOpenCredentialSetup = onOpenCredentialSetup,
-            onOpenCredentialVerify = onOpenCredentialVerify,
-            onOpenCredentialChange = onOpenCredentialChange,
-            onOpenBiometric = onOpenBiometric,
-            onOpenAppLock = onOpenAppLock,
-            onOpenHiddenApps = onOpenHiddenApps,
-            onOpenCamouflage = onOpenCamouflage,
-            onOpenVault = onOpenVault,
-            modifier = modifier,
-        )
-
-        // The Ready branch above guards the type; nothing else is possible once `ready` is true.
-        else -> Unit
-    }
-    }
-}
-
-@Composable
-private fun HomeContent(
-    deviceLockConfigured: Boolean,
-    credentialType: PrimaryCredentialType?,
-    biometricStatus: BiometricStatus,
-    session: SessionState,
-    sessionNoticeRes: Int?,
-    onLockNow: () -> Unit,
-    onOpenAbout: () -> Unit,
-    onOpenCredentialSetup: () -> Unit,
-    onOpenCredentialVerify: () -> Unit,
-    onOpenCredentialChange: () -> Unit,
-    onOpenBiometric: () -> Unit,
     onOpenAppLock: () -> Unit,
-    onOpenHiddenApps: () -> Unit,
-    onOpenCamouflage: () -> Unit,
-    onOpenVault: () -> Unit,
+    onOpenAllFeatures: () -> Unit,
+    onOpenUnlock: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val (gradientStart, gradientEnd) = nivaraHeaderGradientColors()
+    var searchOpen by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
-        verticalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
+            .background(brush = Brush.verticalGradient(listOf(gradientStart, gradientEnd))),
     ) {
-        Text(
-            text = stringResource(id = R.string.home_tagline),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = stringResource(id = R.string.home_intro),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        NivaraSectionHeader(title = stringResource(id = R.string.home_section_security))
-
-        DeviceSecurityCard(deviceLockConfigured = deviceLockConfigured)
-
-        SessionCard(
-            session = session,
-            noticeRes = sessionNoticeRes,
-            onLockNow = onLockNow,
-        )
-
-        CredentialCard(
-            credentialType = credentialType,
-            onOpenCredentialSetup = onOpenCredentialSetup,
-            onOpenCredentialVerify = onOpenCredentialVerify,
-            onOpenCredentialChange = onOpenCredentialChange,
-        )
-
-        InfoCard(
-            title = stringResource(id = R.string.home_foundation_title),
-            body = stringResource(id = R.string.home_foundation_summary),
-        )
-
-        BiometricCard(
-            biometricStatus = biometricStatus,
-            credentialConfigured = credentialType != null,
-            onOpenBiometric = onOpenBiometric,
-        )
-
-        NivaraSectionHeader(title = stringResource(id = R.string.home_section_protection))
-
-        AppLockCard(onOpenAppLock = onOpenAppLock)
-
-        HiddenAppsCard(onOpenHiddenApps = onOpenHiddenApps)
-
-        InfoCard(
-            title = stringResource(id = R.string.home_launcher_title),
-            body = stringResource(id = R.string.home_launcher_summary),
-        )
-
-        CamouflageCard(onOpenCamouflage = onOpenCamouflage)
-
-        NivaraSectionHeader(title = stringResource(id = R.string.home_section_vault))
-
-        VaultCard(onOpenVault = onOpenVault)
-
-        OutlinedButton(onClick = onOpenAbout, modifier = Modifier.fillMaxWidth()) {
-            Text(text = stringResource(id = R.string.home_about_action))
-        }
-    }
-}
-
-@Composable
-private fun DeviceSecurityCard(
-    deviceLockConfigured: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val statusRes = if (deviceLockConfigured) {
-        R.string.home_status_lock_configured
-    } else {
-        R.string.home_status_lock_missing
-    }
-    val summaryRes = if (deviceLockConfigured) {
-        R.string.home_status_lock_configured_summary
-    } else {
-        R.string.home_status_lock_missing_summary
-    }
-
-    InfoCard(
-        title = stringResource(id = R.string.home_status_title),
-        body = "${stringResource(id = statusRes)} — ${stringResource(id = summaryRes)}",
-        modifier = modifier,
-    )
-}
-
-/**
- * The credential's status, and the actions that make sense for it.
- *
- * Only one action can create the credential and only one can replace it; the button shown is
- * derived from the stored state rather than from anything the user chose on this screen.
- */
-@Composable
-private fun CredentialCard(
-    credentialType: PrimaryCredentialType?,
-    onOpenCredentialSetup: () -> Unit,
-    onOpenCredentialVerify: () -> Unit,
-    onOpenCredentialChange: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val body = if (credentialType == null) {
-        "${stringResource(id = R.string.home_credential_none)} — " +
-            stringResource(id = R.string.home_credential_none_summary)
-    } else {
-        stringResource(
-            id = R.string.home_credential_configured,
-            stringResource(id = credentialTypeNameRes(credentialType)),
-        ) + " — " + stringResource(id = R.string.home_credential_configured_summary)
-    }
-
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
-        InfoCard(title = stringResource(id = R.string.home_credential_title), body = body)
-
-        if (credentialType == null) {
-            Button(onClick = onOpenCredentialSetup, modifier = Modifier.fillMaxWidth()) {
-                Text(text = stringResource(id = R.string.home_credential_setup_action))
-            }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
-                Button(onClick = onOpenCredentialVerify, modifier = Modifier.weight(1f)) {
-                    Text(text = stringResource(id = R.string.home_credential_verify_action))
-                }
-                OutlinedButton(onClick = onOpenCredentialChange, modifier = Modifier.weight(1f)) {
-                    Text(text = stringResource(id = R.string.home_credential_change_action))
-                }
-            }
-        }
-    }
-}
-
-/**
- * The biometric path's status, and the way into its settings.
- *
- * The card reports what Android and Nivara together say about the secondary path; it never claims
- * that biometrics replace the credential above it, and it stays available even when biometrics
- * cannot be used at all, because the settings screen is where the user finds out why.
- */
-@Composable
-private fun BiometricCard(
-    biometricStatus: BiometricStatus,
-    credentialConfigured: Boolean,
-    onOpenBiometric: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
-        InfoCard(
-            title = stringResource(id = R.string.home_biometric_title),
-            body = stringResource(id = biometricStatusRes(biometricStatus)),
-        )
-        OutlinedButton(
-            onClick = onOpenBiometric,
-            // Without a primary credential there is nothing for biometrics to stand in for, so the
-            // settings entry point is inert rather than misleading.
-            enabled = credentialConfigured,
-            modifier = Modifier.fillMaxWidth(),
+        Column(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
         ) {
-            Text(text = stringResource(id = R.string.home_biometric_action))
-        }
-    }
-}
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(id = R.string.app_name),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onOpenCamouflage) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_hat),
+                        contentDescription = stringResource(id = R.string.home_cd_camouflage),
+                        tint = Color.White,
+                    )
+                }
+                IconButton(onClick = onOpenHiddenApps) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_eye_off),
+                        contentDescription = stringResource(id = R.string.home_cd_hide_apps),
+                        tint = Color.White,
+                    )
+                }
+                IconButton(onClick = onOpenAllFeatures) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_settings),
+                        contentDescription = stringResource(id = R.string.home_cd_all_features),
+                        tint = Color.White,
+                    )
+                }
+            }
 
-/**
- * The session's state, and Quick Lock.
- *
- * This is the only place the in-memory session is surfaced, and it is surfaced plainly: whether
- * Nivara is currently unlocked, how it got that way, and the one action that ends it immediately.
- * The card never shows a countdown — the exact remaining time is a detail the session manager owns,
- * and a screen that tracked it would be a second source of truth.
- */
-@Composable
-private fun SessionCard(
-    session: SessionState,
-    noticeRes: Int?,
-    onLockNow: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
-        InfoCard(
-            title = stringResource(id = R.string.session_title),
-            body = "${stringResource(id = sessionStatusRes(session))} — " +
-                stringResource(id = sessionSummaryRes(session)),
-        )
+            Spacer(modifier = Modifier.height(NivaraSpacing.row))
 
-        noticeRes?.let { notice ->
-            Text(
-                text = stringResource(id = notice),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                HomeTile(
+                    iconRes = R.drawable.ic_vault,
+                    label = stringResource(id = R.string.home_tile_vault),
+                    gradient = listOf(NivaraColors.TileVaultStart, NivaraColors.TileVaultEnd),
+                    onClick = onOpenVault,
+                )
+                HomeTile(
+                    iconRes = R.drawable.ic_lock,
+                    label = stringResource(id = R.string.home_tile_applock),
+                    gradient = listOf(NivaraColors.TileAppLockStart, NivaraColors.TileAppLockEnd),
+                    onClick = onOpenAppLock,
+                )
+                HomeTile(
+                    iconRes = R.drawable.ic_eye_off,
+                    label = stringResource(id = R.string.home_tile_hide),
+                    gradient = listOf(NivaraColors.TileHideStart, NivaraColors.TileHideEnd),
+                    onClick = onOpenHiddenApps,
+                )
+                HomeTile(
+                    iconRes = R.drawable.ic_apps_grid,
+                    label = stringResource(id = R.string.home_tile_all),
+                    gradient = listOf(NivaraColors.TileAllStart, NivaraColors.TileAllEnd),
+                    onClick = onOpenAllFeatures,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(NivaraSpacing.row))
+
+            SecurityCheckCard(
+                homeState = homeState,
+                lockState = lockState,
+                onScan = onScan,
             )
         }
 
-        // Locking is offered only while there is something to lock.
-        if (session.isAuthenticated) {
-            Button(onClick = onLockNow, modifier = Modifier.fillMaxWidth()) {
-                Text(text = stringResource(id = R.string.session_action_lock))
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            color = MaterialTheme.colorScheme.background,
+        ) {
+            when (lockState) {
+                AppLockManagementUiState.Loading -> HomeSheetLoading()
+                AppLockManagementUiState.Error -> HomeSheetLoading()
+                is AppLockManagementUiState.Ready -> HomeSheet(
+                    state = lockState,
+                    session = (homeState as? HomeUiState.Ready)?.session,
+                    iconLoader = iconLoader,
+                    searchOpen = searchOpen,
+                    onToggleSearch = { searchOpen = !searchOpen },
+                    onSectionChange = onSectionChange,
+                    onQueryChange = onQueryChange,
+                    onProtect = onProtect,
+                    onUnprotect = onUnprotect,
+                    onOpenUnlock = onOpenUnlock,
+                )
+            }
+        }
+    }
+}
+
+/** One rounded, gradient tile of the header row. */
+@Composable
+private fun HomeTile(
+    iconRes: Int,
+    label: String,
+    gradient: List<Color>,
+    onClick: () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clickable(onClick = onClick)
+                .background(
+                    brush = Brush.linearGradient(gradient),
+                    shape = RoundedCornerShape(20.dp),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(id = iconRes),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(28.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(NivaraSpacing.tight))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White,
+        )
+    }
+}
+
+/**
+ * The one-line security check: protection run state, credential and device lock, re-read by the
+ * Check button. It states only what was read, and offers the App Lock screen for the details.
+ */
+@Composable
+private fun SecurityCheckCard(
+    homeState: HomeUiState,
+    lockState: AppLockManagementUiState,
+    onScan: () -> Unit,
+) {
+    val summary = when {
+        homeState is HomeUiState.Ready && homeState.credentialType == null ->
+            stringResource(id = R.string.home_scan_no_credential)
+        lockState is AppLockManagementUiState.Ready &&
+            lockState.runState == ProtectionRunState.Running ->
+            stringResource(id = R.string.home_scan_running)
+        else -> stringResource(id = R.string.home_scan_stopped)
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = 0.16f),
+    ) {
+        Row(
+            modifier = Modifier.padding(NivaraSpacing.row),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
+        ) {
+            Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = Color.White.copy(alpha = 0.2f)) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_shield_check),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .align(Alignment.Center),
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(id = R.string.home_scan_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                )
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            }
+            Button(
+                onClick = onScan,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ),
+                shape = RoundedCornerShape(50),
+            ) {
+                Text(text = stringResource(id = R.string.home_scan_action))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSheetLoading() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        androidx.compose.material3.CircularProgressIndicator()
+    }
+}
+
+/** The white sheet: Unlocked/Locked tabs, optional search, and the lock-toggle list. */
+@Composable
+private fun HomeSheet(
+    state: AppLockManagementUiState.Ready,
+    session: SessionState?,
+    iconLoader: ApplicationIconLoader,
+    searchOpen: Boolean,
+    onToggleSearch: () -> Unit,
+    onSectionChange: (ApplicationSection) -> Unit,
+    onQueryChange: (String) -> Unit,
+    onProtect: (InstalledApplication) -> Unit,
+    onUnprotect: (InstalledApplication) -> Unit,
+    onOpenUnlock: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.row),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SheetTab(
+                label = stringResource(id = R.string.home_sheet_unlocked),
+                selected = state.section == ApplicationSection.All,
+                onClick = { onSectionChange(ApplicationSection.All) },
+            )
+            Spacer(modifier = Modifier.width(NivaraSpacing.section))
+            SheetTab(
+                label = stringResource(id = R.string.home_sheet_locked),
+                selected = state.section == ApplicationSection.Protected,
+                onClick = { onSectionChange(ApplicationSection.Protected) },
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = onToggleSearch) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_search),
+                    contentDescription = stringResource(id = R.string.applock_manage_search_label),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 
-        Text(
-            text = stringResource(id = R.string.session_locked_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-/**
- * The way into hidden-application management.
- *
- * The card says what hiding is and, just as importantly, what it is not: a Nivara preference whose
- * effect is Nivara's own launcher, with Android's launcher unchanged. A user who reads only this card
- * must not come away believing applications have been removed from the device.
- */
-@Composable
-private fun HiddenAppsCard(
-    onOpenHiddenApps: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
-        InfoCard(
-            title = stringResource(id = R.string.home_apphide_title),
-            body = stringResource(id = R.string.home_apphide_summary),
-        )
-        OutlinedButton(onClick = onOpenHiddenApps, modifier = Modifier.fillMaxWidth()) {
-            Text(text = stringResource(id = R.string.home_apphide_action))
+        if (searchOpen) {
+            OutlinedTextField(
+                value = state.query,
+                onValueChange = onQueryChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = NivaraSpacing.screen),
+                singleLine = true,
+                label = { Text(text = stringResource(id = R.string.applock_manage_search_label)) },
+            )
         }
-    }
-}
 
-/**
- * The way into the application-identity screen.
- *
- * The card names the feature for what it is — a name and an icon — and repeats the limitation the
- * screen behind it states in full, so the home screen cannot be read as offering a way to hide
- * Nivara from Android. It also names both ways back to Nivara, because that is the part a user
- * needs before changing the name, not after.
- */
-@Composable
-private fun CamouflageCard(
-    onOpenCamouflage: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
-        InfoCard(
-            title = stringResource(id = R.string.home_camouflage_title),
-            body = stringResource(id = R.string.home_camouflage_summary),
-        )
-        OutlinedButton(onClick = onOpenCamouflage, modifier = Modifier.fillMaxWidth()) {
-            Text(text = stringResource(id = R.string.home_camouflage_action))
+        if (session != null && !session.isAuthenticated) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = NivaraSpacing.screen, vertical = NivaraSpacing.small),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+            ) {
+                Row(
+                    modifier = Modifier.padding(NivaraSpacing.row),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(id = R.string.home_unlock_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = stringResource(id = R.string.home_unlock_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Button(onClick = onOpenUnlock) {
+                        Text(text = stringResource(id = R.string.home_unlock_action))
+                    }
+                }
+            }
         }
-    }
-}
 
-/**
- * The way into vault storage.
- *
- * The only entry into the vault, and it says the two things a person needs before choosing a folder:
- * the folder is theirs to pick, and Nivara never picks one on its own and never falls back to another.
- * It does not claim that files can be imported yet — that is a later stage.
- */
-@Composable
-private fun VaultCard(
-    onOpenVault: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
-        InfoCard(
-            title = stringResource(id = R.string.home_vault_title),
-            body = stringResource(id = R.string.home_vault_summary),
-        )
-        OutlinedButton(onClick = onOpenVault, modifier = Modifier.fillMaxWidth()) {
-            Text(text = stringResource(id = R.string.home_vault_action))
-        }
-    }
-}
-
-/**
- * The way into App Lock.
- *
- * The card states what the feature does, and it leads to the screen where the protected
- * applications are chosen rather than to a promise that locking works: protection is only as good
- * as the capabilities the user has granted, and the screen behind this card says which of them are
- * in place.
- */
-@Composable
-private fun AppLockCard(
-    onOpenAppLock: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(NivaraSpacing.small)) {
-        InfoCard(
-            title = stringResource(id = R.string.home_applock_title),
-            body = stringResource(id = R.string.home_applock_summary),
-        )
-        OutlinedButton(onClick = onOpenAppLock, modifier = Modifier.fillMaxWidth()) {
-            Text(text = stringResource(id = R.string.home_applock_action))
-        }
-    }
-}
-
-@Composable
-private fun InfoCard(
-    title: String,
-    body: String,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(NivaraSpacing.screen),
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                horizontal = NivaraSpacing.screen,
+                vertical = NivaraSpacing.small,
+            ),
             verticalArrangement = Arrangement.spacedBy(NivaraSpacing.tight),
         ) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-            Text(text = body, style = MaterialTheme.typography.bodyMedium)
+            items(state.rows, key = { it.packageName }) { row ->
+                HomeAppRow(
+                    row = row,
+                    iconLoader = iconLoader,
+                    canChange = state.sessionAuthenticated && !state.storedSetUnreadable && !state.busy,
+                    onProtect = onProtect,
+                    onUnprotect = onUnprotect,
+                )
+            }
         }
     }
 }
 
-@Preview(name = "Home – no credential, screen lock set", showBackground = true)
 @Composable
-private fun HomeScreenReadyPreview() {
-    NivaraTheme {
-        HomeScreen(
-            uiState = HomeUiState.Ready(
-                deviceLockConfigured = true,
-                credentialType = null,
-                biometricStatus = BiometricStatus.Disabled,
-                session = SessionState.Unauthenticated,
-            ),
-            onRetry = {},
-            onLockNow = {},
-            onOpenAbout = {},
-            onOpenCredentialSetup = {},
-            onOpenCredentialVerify = {},
-            onOpenCredentialChange = {},
-            onOpenBiometric = {},
-            onOpenAppLock = {},
-            onOpenHiddenApps = {},
-            onOpenCamouflage = {},
-            onOpenVault = {},
+private fun SheetTab(label: String, selected: Boolean, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier
+                .clickable(onClick = onClick)
+                .padding(NivaraSpacing.small),
         )
-    }
-}
-
-@Preview(name = "Home – credential configured, no screen lock", showBackground = true)
-@Composable
-private fun HomeScreenConfiguredPreview() {
-    NivaraTheme {
-        HomeScreen(
-            uiState = HomeUiState.Ready(
-                deviceLockConfigured = false,
-                credentialType = PrimaryCredentialType.Pattern,
-                biometricStatus = BiometricStatus.Enabled,
-                session = SessionState.Authenticated(
-                    source = AuthenticationSource.Biometric,
-                    startedAtMillis = 0L,
-                    expiresAtMillis = 300_000L,
+        Box(
+            modifier = Modifier
+                .height(3.dp)
+                .width(40.dp)
+                .background(
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        Color.Transparent
+                    },
+                    shape = RoundedCornerShape(50),
                 ),
-            ),
-            onRetry = {},
-            onLockNow = {},
-            onOpenAbout = {},
-            onOpenCredentialSetup = {},
-            onOpenCredentialVerify = {},
-            onOpenCredentialChange = {},
-            onOpenBiometric = {},
-            onOpenAppLock = {},
-            onOpenHiddenApps = {},
-            onOpenCamouflage = {},
-            onOpenVault = {},
         )
     }
 }
 
-@Preview(name = "Home – error", showBackground = true)
+/** One application row: icon, label, and the lock toggle for it. */
 @Composable
-private fun HomeScreenErrorPreview() {
-    NivaraTheme {
-        HomeScreen(
-            uiState = HomeUiState.Error,
-            onRetry = {},
-            onLockNow = {},
-            onOpenAbout = {},
-            onOpenCredentialSetup = {},
-            onOpenCredentialVerify = {},
-            onOpenCredentialChange = {},
-            onOpenBiometric = {},
-            onOpenAppLock = {},
-            onOpenHiddenApps = {},
-            onOpenCamouflage = {},
-            onOpenVault = {},
+private fun HomeAppRow(
+    row: ManagedApplication,
+    iconLoader: ApplicationIconLoader,
+    canChange: Boolean,
+    onProtect: (InstalledApplication) -> Unit,
+    onUnprotect: (InstalledApplication) -> Unit,
+) {
+    var icon by remember(row.packageName) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(row.packageName, iconLoader) {
+        icon = iconLoader.iconFor(row.packageName)
+    }
+    val protected = row.state != null &&
+        row.state != com.nivara.app.domain.applock.ApplicationProtectionState.NotProtected
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = NivaraSpacing.tight),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NivaraSpacing.row),
+    ) {
+        NivaraApplicationIcon(icon = icon)
+        Text(
+            text = row.label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
         )
+        IconButton(
+            onClick = { if (protected) onUnprotect(row.application) else onProtect(row.application) },
+            enabled = canChange && row.state != null,
+        ) {
+            Icon(
+                painter = painterResource(
+                    id = if (protected) R.drawable.ic_lock else R.drawable.ic_lock_open,
+                ),
+                contentDescription = stringResource(
+                    id = if (protected) R.string.home_lock_cd_unlock else R.string.home_lock_cd_lock,
+                ),
+                tint = if (protected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                },
+            )
+        }
     }
 }

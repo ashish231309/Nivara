@@ -240,6 +240,22 @@ justified_permissions = {
         "App Lock: lets the protection surface be drawn above the protected application; Android "
         "offers no other unprivileged way to do that, and the grant is given by the user in "
         "Android's own overlay settings",
+    "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS":
+        "App Lock survival: lets the onboarding screen show Android's own battery-exemption "
+        "confirmation so the protection service is not deferred while the user is inside a "
+        "protected application; only the user can grant it",
+    "android.permission.FOREGROUND_SERVICE":
+        "App Lock survival: the detection service runs as a foreground service so protection "
+        "continues while Nivara is not on screen, announced by one quiet notification",
+    "android.permission.FOREGROUND_SERVICE_SPECIAL_USE":
+        "App Lock survival: no standard foreground-service type describes an application lock, "
+        "so the service declares the specialUse type with a subtype property stating the use",
+    "android.permission.RECEIVE_BOOT_COMPLETED":
+        "App Lock survival: after a restart the boot receiver reads the stored run-state and "
+        "restores protection the user left on; protected broadcasts only, non-exported receiver",
+    "android.permission.POST_NOTIFICATIONS":
+        "App Lock notification: the runtime permission for the one quiet notification shown while "
+        "protection runs; optional, and protection still runs when it is not granted",
 }
 applock_docs_path = ROOT / "docs/applock/README.md"
 if not applock_docs_path.exists():
@@ -261,16 +277,6 @@ notes.append(f"manifest: {len(declared_permissions)} permission(s), all on the j
 for deferred_permission, reason in (
     ("android.permission.QUERY_ALL_PACKAGES",
      "the launcher-intent <queries> element is the narrow mechanism for launcher discovery"),
-    ("android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
-     "no battery exemption is justified by the current feature set"),
-    ("android.permission.FOREGROUND_SERVICE",
-     "detection runs as a plain started service; a foreground service must be justified by the "
-     "feature it serves and documented first"),
-    ("android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
-     "no foreground service is declared, so no service type is declared either"),
-    ("android.permission.POST_NOTIFICATIONS",
-     "no foreground service and no user-visible notification yet; the notification permission "
-     "belongs with the feature that shows one"),
     ("android.permission.BIND_ACCESSIBILITY_SERVICE",
      "detection reads usage events; an accessibility service is not used and would be a much "
      "broader capability"),
